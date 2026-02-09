@@ -1,10 +1,11 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, Video, FileText, ExternalLink, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, BookOpen, Video, FileText, ExternalLink, CheckCircle2, CodeXml } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CodeAssistant from "@/components/CodeAssistant";
+import CodeEditorComponent from "@/components/CodeEditor";
 import { domains } from "@/lib/domains";
 
 const DomainDetail = () => {
@@ -61,6 +62,7 @@ const DomainDetail = () => {
           <TabsList className="mb-6 w-full justify-start bg-card border border-border">
             <TabsTrigger value="guidance">Guidance</TabsTrigger>
             <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
+            <TabsTrigger value="editor">Code Editor</TabsTrigger>
             <TabsTrigger value="videos">Videos</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>
           </TabsList>
@@ -106,6 +108,10 @@ const DomainDetail = () => {
 
           <TabsContent value="assistant">
             <CodeAssistant domainName={domain.name} />
+          </TabsContent>
+
+          <TabsContent value="editor">
+            <CodeEditorComponent domainName={domain.name} />
           </TabsContent>
 
           <TabsContent value="videos">
