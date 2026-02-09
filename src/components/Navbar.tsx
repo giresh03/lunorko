@@ -20,6 +20,7 @@ const Navbar = () => {
         <div className="hidden items-center gap-6 md:flex">
           <Link to="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Home</Link>
           <Link to="/domains" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Domains</Link>
+          <Link to="/mentors" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Mentors</Link>
           <Link to="/about" className="text-sm text-muted-foreground transition-colors hover:text-foreground">About</Link>
           {!loading && (
             user ? (
@@ -53,6 +54,7 @@ const Navbar = () => {
           <div className="flex flex-col gap-3">
             <Link to="/" className="text-sm text-muted-foreground" onClick={() => setOpen(false)}>Home</Link>
             <Link to="/domains" className="text-sm text-muted-foreground" onClick={() => setOpen(false)}>Domains</Link>
+            <Link to="/mentors" className="text-sm text-muted-foreground" onClick={() => setOpen(false)}>Mentors</Link>
             <Link to="/about" className="text-sm text-muted-foreground" onClick={() => setOpen(false)}>About</Link>
             {!loading && (
               user ? (
