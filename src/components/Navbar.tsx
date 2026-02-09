@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Menu, X, LogOut, User } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +24,9 @@ const Navbar = () => {
           {!loading && (
             user ? (
               <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/dashboard"><LayoutDashboard className="mr-1.5 h-4 w-4" /> Dashboard</Link>
+                </Button>
                 <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <User className="h-4 w-4" />
                   {user.user_metadata?.display_name || user.email?.split("@")[0]}
@@ -54,6 +57,7 @@ const Navbar = () => {
             {!loading && (
               user ? (
                 <>
+                  <Link to="/dashboard" className="text-sm text-muted-foreground" onClick={() => setOpen(false)}>Dashboard</Link>
                   <span className="text-sm text-muted-foreground">
                     {user.user_metadata?.display_name || user.email?.split("@")[0]}
                   </span>

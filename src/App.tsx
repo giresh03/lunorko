@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
+import Dashboard from "./pages/Dashboard";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/domains" element={<Domains />} />
             <Route path="/domain/:domainId" element={<DomainDetail />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/about" element={<About />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="*" element={<NotFound />} />
