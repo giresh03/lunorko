@@ -3,11 +3,15 @@ import { useRef, useState } from "react";
 import { ArrowLeft, BookOpen, Video, FileText, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CodeAssistant from "@/components/CodeAssistant";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
+import { useAuth } from "@/hooks/useAuth";
+import { useDashboard } from "@/hooks/useDashboard";
 import { domains } from "@/lib/domains";
 
 const DomainDetail = () => {
@@ -16,6 +20,8 @@ const DomainDetail = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { progress, updateProgress, logActivity } = useDashboard();
 
   const handleSendToEditor = (code: string, language: string) => {
     editorRef.current?.setExternalCode(code, language);
@@ -81,17 +87,62 @@ const DomainDetail = () => {
           <TabsContent value="guidance">
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="rounded-lg border border-border bg-card p-6">
-                <h3 className="mb-4 text-lg font-semibold text-foreground">Learning Roadmap</h3>
-                <div className="space-y-3">
-                  {domain.topics.map((topic, i) => (
-                    <div key={topic} className="flex items-center gap-3">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
-                        {i + 1}
-                      </div>
-                      <span className="text-sm text-foreground">{topic}</span>
-                    </div>
-                  ))}
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-foreground">Learning Roadmap</h3>
+                  {user && domainId && (() => {
+                    const dp = progress.find((p) => p.domain_id === domainId);
+                    const completed = dp?.completed_topics.length ?? 0;
+                    const total = domain.topics.length;
+                    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+                    return (
+                      <span className="text-xs text-muted-foreground">{completed}/{total} done ({pct}%)</span>
+                    );
+                  })()}
                 </div>
+                {user && domainId && (() => {
+                  const dp = progress.find((p) => p.domain_id === domainId);
+                  const pct = domain.topics.length > 0
+                    ? Math.round(((dp?.completed_topics.length ?? 0) / domain.topics.length) * 100)
+                    : 0;
+                  return <Progress value={pct} className="mb-4 h-2" />;
+                })()}
+                <div className="space-y-3">
+                  {domain.topics.map((topic, i) => {
+                    const dp = progress.find((p) => p.domain_id === domainId);
+                    const isCompleted = dp?.completed_topics.includes(topic) ?? false;
+
+                    return (
+                      <div key={topic} className="flex items-center gap-3">
+                        {user ? (
+                          <Checkbox
+                            checked={isCompleted}
+                            onCheckedChange={() => {
+                              if (domainId) {
+                                updateProgress(domainId, topic);
+                                if (!isCompleted) {
+                                  logActivity(domainId, "Completed topic", topic);
+                                }
+                              }
+                            }}
+                            className="h-5 w-5"
+                          />
+                        ) : (
+                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                            {i + 1}
+                          </div>
+                        )}
+                        <span className={`text-sm ${isCompleted ? "text-muted-foreground line-through" : "text-foreground"}`}>
+                          {topic}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {!user && (
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    <Link to="/auth" className="text-primary hover:underline">Sign in</Link> to track your progress
+                  </p>
+                )}
               </div>
               <div className="rounded-lg border border-border bg-card p-6">
                 <h3 className="mb-4 text-lg font-semibold text-foreground">Why Learn {domain.name}?</h3>
