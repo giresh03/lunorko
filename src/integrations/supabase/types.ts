@@ -41,6 +41,57 @@ export type Database = {
         }
         Relationships: []
       }
+      bookings: {
+        Row: {
+          created_at: string
+          domain_id: string
+          id: string
+          meeting_link: string | null
+          mentor_id: string
+          notes: string | null
+          slot_id: string
+          status: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          domain_id: string
+          id?: string
+          meeting_link?: string | null
+          mentor_id: string
+          notes?: string | null
+          slot_id: string
+          status?: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          domain_id?: string
+          id?: string
+          meeting_link?: string | null
+          mentor_id?: string
+          notes?: string | null
+          slot_id?: string
+          status?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: true
+            referencedRelation: "mentor_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookmarks: {
         Row: {
           created_at: string
@@ -98,6 +149,89 @@ export type Database = {
           last_accessed_at?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      mentor_slots: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          is_booked: boolean
+          mentor_id: string
+          slot_date: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          is_booked?: boolean
+          mentor_id: string
+          slot_date: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          is_booked?: boolean
+          mentor_id?: string
+          slot_date?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mentor_slots_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mentors: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          company: string
+          created_at: string
+          domain_id: string
+          email: string
+          id: string
+          is_active: boolean
+          meeting_link: string | null
+          name: string
+          role: string
+          years_experience: number
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          company: string
+          created_at?: string
+          domain_id: string
+          email: string
+          id?: string
+          is_active?: boolean
+          meeting_link?: string | null
+          name: string
+          role: string
+          years_experience?: number
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          company?: string
+          created_at?: string
+          domain_id?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          meeting_link?: string | null
+          name?: string
+          role?: string
+          years_experience?: number
         }
         Relationships: []
       }
