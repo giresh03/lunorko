@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
 import Editor from "@monaco-editor/react";
-import { Play, RotateCcw, Copy, Check, ChevronDown } from "lucide-react";
+import { Play, RotateCcw, Copy, Check, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const LANGUAGE_TEMPLATES: Record<string, { label: string; template: string }> = {
   javascript: {
@@ -45,21 +46,25 @@ const CodeEditorComponent = ({ domainName }: { domainName: string }) => {
     setShowLangMenu(false);
   };
 
-  const handleRun = useCallback(() => {
+  const handleRun = useCallback(async () => {
     setIsRunning(true);
     setOutput([]);
 
     if (language === "javascript" || language === "typescript") {
       try {
-        const logs: string[] = [];
-        const mockConsole = {
-          log: (...args: unknown[]) => logs.push(args.map(String).join(" ")),
-          error: (...args: unknown[]) => logs.push(`❌ ${args.map(String).join(" ")}`),
-          warn: (...args: unknown[]) => logs.push(`⚠️ ${args.map(String).join(" ")}`),
-        };
-        const fn = new Function("console", code);
-        fn(mockConsole);
-        setOutput(logs.length ? logs : ["✅ Code executed successfully (no output)"]);
+        const { data, error } = await supabase.functions.invoke("run-code", {
+          body: { code, language },
+        });
+
+        if (error) {
+          setOutput([`❌ Error: ${error.message}`]);
+        } else if (data?.output) {
+          setOutput(data.output);
+        } else if (data?.error) {
+          setOutput([`❌ ${data.error}`]);
+        } else {
+          setOutput(["✅ Code executed successfully (no output)"]);
+        }
       } catch (err: unknown) {
         setOutput([`❌ Error: ${err instanceof Error ? err.message : String(err)}`]);
       }
@@ -69,7 +74,7 @@ const CodeEditorComponent = ({ domainName }: { domainName: string }) => {
       setOutput([`⚙️ ${LANGUAGE_TEMPLATES[language]?.label} execution requires a backend runtime. Coming soon!`]);
     }
 
-    setTimeout(() => setIsRunning(false), 300);
+    setIsRunning(false);
   }, [code, language]);
 
   const handleCopy = () => {
@@ -128,8 +133,8 @@ const CodeEditorComponent = ({ domainName }: { domainName: string }) => {
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
           <Button size="sm" onClick={handleRun} disabled={isRunning} className="h-7 gap-1.5 px-3 text-xs">
-            <Play className="h-3.5 w-3.5" />
-            Run
+            {isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+            {isRunning ? "Running…" : "Run"}
           </Button>
         </div>
       </div>
