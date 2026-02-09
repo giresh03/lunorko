@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
-import { Code2, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/logo.jpeg";
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -10,9 +11,7 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <Code2 className="h-5 w-5 text-primary-foreground" />
-          </div>
+          <img src={logo} alt="Lunor.AI logo" className="h-8 w-8 rounded-md object-cover" />
           <span className="text-lg font-bold text-foreground">Lunor.AI</span>
         </Link>
 
