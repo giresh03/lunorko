@@ -1,1 +1,4 @@
 project_id = "acuxnbsxocagawbtggxe"
+
+[functions.code-assistant]
+verify_jwt = false
