@@ -1,16 +1,27 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, BookOpen, Video, FileText, ExternalLink, CheckCircle2, CodeXml } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowLeft, BookOpen, Video, FileText, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CodeAssistant from "@/components/CodeAssistant";
-import CodeEditorComponent from "@/components/CodeEditor";
+import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
 import { domains } from "@/lib/domains";
 
 const DomainDetail = () => {
   const { domainId } = useParams();
   const domain = domains.find((d) => d.id === domainId);
+  const editorRef = useRef<CodeEditorHandle>(null);
+  const [activeTab, setActiveTab] = useState("guidance");
+  const { toast } = useToast();
+
+  const handleSendToEditor = (code: string, language: string) => {
+    editorRef.current?.setExternalCode(code, language);
+    setActiveTab("editor");
+    toast({ title: "Code sent to editor", description: "Switch to the Editor tab to run it." });
+  };
 
   if (!domain) {
     return (
@@ -58,7 +69,7 @@ const DomainDetail = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="guidance" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-6 w-full justify-start bg-card border border-border">
             <TabsTrigger value="guidance">Guidance</TabsTrigger>
             <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
@@ -107,11 +118,11 @@ const DomainDetail = () => {
           </TabsContent>
 
           <TabsContent value="assistant">
-            <CodeAssistant domainName={domain.name} />
+            <CodeAssistant domainName={domain.name} onSendToEditor={handleSendToEditor} />
           </TabsContent>
 
           <TabsContent value="editor">
-            <CodeEditorComponent domainName={domain.name} />
+            <CodeEditorComponent ref={editorRef} domainName={domain.name} />
           </TabsContent>
 
           <TabsContent value="videos">
