@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, Loader2, Trash2 } from "lucide-react";
+import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 
@@ -8,9 +8,14 @@ interface Message {
   content: string;
 }
 
+interface CodeAssistantProps {
+  domainName: string;
+  onSendToEditor?: (code: string, language: string) => void;
+}
+
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-assistant`;
 
-const CodeAssistant = ({ domainName }: { domainName: string }) => {
+const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -157,8 +162,36 @@ const CodeAssistant = ({ domainName }: { domainName: string }) => {
                   : "bg-secondary text-secondary-foreground"
               }`}
             >
-              <div className="prose prose-sm prose-invert max-w-none [&_pre]:bg-background [&_pre]:p-3 [&_pre]:rounded-md [&_pre]:text-xs [&_code]:text-primary [&_code]:bg-background/50 [&_code]:px-1 [&_code]:rounded-sm">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              <div className="prose prose-sm prose-invert max-w-none [&_pre]:bg-background [&_pre]:p-3 [&_pre]:rounded-md [&_pre]:text-xs [&_code]:text-primary [&_code]:bg-background/50 [&_code]:px-1 [&_code]:rounded-sm [&_pre]:relative">
+                <ReactMarkdown
+                  components={{
+                    pre({ children, ...props }) {
+                      // Extract code text and language from the child <code> element
+                      const codeEl = (children as any)?.props;
+                      const codeText = codeEl?.children || "";
+                      const className = codeEl?.className || "";
+                      const lang = className.replace("language-", "") || "javascript";
+
+                      return (
+                        <div className="relative group">
+                          <pre {...props}>{children}</pre>
+                          {onSendToEditor && msg.role === "assistant" && String(codeText).trim().length > 0 && (
+                            <button
+                              onClick={() => onSendToEditor(String(codeText).trim(), lang)}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground hover:bg-primary/90"
+                              title="Send to Code Editor"
+                            >
+                              <ArrowRightToLine className="h-3 w-3" />
+                              Editor
+                            </button>
+                          )}
+                        </div>
+                      );
+                    },
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
               </div>
             </div>
           </div>

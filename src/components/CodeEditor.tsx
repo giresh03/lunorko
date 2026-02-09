@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useImperativeHandle, forwardRef } from "react";
 import Editor from "@monaco-editor/react";
 import { Play, RotateCcw, Copy, Check, ChevronDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,13 +31,26 @@ const LANGUAGE_TEMPLATES: Record<string, { label: string; template: string }> = 
   },
 };
 
-const CodeEditorComponent = ({ domainName }: { domainName: string }) => {
+export interface CodeEditorHandle {
+  setExternalCode: (code: string, language: string) => void;
+}
+
+const CodeEditorComponent = forwardRef<CodeEditorHandle, { domainName: string }>(({ domainName }, ref) => {
   const [language, setLanguage] = useState("javascript");
   const [code, setCode] = useState(LANGUAGE_TEMPLATES.javascript.template);
   const [output, setOutput] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    setExternalCode: (newCode: string, lang: string) => {
+      const mappedLang = Object.keys(LANGUAGE_TEMPLATES).includes(lang) ? lang : "javascript";
+      setLanguage(mappedLang);
+      setCode(newCode);
+      setOutput([]);
+    },
+  }));
 
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang);
@@ -179,6 +192,6 @@ const CodeEditorComponent = ({ domainName }: { domainName: string }) => {
       )}
     </div>
   );
-};
+});
 
 export default CodeEditorComponent;
