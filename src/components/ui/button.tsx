@@ -47,19 +47,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <NoiseBackground
           containerClassName={cn(
             buttonVariants({ variant, size, className }),
-            "rounded-md"
+            "rounded-md bg-primary"
           )}
           gradientColors={[
-            "hsl(var(--primary))",
-            "hsl(var(--accent))",
-            "hsl(var(--secondary))",
+            "rgb(200, 120, 255)",
+            "rgb(100, 180, 255)",
+            "rgb(255, 160, 200)",
           ]}
-          noiseIntensity={0.15}
+          noiseIntensity={0.12}
           speed={0.08}
           className="flex items-center justify-center"
         >
           <Comp
-            className="relative z-10 inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+            className="relative z-10 inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium text-primary-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
             ref={ref}
             {...props}
           />

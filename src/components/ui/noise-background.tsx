@@ -130,9 +130,9 @@ export const NoiseBackground = ({
       ref={containerRef}
       className={cn("relative overflow-hidden", containerClassName)}
     >
-      <GradientLayer springX={springX} springY={springY} gradientColor={gradientColors[0]} opacity={0.3} multiplier={1} />
-      <GradientLayer springX={springX} springY={springY} gradientColor={gradientColors[1] || gradientColors[0]} opacity={0.2} multiplier={-0.5} />
-      <GradientLayer springX={springX} springY={springY} gradientColor={gradientColors[2] || gradientColors[0]} opacity={0.15} multiplier={0.75} />
+      <GradientLayer springX={springX} springY={springY} gradientColor={gradientColors[0]} opacity={0.6} multiplier={1} />
+      <GradientLayer springX={springX} springY={springY} gradientColor={gradientColors[1] || gradientColors[0]} opacity={0.45} multiplier={-0.5} />
+      <GradientLayer springX={springX} springY={springY} gradientColor={gradientColors[2] || gradientColors[0]} opacity={0.35} multiplier={0.75} />
 
       <motion.div
         className="pointer-events-none absolute -top-1 left-0 right-0 h-[2px]"
