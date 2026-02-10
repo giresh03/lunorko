@@ -96,7 +96,7 @@ export default {
   		},
   		fontFamily: {
   			sans: [
-  				'DM Sans',
+  				'Manrope',
   				'ui-sans-serif',
   				'system-ui',
   				'sans-serif',
