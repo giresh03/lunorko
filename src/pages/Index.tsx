@@ -15,23 +15,23 @@ const Index = () => {
       {/* Hero */}
       <section className="relative overflow-hidden pt-16">
         <div className="absolute inset-0 z-0">
-          <img src={heroBg} alt="" className="h-full w-full object-cover opacity-30" />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/80 to-background" />
+          <img src={heroBg} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/70 to-background" />
         </div>
-        <div className="relative z-10 container mx-auto flex flex-col items-center px-4 py-24 text-center md:py-36">
+        <div className="relative z-10 mx-auto flex flex-col items-center px-6 py-32 text-center md:py-44 max-w-5xl">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5">
             <Sparkles className="h-4 w-4 text-primary" />
             <span className="text-xs font-medium text-primary">AI-Powered Learning for Engineers</span>
           </div>
-          <h1 className="max-w-3xl text-4xl font-extrabold leading-tight text-foreground md:text-6xl">
+          <h1 className="max-w-4xl text-5xl font-extrabold leading-tight text-foreground md:text-7xl font-serif">
             Code Smarter with{" "}
             <span className="text-gradient">Lunor.AI</span>
           </h1>
-          <p className="mt-5 max-w-xl text-base text-muted-foreground md:text-lg">
+          <p className="mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl">
             Your AI-powered coding companion. Learn any engineering domain with personalized guidance, 
             intelligent code assistants, curated resources, and hands-on projects.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Button size="lg" asChild>
               <Link to="/domains">
                 Explore Domains <ArrowRight className="ml-2 h-4 w-4" />
