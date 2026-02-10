@@ -193,7 +193,15 @@ const Index = () => {
       <section className="container mx-auto px-4 py-20">
         <div className="scroll-reveal opacity-0 scale-95 transition-all duration-700 ease-out">
           <div className="relative overflow-hidden rounded-lg border border-primary/20 gradient-hero p-12 text-center">
-            <h2 className="text-3xl font-bold text-foreground md:text-4xl font-serif">Ready to Level Up?</h2>
+            <TypewriterEffectSmooth
+              words={[
+                { text: "Ready" },
+                { text: "to" },
+                { text: "Level" },
+                { text: "Up?", className: "text-primary dark:text-primary" },
+              ]}
+              className="font-serif justify-center text-foreground"
+            />
             <p className="mt-3 text-muted-foreground">Start learning with AI-powered assistance across 12+ domains</p>
             <Button size="lg" className="mt-6 hover-scale" asChild>
               <Link to="/domains">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
