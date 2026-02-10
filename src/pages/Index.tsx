@@ -7,6 +7,7 @@ import DomainCard from "@/components/DomainCard";
 import { domains } from "@/lib/domains";
 import heroBg from "@/assets/hero-bg.jpg";
 import { useEffect, useRef } from "react";
+import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 
 const useParallax = () => {
   const ref = useRef<HTMLImageElement>(null);
@@ -19,28 +20,6 @@ const useParallax = () => {
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-  return ref;
-};
-
-const useScrollReveal = () => {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("revealed");
-          }
-        });
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
-    );
-    const el = ref.current;
-    if (el) {
-      el.querySelectorAll(".scroll-reveal").forEach((child) => observer.observe(child));
-    }
-    return () => observer.disconnect();
   }, []);
   return ref;
 };
@@ -178,12 +157,7 @@ const Index = () => {
 
       <Footer />
 
-      <style>{`
-        .scroll-reveal.revealed {
-          opacity: 1 !important;
-          transform: translateY(0) scale(1) !important;
-        }
-      `}</style>
+      <style>{scrollRevealStyle}</style>
     </div>
   );
 };

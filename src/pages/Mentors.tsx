@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import MentorCard from "@/components/MentorCard";
 import { supabase } from "@/integrations/supabase/client";
 import { domains } from "@/lib/domains";
+import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 
 export interface Mentor {
   id: string;
@@ -30,6 +31,7 @@ const Mentors = () => {
   const [search, setSearch] = useState("");
   const [selectedDomain, setSelectedDomain] = useState("all");
   const [selectedCompany, setSelectedCompany] = useState("All");
+  const pageRef = useScrollReveal();
 
   useEffect(() => {
     const fetchMentors = async () => {
@@ -58,18 +60,18 @@ const Mentors = () => {
   }, {});
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" ref={pageRef}>
       <Navbar />
       <main className="container mx-auto px-4 pt-24 pb-20">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Find a Mentor</h1>
+        <div className="mb-8 scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground font-serif">Find a Mentor</h1>
           <p className="mt-1 text-muted-foreground">
             Connect with industry professionals for guidance, code reviews, and career advice
           </p>
         </div>
 
         {/* Filters */}
-        <div className="mb-8 space-y-4">
+        <div className="mb-8 space-y-4 scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-100 ease-out">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -139,8 +141,8 @@ const Mentors = () => {
             <p className="text-muted-foreground">No mentors found matching your filters.</p>
           </div>
         ) : (
-          Object.entries(grouped).map(([company, companyMentors]) => (
-            <div key={company} className="mb-10">
+          Object.entries(grouped).map(([company, companyMentors], gi) => (
+            <div key={company} className="mb-10 scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out" style={{ transitionDelay: `${gi * 120}ms` }}>
               <div className="mb-4 flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
                 <h2 className="text-xl font-semibold text-foreground">{company}</h2>
@@ -149,8 +151,14 @@ const Mentors = () => {
                 </span>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {companyMentors.map((mentor) => (
-                  <MentorCard key={mentor.id} mentor={mentor} />
+                {companyMentors.map((mentor, mi) => (
+                  <div
+                    key={mentor.id}
+                    className="scroll-reveal opacity-0 translate-y-6 transition-all duration-500 ease-out hover-scale"
+                    style={{ transitionDelay: `${gi * 120 + mi * 80}ms` }}
+                  >
+                    <MentorCard mentor={mentor} />
+                  </div>
                 ))}
               </div>
             </div>
@@ -158,6 +166,7 @@ const Mentors = () => {
         )}
       </main>
       <Footer />
+      <style>{scrollRevealStyle}</style>
     </div>
   );
 };
