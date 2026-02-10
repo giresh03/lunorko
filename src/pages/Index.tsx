@@ -8,7 +8,7 @@ import { domains } from "@/lib/domains";
 import heroBg from "@/assets/hero-bg.jpg";
 import { useEffect, useRef } from "react";
 import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
-import { WebcamPixelGrid } from "@/components/ui/webcam-pixel-grid";
+
 
 const useParallax = () => {
   const ref = useRef<HTMLImageElement>(null);
@@ -35,26 +35,7 @@ const Index = () => {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-16 min-h-[90vh] flex items-center">
-        {/* Webcam pixel grid background */}
-        <div className="absolute inset-0 z-0">
-          <WebcamPixelGrid
-            gridCols={80}
-            gridRows={50}
-            colorMode="webcam"
-            darken={0.3}
-            gapRatio={0.08}
-            maxElevation={12}
-            motionSensitivity={0.35}
-            elevationSmoothing={0.12}
-            backgroundColor="hsl(222 47% 11%)"
-            borderOpacity={0.05}
-            className="h-full w-full"
-            onWebcamReady={() => console.log("Webcam ready!")}
-            onWebcamError={() => {}}
-          />
-        </div>
-
-        {/* Fallback image background (visible when webcam not available) */}
+        {/* Animated CSS background */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             ref={parallaxRef}
@@ -62,6 +43,27 @@ const Index = () => {
             alt=""
             className="h-full w-full object-cover scale-110 origin-center will-change-transform brightness-90"
           />
+          {/* Floating particles */}
+          <div className="absolute inset-0">
+            {Array.from({ length: 30 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute rounded-full bg-primary/20 animate-float"
+                style={{
+                  width: `${Math.random() * 6 + 2}px`,
+                  height: `${Math.random() * 6 + 2}px`,
+                  left: `${Math.random() * 100}%`,
+                  top: `${Math.random() * 100}%`,
+                  animationDuration: `${Math.random() * 8 + 6}s`,
+                  animationDelay: `${Math.random() * 5}s`,
+                }}
+              />
+            ))}
+          </div>
+          {/* Gradient mesh blobs */}
+          <div className="absolute -top-1/4 -left-1/4 h-[60%] w-[60%] rounded-full bg-primary/10 blur-[120px] animate-mesh-1" />
+          <div className="absolute -bottom-1/4 -right-1/4 h-[50%] w-[50%] rounded-full bg-accent/10 blur-[100px] animate-mesh-2" />
+          <div className="absolute top-1/3 right-1/4 h-[40%] w-[40%] rounded-full bg-secondary/10 blur-[80px] animate-mesh-3" />
         </div>
 
         {/* Gradient overlay */}
@@ -181,7 +183,33 @@ const Index = () => {
 
       <Footer />
 
-      <style>{scrollRevealStyle}</style>
+      <style>{`
+        ${scrollRevealStyle}
+        @keyframes float {
+          0%, 100% { transform: translateY(0) translateX(0); opacity: 0.4; }
+          25% { transform: translateY(-20px) translateX(10px); opacity: 0.8; }
+          50% { transform: translateY(-40px) translateX(-5px); opacity: 0.5; }
+          75% { transform: translateY(-20px) translateX(15px); opacity: 0.7; }
+        }
+        @keyframes mesh1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(5%, 10%) scale(1.1); }
+          66% { transform: translate(-5%, 5%) scale(0.95); }
+        }
+        @keyframes mesh2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-8%, -5%) scale(1.05); }
+          66% { transform: translate(3%, -8%) scale(1.1); }
+        }
+        @keyframes mesh3 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50% { transform: translate(10%, -10%) scale(1.15); }
+        }
+        .animate-float { animation: float linear infinite; }
+        .animate-mesh-1 { animation: mesh1 15s ease-in-out infinite; }
+        .animate-mesh-2 { animation: mesh2 18s ease-in-out infinite; }
+        .animate-mesh-3 { animation: mesh3 12s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 };
