@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
+// ... keep existing code (interfaces DomainProgressRow, BookmarkRow, ActivityRow)
 export interface DomainProgressRow {
   id: string;
   domain_id: string;
@@ -26,29 +27,66 @@ export interface ActivityRow {
   created_at: string;
 }
 
+export interface BookingRow {
+  id: string;
+  mentor_id: string;
+  slot_id: string;
+  domain_id: string;
+  status: string;
+  notes: string | null;
+  meeting_link: string | null;
+  created_at: string;
+  mentor_name?: string;
+  mentor_company?: string;
+  mentor_role?: string;
+  slot_date?: string;
+  start_time?: string;
+  end_time?: string;
+}
+
 export function useDashboard() {
   const { user } = useAuth();
   const [progress, setProgress] = useState<DomainProgressRow[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkRow[]>([]);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
 
-    const fetch = async () => {
+    const fetchData = async () => {
       setLoading(true);
-      const [pRes, bRes, aRes] = await Promise.all([
+      const [pRes, bRes, aRes, bookRes] = await Promise.all([
         supabase.from("domain_progress").select("*").eq("user_id", user.id).order("last_accessed_at", { ascending: false }),
         supabase.from("bookmarks").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
         supabase.from("activity_log").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
+        supabase.from("bookings").select("*, mentors(name, company, role), mentor_slots(slot_date, start_time, end_time)").eq("student_id", user.id).order("created_at", { ascending: false }),
       ]);
       setProgress((pRes.data as DomainProgressRow[]) ?? []);
       setBookmarks((bRes.data as BookmarkRow[]) ?? []);
       setActivity((aRes.data as ActivityRow[]) ?? []);
+
+      const rawBookings = (bookRes.data ?? []) as any[];
+      setBookings(rawBookings.map((b) => ({
+        id: b.id,
+        mentor_id: b.mentor_id,
+        slot_id: b.slot_id,
+        domain_id: b.domain_id,
+        status: b.status,
+        notes: b.notes,
+        meeting_link: b.meeting_link,
+        created_at: b.created_at,
+        mentor_name: b.mentors?.name,
+        mentor_company: b.mentors?.company,
+        mentor_role: b.mentors?.role,
+        slot_date: b.mentor_slots?.slot_date,
+        start_time: b.mentor_slots?.start_time,
+        end_time: b.mentor_slots?.end_time,
+      })));
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, [user]);
 
   const logActivity = async (domain_id: string, action: string, detail?: string) => {
@@ -83,5 +121,16 @@ export function useDashboard() {
     }
   };
 
-  return { progress, bookmarks, activity, loading, logActivity, toggleBookmark, updateProgress };
+  const cancelBooking = async (bookingId: string) => {
+    if (!user) return;
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking) return;
+    await Promise.all([
+      supabase.from("bookings").delete().eq("id", bookingId),
+      supabase.from("mentor_slots").update({ is_booked: false }).eq("id", booking.slot_id),
+    ]);
+    setBookings((prev) => prev.filter((b) => b.id !== bookingId));
+  };
+
+  return { progress, bookmarks, activity, bookings, loading, logActivity, toggleBookmark, updateProgress, cancelBooking };
 }
