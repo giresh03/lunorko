@@ -119,7 +119,16 @@ const Index = () => {
       {/* Features */}
       <section className="container mx-auto px-4 py-20">
         <div className="mb-12 text-center scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
-          <h2 className="text-3xl font-bold text-foreground md:text-4xl font-serif">Everything You Need to Excel</h2>
+          <TypewriterEffectSmooth
+            words={[
+              { text: "Everything" },
+              { text: "You" },
+              { text: "Need" },
+              { text: "to" },
+              { text: "Excel", className: "text-primary dark:text-primary" },
+            ]}
+            className="font-serif justify-center text-foreground"
+          />
           <p className="mt-2 text-muted-foreground">Built for engineering students who want to go beyond the classroom</p>
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -154,7 +163,13 @@ const Index = () => {
       <section className="container mx-auto px-4 py-20">
         <div className="mb-12 flex items-end justify-between scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
           <div>
-            <h2 className="text-3xl font-bold text-foreground md:text-4xl font-serif">Explore Domains</h2>
+            <TypewriterEffectSmooth
+              words={[
+                { text: "Explore" },
+                { text: "Domains", className: "text-primary dark:text-primary" },
+              ]}
+              className="font-serif justify-start text-foreground"
+            />
             <p className="mt-2 text-muted-foreground">Dive into any engineering discipline</p>
           </div>
           <Button variant="outline" size="sm" className="hover-scale" asChild>
