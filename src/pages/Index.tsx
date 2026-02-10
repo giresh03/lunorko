@@ -8,6 +8,7 @@ import { domains } from "@/lib/domains";
 import heroBg from "@/assets/hero-bg.jpg";
 import { useEffect, useRef } from "react";
 import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
+import { WebcamPixelGrid } from "@/components/ui/webcam-pixel-grid";
 
 const useParallax = () => {
   const ref = useRef<HTMLImageElement>(null);
@@ -34,6 +35,26 @@ const Index = () => {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-16 min-h-[90vh] flex items-center">
+        {/* Webcam pixel grid background */}
+        <div className="absolute inset-0 z-0">
+          <WebcamPixelGrid
+            gridCols={80}
+            gridRows={50}
+            colorMode="webcam"
+            darken={0.3}
+            gapRatio={0.08}
+            maxElevation={12}
+            motionSensitivity={0.35}
+            elevationSmoothing={0.12}
+            backgroundColor="hsl(222 47% 11%)"
+            borderOpacity={0.05}
+            className="h-full w-full"
+            onWebcamReady={() => console.log("Webcam ready!")}
+            onWebcamError={() => {}}
+          />
+        </div>
+
+        {/* Fallback image background (visible when webcam not available) */}
         <div className="absolute inset-0 z-0 overflow-hidden">
           <img
             ref={parallaxRef}
@@ -41,8 +62,11 @@ const Index = () => {
             alt=""
             className="h-full w-full object-cover scale-110 origin-center will-change-transform brightness-90"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/50 to-background" />
         </div>
+
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 z-[1] bg-gradient-to-b from-background/30 via-background/60 to-background" />
+
         <div className="relative z-10 mx-auto flex flex-col items-center px-6 py-32 text-center md:py-44 max-w-5xl">
           <div
             className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 backdrop-blur-sm scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out"
