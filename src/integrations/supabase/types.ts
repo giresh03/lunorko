@@ -194,43 +194,55 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          career_tips: string | null
+          college_preparation: string | null
           company: string
           created_at: string
           domain_id: string
           email: string
           id: string
           is_active: boolean
+          journey_summary: string | null
           meeting_link: string | null
           name: string
           role: string
+          tech_stack: string[] | null
           years_experience: number
         }
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          career_tips?: string | null
+          college_preparation?: string | null
           company: string
           created_at?: string
           domain_id: string
           email: string
           id?: string
           is_active?: boolean
+          journey_summary?: string | null
           meeting_link?: string | null
           name: string
           role: string
+          tech_stack?: string[] | null
           years_experience?: number
         }
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          career_tips?: string | null
+          college_preparation?: string | null
           company?: string
           created_at?: string
           domain_id?: string
           email?: string
           id?: string
           is_active?: boolean
+          journey_summary?: string | null
           meeting_link?: string | null
           name?: string
           role?: string
+          tech_stack?: string[] | null
           years_experience?: number
         }
         Relationships: []
