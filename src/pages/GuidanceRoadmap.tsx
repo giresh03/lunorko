@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 import {
   Search, Building2, Filter, GraduationCap, Briefcase, Code2,
   MapPin, ChevronRight, Sparkles, CalendarDays, ExternalLink,
@@ -49,6 +50,7 @@ const GuidanceRoadmap = () => {
   const [selectedMentor, setSelectedMentor] = useState<GuidanceMentor | null>(null);
   const [showBooking, setShowBooking] = useState(false);
   const [bookingMentor, setBookingMentor] = useState<GuidanceMentor | null>(null);
+  const pageRef = useScrollReveal();
 
   useEffect(() => {
     const fetchMentors = async () => {
@@ -93,11 +95,11 @@ const GuidanceRoadmap = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" ref={pageRef}>
       <Navbar />
       <main className="container mx-auto px-4 pt-24 pb-20">
         {/* Hero Section */}
-        <div className="relative mb-12 overflow-hidden rounded-xl border border-border bg-card p-8 md:p-12">
+        <div className="relative mb-12 overflow-hidden rounded-xl border border-border bg-card p-8 md:p-12 scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
           <div className="absolute inset-0 gradient-hero opacity-50" />
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-3">
@@ -131,7 +133,7 @@ const GuidanceRoadmap = () => {
         </div>
 
         {/* Filters */}
-        <div className="mb-8 space-y-4">
+        <div className="mb-8 space-y-4 scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-100 ease-out">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -228,12 +230,13 @@ const GuidanceRoadmap = () => {
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {domainMentors.map((mentor) => {
+                    {domainMentors.map((mentor, mi) => {
                       const domain = getDomain(mentor.domain_id);
                       return (
                         <div
                           key={mentor.id}
-                          className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-md cursor-pointer"
+                          className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-md hover:-translate-y-1 cursor-pointer scroll-reveal opacity-0 translate-y-6 duration-500 ease-out"
+                          style={{ transitionDelay: `${mi * 80}ms` }}
                           onClick={() => setSelectedMentor(mentor)}
                         >
                           {/* Header */}
@@ -484,6 +487,7 @@ const GuidanceRoadmap = () => {
           mentor={bookingMentor}
         />
       )}
+      <style>{scrollRevealStyle}</style>
     </div>
   );
 };
