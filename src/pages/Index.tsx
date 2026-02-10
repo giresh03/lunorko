@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles, BookOpen, Code2, Zap, Users, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TypewriterEffectSmooth } from "@/components/ui/typewriter-effect";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DomainCard from "@/components/DomainCard";
@@ -76,12 +77,17 @@ const Index = () => {
             <Sparkles className="h-4 w-4 text-primary animate-pulse" />
             <span className="text-xs font-medium text-primary">AI-Powered Learning for Engineers</span>
           </div>
-          <h1
-            className="max-w-4xl text-5xl font-extrabold leading-tight text-foreground md:text-7xl font-serif scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-150 ease-out"
-          >
-            Code Smarter with{" "}
-            <span className="text-gradient">Lunor.AI</span>
-          </h1>
+          <div className="scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-150 ease-out">
+            <TypewriterEffectSmooth
+              words={[
+                { text: "Code" },
+                { text: "Smarter" },
+                { text: "with" },
+                { text: "Lunor.AI", className: "text-primary dark:text-primary" },
+              ]}
+              className="font-serif justify-center"
+            />
+          </div>
           <p
             className="mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-300 ease-out"
           >
