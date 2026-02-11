@@ -23,7 +23,7 @@ export interface Mentor {
   years_experience: number;
 }
 
-const companies = ["All", "TCS", "Infosys", "Wipro", "Cognizant", "HCL"];
+const companies = ["All", "Google", "Microsoft", "Amazon", "Meta", "Apple", "Uber", "Flipkart", "Adobe", "Oracle", "JP Morgan", "Polygon", "Bosch", "Deloitte", "Amazon Web Services", "TCS", "Infosys", "Wipro", "Cognizant", "HCL"];
 
 const Mentors = () => {
   const [mentors, setMentors] = useState<Mentor[]>([]);
