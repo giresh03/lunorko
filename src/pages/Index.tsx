@@ -15,6 +15,7 @@ import AIPowerSection from "@/components/home/AIPowerSection";
 import PricingPreviewSection from "@/components/home/PricingPreviewSection";
 import ComparisonSection from "@/components/home/ComparisonSection";
 import VideoSection from "@/components/home/VideoSection";
+import FAQSection from "@/components/home/FAQSection";
 
 const Index = () => {
   const pageRef = useScrollReveal();
@@ -195,6 +196,9 @@ const Index = () => {
 
       {/* Pricing */}
       <PricingPreviewSection />
+
+      {/* FAQ */}
+      <FAQSection />
 
       {/* CTA */}
       <section className="container mx-auto px-4 py-20">
