@@ -10,22 +10,34 @@ const DomainCard = ({ domain }: { domain: typeof domains[0] }) => {
     <BackgroundGradient containerClassName="rounded-xl h-full">
       <Link
         to={`/domain/${domain.id}`}
-        className="group relative flex flex-col rounded-xl bg-card overflow-hidden min-h-[320px] transition-all duration-500 hover:bg-card/90 hover:-translate-y-1 hover:shadow-xl"
+        className="group relative flex flex-col rounded-xl bg-card overflow-hidden min-h-[340px] transition-all duration-500 hover:bg-card/90 hover:-translate-y-1 hover:shadow-xl"
       >
-        {/* Image */}
-        <div className="relative h-36 w-full overflow-hidden">
+        {/* Image with glassmorphism */}
+        <div className="relative h-44 w-full overflow-hidden">
           <img
             src={domain.image}
             alt={domain.name}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+          {/* Multi-layer gradient for depth */}
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
           <div
-            className="absolute top-3 left-3 flex h-10 w-10 items-center justify-center rounded-lg backdrop-blur-md border border-border/30 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3"
-            style={{ backgroundColor: `hsl(${domain.color} / 0.25)` }}
+            className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+            style={{ background: `radial-gradient(circle at 50% 80%, hsl(${domain.color} / 0.15) 0%, transparent 70%)` }}
+          />
+
+          {/* Glassmorphism icon badge */}
+          <div
+            className="absolute top-3 left-3 flex h-11 w-11 items-center justify-center rounded-xl backdrop-blur-xl border border-border/20 shadow-lg transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 group-hover:shadow-primary/20"
+            style={{ backgroundColor: `hsl(${domain.color} / 0.2)` }}
           >
-            <Icon className="h-5 w-5" style={{ color: `hsl(${domain.color})` }} />
+            <Icon className="h-5 w-5 drop-shadow-sm" style={{ color: `hsl(${domain.color})` }} />
+          </div>
+
+          {/* Glassmorphism topic count pill */}
+          <div className="absolute top-3 right-3 rounded-full backdrop-blur-xl border border-border/20 bg-background/30 px-2.5 py-1 text-[10px] font-medium text-foreground/80 shadow-sm">
+            {domain.topics.length} topics
           </div>
         </div>
 
@@ -41,7 +53,7 @@ const DomainCard = ({ domain }: { domain: typeof domains[0] }) => {
             {domain.topics.slice(0, 3).map((topic) => (
               <span
                 key={topic}
-                className="rounded-md bg-secondary/80 px-2.5 py-1 text-xs text-secondary-foreground transition-colors duration-300 group-hover:bg-primary/10 group-hover:text-primary"
+                className="rounded-md backdrop-blur-sm bg-secondary/60 px-2.5 py-1 text-xs text-secondary-foreground border border-border/10 transition-all duration-300 group-hover:bg-primary/10 group-hover:text-primary group-hover:border-primary/20"
               >
                 {topic}
               </span>
