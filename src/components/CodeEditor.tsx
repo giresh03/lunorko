@@ -1,10 +1,10 @@
-import { useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
+import { useState, useCallback, useImperativeHandle, forwardRef, useMemo, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import {
-  Play, RotateCcw, Copy, Check, ChevronDown, ChevronRight, Loader2, X,
+  Play, RotateCcw, Copy, Check, ChevronRight, Loader2, X,
   File, FolderOpen, FolderClosed, Plus, Trash2, FilePlus, FolderPlus,
-  Terminal as TerminalIcon, Bot, Send, Maximize2, Minimize2, Settings,
-  Search, GitBranch, MoreHorizontal
+  Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
+  Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -88,6 +88,17 @@ const createDefaultProject = (domainName: string): FileNode[] => [
     content: `# ${domainName}\n\nWelcome to your ${domainName} workspace on **Lunor.AI**.\n\n## Getting Started\n\n1. Edit files in the explorer\n2. Run code with the play button\n3. Ask the AI assistant for help\n` },
 ];
 
+// -- Extract code blocks from markdown --
+function extractCodeBlocks(markdown: string): { code: string; language: string }[] {
+  const regex = /```(\w*)\n([\s\S]*?)```/g;
+  const blocks: { code: string; language: string }[] = [];
+  let match;
+  while ((match = regex.exec(markdown)) !== null) {
+    blocks.push({ language: match[1] || "javascript", code: match[2].trim() });
+  }
+  return blocks;
+}
+
 // -- File Explorer Item --
 const FileItem = ({
   node, depth, activeFileId, onSelect, onToggle, onDelete, onRename,
@@ -107,9 +118,7 @@ const FileItem = ({
   };
 
   const handleRename = () => {
-    if (editName.trim() && editName !== node.name) {
-      onRename(node.id, editName.trim());
-    }
+    if (editName.trim() && editName !== node.name) onRename(node.id, editName.trim());
     setIsEditing(false);
   };
 
@@ -126,11 +135,7 @@ const FileItem = ({
         {node.type === "folder" ? (
           <>
             <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${node.isOpen ? "rotate-90" : ""}`} />
-            {node.isOpen ? (
-              <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" />
-            ) : (
-              <FolderClosed className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            )}
+            {node.isOpen ? <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" /> : <FolderClosed className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
           </>
         ) : (
           <>
@@ -140,8 +145,7 @@ const FileItem = ({
         )}
         {isEditing ? (
           <input
-            autoFocus
-            value={editName}
+            autoFocus value={editName}
             onChange={(e) => setEditName(e.target.value)}
             onBlur={handleRename}
             onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") setIsEditing(false); }}
@@ -151,24 +155,12 @@ const FileItem = ({
         ) : (
           <span className="truncate flex-1">{node.name}</span>
         )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive"
-        >
+        <button onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive">
           <X className="h-3 w-3" />
         </button>
       </div>
       {node.type === "folder" && node.isOpen && node.children?.map((child) => (
-        <FileItem
-          key={child.id}
-          node={child}
-          depth={depth + 1}
-          activeFileId={activeFileId}
-          onSelect={onSelect}
-          onToggle={onToggle}
-          onDelete={onDelete}
-          onRename={onRename}
-        />
+        <FileItem key={child.id} node={child} depth={depth + 1} activeFileId={activeFileId} onSelect={onSelect} onToggle={onToggle} onDelete={onDelete} onRename={onRename} />
       ))}
     </div>
   );
@@ -199,18 +191,19 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<"files" | "search">("files");
-  const [showTerminal, setShowTerminal] = useState(true);
-  const [terminalTab, setTerminalTab] = useState<"output" | "ai">("output");
+  const [showAIPanel, setShowAIPanel] = useState(true);
   const [output, setOutput] = useState<string[]>(["$ Ready."]);
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
 
   // AI Chat
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant. Ask me anything!` },
+    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Cursor! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your active file. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // New file/folder input
   const [newItemParent, setNewItemParent] = useState<string | null>(null);
@@ -218,6 +211,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [newItemName, setNewItemName] = useState("");
 
   const activeTab = openTabs.find((t) => t.id === activeTabId);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useImperativeHandle(ref, () => ({
     setExternalCode: (code: string, lang: string) => {
@@ -230,14 +227,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   }));
 
   // -- File tree helpers --
-  const findFile = useCallback((nodes: FileNode[], id: string): FileNode | null => {
-    for (const n of nodes) {
-      if (n.id === id) return n;
-      if (n.children) { const f = findFile(n.children, id); if (f) return f; }
-    }
-    return null;
-  }, []);
-
   const updateNode = useCallback((nodes: FileNode[], id: string, updater: (n: FileNode) => FileNode): FileNode[] => {
     return nodes.map((n) => {
       if (n.id === id) return updater(n);
@@ -256,6 +245,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       if (n.children) return { ...n, children: addChild(n.children, parentId, child) };
       return n;
     });
+  }, []);
+
+  const findFile = useCallback((nodes: FileNode[], id: string): FileNode | null => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      if (n.children) { const f = findFile(n.children, id); if (f) return f; }
+    }
+    return null;
   }, []);
 
   const handleSelectFile = (node: FileNode) => {
@@ -309,18 +306,23 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const handleCodeChange = (val: string | undefined) => {
     if (!activeTabId) return;
     setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: val || "", isModified: true } : t));
-    // Sync back to file tree
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
+
+  // Auto-apply code to editor
+  const applyCodeToEditor = useCallback((code: string, language: string) => {
+    if (activeTabId) {
+      setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: code, isModified: true } : t));
+      setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: code })));
+    }
+  }, [activeTabId, updateNode]);
 
   // -- Run Code --
   const handleRun = useCallback(async () => {
     if (!activeTab) return;
     setIsRunning(true);
-    setTerminalTab("output");
     setShowTerminal(true);
     setOutput([`$ Running ${activeTab.name}...`]);
-
     const lang = activeTab.language;
     if (lang === "javascript" || lang === "typescript") {
       try {
@@ -352,7 +354,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     if (original?.content) handleCodeChange(original.content);
   };
 
-  // -- AI Chat --
+  // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
     const userMsg: Message = { role: "user", content: chatInput };
@@ -399,10 +401,21 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         }
       }
     } catch { upsert("❌ Connection error."); }
-    setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName]);
 
-  // Find first folder for "new file" context
+    // Auto-apply: extract last code block and apply to editor
+    const codeBlocks = extractCodeBlocks(assistantSoFar);
+    if (codeBlocks.length > 0) {
+      const lastBlock = codeBlocks[codeBlocks.length - 1];
+      applyCodeToEditor(lastBlock.code, lastBlock.language);
+    }
+
+    setChatLoading(false);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor]);
+
+  const handleClearChat = () => {
+    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+  };
+
   const firstFolderId = useMemo(() => {
     const find = (nodes: FileNode[]): string | null => {
       for (const n of nodes) { if (n.type === "folder") return n.id; if (n.children) { const f = find(n.children); if (f) return f; } }
@@ -420,6 +433,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
           <span className="text-[10px] text-muted-foreground">— {domainName} Workspace</span>
         </div>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
+            {showAIPanel ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
+          </Button>
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowSidebar(!showSidebar)}>
             <Settings className="h-3 w-3" />
           </Button>
@@ -440,19 +456,19 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
           <button onClick={() => { setShowSidebar(true); setSidebarTab("search"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "search" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             <Search className="h-4 w-4" />
           </button>
-          <button onClick={() => { setShowSidebar(true); setSidebarTab("files"); }} className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
+          <button className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
             <GitBranch className="h-4 w-4" />
           </button>
           <div className="flex-1" />
-          <button onClick={() => { setShowTerminal(!showTerminal); setTerminalTab("ai"); }} className={`p-2 rounded-md transition-colors ${terminalTab === "ai" && showTerminal ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
-            <Bot className="h-4 w-4" />
+          <button onClick={() => setShowAIPanel(!showAIPanel)} className={`p-2 rounded-md transition-colors ${showAIPanel ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+            <Sparkles className="h-4 w-4" />
           </button>
-          <button onClick={() => { setShowTerminal(!showTerminal); setTerminalTab("output"); }} className={`p-2 rounded-md transition-colors ${terminalTab === "output" && showTerminal ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+          <button onClick={() => setShowTerminal(!showTerminal)} className={`p-2 rounded-md transition-colors ${showTerminal ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             <TerminalIcon className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Sidebar */}
+        {/* Sidebar - file explorer */}
         {showSidebar && (
           <div className="flex flex-col w-56 bg-card border-r border-border shrink-0 overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border">
@@ -461,30 +477,22 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
               </span>
               {sidebarTab === "files" && (
                 <div className="flex gap-0.5">
-                  <button
-                    onClick={() => { setNewItemParent(firstFolderId); setNewItemType("file"); setNewItemName(""); }}
-                    className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="New File"
-                  >
+                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("file"); setNewItemName(""); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="New File">
                     <FilePlus className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    onClick={() => { setNewItemParent(firstFolderId); setNewItemType("folder"); setNewItemName(""); }}
-                    className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="New Folder"
-                  >
+                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("folder"); setNewItemName(""); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="New Folder">
                     <FolderPlus className="h-3.5 w-3.5" />
                   </button>
                 </div>
               )}
             </div>
-
             {sidebarTab === "files" ? (
               <div className="flex-1 overflow-y-auto py-1 text-xs">
                 {newItemParent !== null && (
                   <div className="flex items-center gap-1 px-3 py-1">
                     {newItemType === "folder" ? <FolderClosed className="h-3 w-3 text-muted-foreground" /> : <File className="h-3 w-3 text-muted-foreground" />}
                     <input
-                      autoFocus
-                      value={newItemName}
+                      autoFocus value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") handleCreateItem(); if (e.key === "Escape") setNewItemParent(null); }}
                       onBlur={handleCreateItem}
@@ -494,16 +502,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                   </div>
                 )}
                 {fileTree.map((node) => (
-                  <FileItem
-                    key={node.id}
-                    node={node}
-                    depth={0}
-                    activeFileId={activeTabId}
-                    onSelect={handleSelectFile}
-                    onToggle={handleToggleFolder}
-                    onDelete={handleDeleteNode}
-                    onRename={handleRenameNode}
-                  />
+                  <FileItem key={node.id} node={node} depth={0} activeFileId={activeTabId} onSelect={handleSelectFile} onToggle={handleToggleFolder} onDelete={handleDeleteNode} onRename={handleRenameNode} />
                 ))}
               </div>
             ) : (
@@ -514,8 +513,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
           </div>
         )}
 
-        {/* Main editor area */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Center: Editor */}
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           {/* Editor tabs */}
           <div className="flex items-center h-8 bg-card border-b border-border overflow-x-auto shrink-0">
             {openTabs.map((tab) => (
@@ -529,16 +528,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                 <File className={`h-3 w-3 ${getFileIcon(tab.name)}`} />
                 <span className="whitespace-nowrap">{tab.name}</span>
                 {tab.isModified && <span className="h-2 w-2 rounded-full bg-primary/60" />}
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.id); }}
-                  className="opacity-0 group-hover:opacity-100 ml-1 hover:text-destructive transition-opacity"
-                >
+                <button onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.id); }} className="opacity-0 group-hover:opacity-100 ml-1 hover:text-destructive transition-opacity">
                   <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
             <div className="flex-1" />
-            {/* Toolbar buttons */}
             <div className="flex items-center gap-1 px-2 shrink-0">
               <button onClick={handleCopy} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Copy">
                 {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
@@ -589,74 +584,118 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
             )}
           </div>
 
-          {/* Terminal / AI Panel */}
+          {/* Terminal panel (bottom) */}
           {showTerminal && (
-            <div className="flex flex-col h-52 border-t border-border shrink-0 bg-card">
+            <div className="flex flex-col h-40 border-t border-border shrink-0 bg-card">
               <div className="flex items-center h-7 border-b border-border px-2 shrink-0">
-                <button
-                  onClick={() => setTerminalTab("output")}
-                  className={`px-2 py-1 text-[10px] font-medium transition-colors ${terminalTab === "output" ? "text-foreground border-b border-primary" : "text-muted-foreground"}`}
-                >
-                  Terminal
-                </button>
-                <button
-                  onClick={() => setTerminalTab("ai")}
-                  className={`px-2 py-1 text-[10px] font-medium transition-colors ${terminalTab === "ai" ? "text-foreground border-b border-primary" : "text-muted-foreground"}`}
-                >
-                  AI Assistant
-                </button>
+                <span className="px-2 py-1 text-[10px] font-medium text-foreground">Terminal</span>
                 <div className="flex-1" />
                 <button onClick={() => setShowTerminal(false)} className="p-0.5 text-muted-foreground hover:text-foreground">
                   <X className="h-3 w-3" />
                 </button>
               </div>
-
-              {terminalTab === "output" ? (
-                <div className="flex-1 overflow-y-auto p-3 font-mono text-xs bg-background">
-                  {output.map((line, i) => (
-                    <div key={i} className="text-foreground/80 whitespace-pre-wrap">{line}</div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col flex-1 overflow-hidden">
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                    {messages.map((msg, i) => (
-                      <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${msg.role === "user" ? "bg-secondary" : "bg-primary/10"}`}>
-                          {msg.role === "user" ? <span className="text-[8px] text-secondary-foreground">U</span> : <Bot className="h-3 w-3 text-primary" />}
-                        </div>
-                        <div className={`max-w-[85%] rounded-md px-2 py-1 text-[11px] ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                          <div className="prose prose-sm prose-invert max-w-none [&_pre]:bg-background [&_pre]:p-2 [&_pre]:rounded [&_pre]:text-[10px] [&_code]:text-primary [&_code]:bg-background/50 [&_code]:px-0.5 [&_code]:rounded-sm">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {chatLoading && messages[messages.length - 1]?.role !== "assistant" && (
-                      <div className="flex gap-2">
-                        <div className="flex h-5 w-5 items-center justify-center rounded bg-primary/10"><Bot className="h-3 w-3 text-primary" /></div>
-                        <div className="flex items-center gap-1 rounded bg-secondary px-2 py-1"><Loader2 className="h-3 w-3 animate-spin text-primary" /><span className="text-[10px] text-muted-foreground">Thinking...</span></div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-1 border-t border-border p-1.5">
-                    <input
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
-                      placeholder={`Ask about ${domainName.toLowerCase()}...`}
-                      className="flex-1 rounded border border-border bg-input px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
-                      disabled={chatLoading}
-                    />
-                    <Button size="sm" className="h-6 px-2" onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}>
-                      <Send className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <div className="flex-1 overflow-y-auto p-3 font-mono text-xs bg-background">
+                {output.map((line, i) => (
+                  <div key={i} className="text-foreground/80 whitespace-pre-wrap">{line}</div>
+                ))}
+              </div>
             </div>
           )}
         </div>
+
+        {/* Right: AI Assistant Panel */}
+        {showAIPanel && (
+          <div className="flex flex-col w-80 lg:w-96 border-l border-border bg-card shrink-0 overflow-hidden">
+            {/* AI Header */}
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold text-foreground">AI Assistant</span>
+              <span className="rounded-sm bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">Auto-Apply</span>
+              <div className="flex-1" />
+              <button onClick={handleClearChat} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clear chat">
+                <Trash2 className="h-3 w-3" />
+              </button>
+              <button onClick={() => setShowAIPanel(false)} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Chat messages */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                  <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${msg.role === "user" ? "bg-secondary" : "bg-primary/10"}`}>
+                    {msg.role === "user" ? <span className="text-[9px] font-medium text-secondary-foreground">U</span> : <Bot className="h-3.5 w-3.5 text-primary" />}
+                  </div>
+                  <div className={`max-w-[88%] rounded-lg px-3 py-2 text-xs ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                    <div className="prose prose-sm prose-invert max-w-none [&_pre]:bg-background [&_pre]:p-2.5 [&_pre]:rounded-md [&_pre]:text-[10px] [&_pre]:my-2 [&_code]:text-primary [&_code]:bg-background/50 [&_code]:px-1 [&_code]:rounded-sm [&_pre]:relative [&_pre]:border [&_pre]:border-primary/20">
+                      <ReactMarkdown
+                        components={{
+                          pre({ children, ...props }) {
+                            const codeEl = (children as any)?.props;
+                            const codeText = codeEl?.children || "";
+                            const className = codeEl?.className || "";
+                            const lang = className.replace("language-", "") || "javascript";
+                            return (
+                              <div className="relative group">
+                                <div className="flex items-center justify-between bg-background/80 rounded-t-md border border-b-0 border-primary/20 px-2 py-1">
+                                  <span className="text-[9px] text-muted-foreground font-mono">{lang}</span>
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => applyCodeToEditor(String(codeText).trim(), lang)}
+                                      className="flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-medium text-primary hover:bg-primary/30 transition-colors"
+                                      title="Apply to Editor"
+                                    >
+                                      <ArrowRightToLine className="h-2.5 w-2.5" />
+                                      Apply
+                                    </button>
+                                  </div>
+                                </div>
+                                <pre {...props} className="!rounded-t-none !mt-0">{children}</pre>
+                              </div>
+                            );
+                          },
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {chatLoading && messages[messages.length - 1]?.role !== "assistant" && (
+                <div className="flex gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10"><Bot className="h-3.5 w-3.5 text-primary" /></div>
+                  <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground">Thinking...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* AI Input */}
+            <div className="border-t border-border p-2 shrink-0">
+              <div className="flex gap-1.5">
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
+                  placeholder={`Ask about ${domainName.toLowerCase()}...`}
+                  className="flex-1 rounded-md border border-border bg-input px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
+                  disabled={chatLoading}
+                />
+                <Button size="sm" className="h-7 px-2" onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}>
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="mt-1.5 text-[9px] text-muted-foreground text-center">
+                Code is <span className="text-primary font-medium">auto-applied</span> to your active file
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Status bar */}
@@ -669,7 +708,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
           {activeTab && <span>{activeTab.language}</span>}
           <span>UTF-8</span>
           <span>Spaces: 2</span>
-          <span>Lunor.AI</span>
+          <span className="text-primary font-medium">Lunor.AI</span>
         </div>
       </div>
     </div>
