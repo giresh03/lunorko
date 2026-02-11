@@ -597,6 +597,23 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     setRecentProjects(getSavedProjects());
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      switch (e.key.toLowerCase()) {
+        case "s": e.preventDefault(); handleSaveProject(); break;
+        case "n": e.preventDefault(); setShowNewProject(true); break;
+        case "o": e.preventDefault(); setShowWelcome(true); break;
+        case "b": e.preventDefault(); setShowSidebar(prev => !prev); break;
+        case "j": e.preventDefault(); setShowTerminal(prev => !prev); break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleSaveProject]);
+
   const firstFolderId = useMemo(() => {
     const find = (nodes: FileNode[]): string | null => {
       for (const n of nodes) { if (n.type === "folder") return n.id; if (n.children) { const f = find(n.children); if (f) return f; } }
