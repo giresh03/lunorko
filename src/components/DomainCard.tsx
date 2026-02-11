@@ -1,10 +1,36 @@
 import { Link } from "react-router-dom";
+import { useRef, useEffect, useCallback } from "react";
 import { domains } from "@/lib/domains";
 import { BackgroundGradient } from "@/components/ui/background-gradient";
 import { ArrowRight } from "lucide-react";
 
+const useCardParallax = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current || !imgRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const windowH = window.innerHeight;
+    // Progress: 0 when card enters bottom, 1 when it exits top
+    const progress = 1 - (rect.top + rect.height) / (windowH + rect.height);
+    // Shift image between -15px and +15px based on scroll position
+    const offset = (progress - 0.5) * 30;
+    imgRef.current.style.transform = `translateY(${offset}px) scale(1.15)`;
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
+
+  return { containerRef, imgRef };
+};
+
 const DomainCard = ({ domain }: { domain: typeof domains[0] }) => {
   const Icon = domain.icon;
+  const { containerRef, imgRef } = useCardParallax();
 
   return (
     <BackgroundGradient containerClassName="rounded-xl h-full">
@@ -12,12 +38,14 @@ const DomainCard = ({ domain }: { domain: typeof domains[0] }) => {
         to={`/domain/${domain.id}`}
         className="group relative flex flex-col rounded-xl bg-card overflow-hidden min-h-[340px] transition-all duration-500 hover:bg-card/90 hover:-translate-y-1 hover:shadow-xl"
       >
-        {/* Image with glassmorphism */}
-        <div className="relative h-44 w-full overflow-hidden">
+        {/* Image with parallax + glassmorphism */}
+        <div ref={containerRef} className="relative h-44 w-full overflow-hidden">
           <img
+            ref={imgRef}
             src={domain.image}
             alt={domain.name}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="h-full w-full object-cover will-change-transform transition-transform duration-700 group-hover:scale-[1.2]"
+            style={{ transform: "translateY(0) scale(1.15)" }}
             loading="lazy"
           />
           {/* Multi-layer gradient for depth */}
