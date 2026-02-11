@@ -88,13 +88,32 @@ const createDefaultProject = (domainName: string): FileNode[] => [
     content: `# ${domainName}\n\nWelcome to your ${domainName} workspace on **Lunor.AI**.\n\n## Getting Started\n\n1. Edit files in the explorer\n2. Run code with the play button\n3. Ask the AI assistant for help\n` },
 ];
 
-// -- Extract code blocks from markdown --
-function extractCodeBlocks(markdown: string): { code: string; language: string }[] {
-  const regex = /```(\w*)\n([\s\S]*?)```/g;
-  const blocks: { code: string; language: string }[] = [];
+// -- Extract code blocks from markdown with filename detection --
+const LANG_EXT_MAP: Record<string, string> = {
+  javascript: "js", typescript: "ts", python: "py", html: "html",
+  css: "css", json: "json", jsx: "jsx", tsx: "tsx", xml: "xml",
+  yaml: "yaml", shell: "sh", bash: "sh", sql: "sql", markdown: "md",
+};
+
+function extractCodeBlocks(markdown: string): { code: string; language: string; filename?: string }[] {
+  // Match code blocks, and look for filename hints in the line before the code block
+  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
-    blocks.push({ language: match[1] || "javascript", code: match[2].trim() });
+    const filename = match[1] || undefined;
+    const lang = match[2] || "javascript";
+    blocks.push({ language: lang, code: match[3].trim(), filename });
+  }
+  // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
+  if (blocks.length > 0 && !blocks.some(b => b.filename)) {
+    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
+    let fnMatch;
+    while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
+      // Assign to first block without a filename
+      const unassigned = blocks.find(b => !b.filename);
+      if (unassigned) unassigned.filename = fnMatch[1];
+    }
   }
   return blocks;
 }
@@ -309,13 +328,34 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
 
-  // Auto-apply code to editor
-  const applyCodeToEditor = useCallback((code: string, language: string) => {
-    if (activeTabId) {
+  // Auto-apply code to editor — creates new file if language doesn't match active file
+  const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
+    const activeLanguage = activeTab?.language;
+    const normalizedLang = LANG_MAP[language] || language;
+    const langMatches = activeLanguage === normalizedLang || activeLanguage === language;
+
+    if (activeTabId && langMatches && !filename) {
+      // Same language — update active file
       setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: code, isModified: true } : t));
       setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: code })));
+    } else {
+      // Different language or explicit filename — create a new file
+      const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[language] || language || "js";
+      const newName = filename || `untitled-${Date.now().toString(36)}.${ext}`;
+      const newId = `src/${newName}`;
+      const newNode: FileNode = { id: newId, name: newName, type: "file", language: normalizedLang || getLang(newName), content: code };
+      const newTab: OpenTab = { id: newId, name: newName, language: normalizedLang || getLang(newName), content: code, isModified: true };
+
+      // Add to src folder
+      setFileTree((prev) => {
+        const srcFolder = prev.find(n => n.id === "src" && n.type === "folder");
+        if (srcFolder) return addChild(prev, "src", newNode);
+        return [...prev, newNode];
+      });
+      setOpenTabs((prev) => [...prev, newTab]);
+      setActiveTabId(newId);
     }
-  }, [activeTabId, updateNode]);
+  }, [activeTabId, activeTab, updateNode, addChild]);
 
   // -- Run Code --
   const handleRun = useCallback(async () => {
@@ -402,11 +442,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       }
     } catch { upsert("❌ Connection error."); }
 
-    // Auto-apply: extract last code block and apply to editor
+    // Auto-apply: extract code blocks and create appropriate files
     const codeBlocks = extractCodeBlocks(assistantSoFar);
     if (codeBlocks.length > 0) {
-      const lastBlock = codeBlocks[codeBlocks.length - 1];
-      applyCodeToEditor(lastBlock.code, lastBlock.language);
+      // Apply each block — creates new files for different languages
+      codeBlocks.forEach((block) => {
+        applyCodeToEditor(block.code, block.language, block.filename);
+      });
     }
 
     setChatLoading(false);
