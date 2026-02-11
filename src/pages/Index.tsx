@@ -6,28 +6,10 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DomainCard from "@/components/DomainCard";
 import { domains } from "@/lib/domains";
-import heroBg from "@/assets/hero-bg.jpg";
-import { useEffect, useRef } from "react";
 import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 
 
-const useParallax = () => {
-  const ref = useRef<HTMLImageElement>(null);
-  useEffect(() => {
-    const handleScroll = () => {
-      if (ref.current) {
-        const scrollY = window.scrollY;
-        ref.current.style.transform = `translateY(${scrollY * 0.4}px) scale(1.1)`;
-      }
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-  return ref;
-};
-
 const Index = () => {
-  const parallaxRef = useParallax();
   const pageRef = useScrollReveal();
 
   return (
@@ -37,13 +19,7 @@ const Index = () => {
       {/* Hero */}
       <section className="relative overflow-hidden pt-16 min-h-[90vh] flex items-center">
         {/* Animated CSS background */}
-        <div className="absolute inset-0 z-0 overflow-hidden">
-          <img
-            ref={parallaxRef}
-            src={heroBg}
-            alt=""
-            className="h-full w-full object-cover scale-110 origin-center will-change-transform brightness-90"
-          />
+        <div className="absolute inset-0 z-0 overflow-hidden bg-background">
           {/* Floating particles */}
           <div className="absolute inset-0">
             {Array.from({ length: 30 }).map((_, i) => (
