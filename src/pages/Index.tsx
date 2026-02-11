@@ -14,6 +14,7 @@ import TestimonialsSection from "@/components/home/TestimonialsSection";
 import AIPowerSection from "@/components/home/AIPowerSection";
 import PricingPreviewSection from "@/components/home/PricingPreviewSection";
 import ComparisonSection from "@/components/home/ComparisonSection";
+import VideoSection from "@/components/home/VideoSection";
 
 const Index = () => {
   const pageRef = useScrollReveal();
@@ -170,6 +171,9 @@ const Index = () => {
           ))}
         </div>
       </section>
+
+      {/* Video Demo */}
+      <VideoSection />
 
       {/* Why Lunor */}
       <WhyLunorSection />
