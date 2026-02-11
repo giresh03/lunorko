@@ -28,7 +28,7 @@ const faqs = [
   },
   {
     q: "What do I get with the Pro plan?",
-    a: "Pro (₹499/month) unlocks unlimited AI assistant queries, 1:1 mentor booking sessions with industry professionals, premium course recommendations, certificates of completion, and resume & interview preparation support.",
+    a: "Pro (₹49/month) unlocks unlimited AI assistant queries, 1:1 mentor booking sessions with industry professionals, premium course recommendations, certificates of completion, and resume & interview preparation support.",
   },
   {
     q: "Can Lunor.AI help me get placed?",
