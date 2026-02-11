@@ -7,7 +7,13 @@ import Footer from "@/components/Footer";
 import DomainCard from "@/components/DomainCard";
 import { domains } from "@/lib/domains";
 import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
-
+import WhyLunorSection from "@/components/home/WhyLunorSection";
+import HowItWorksSection from "@/components/home/HowItWorksSection";
+import StatsSection from "@/components/home/StatsSection";
+import TestimonialsSection from "@/components/home/TestimonialsSection";
+import AIPowerSection from "@/components/home/AIPowerSection";
+import PricingPreviewSection from "@/components/home/PricingPreviewSection";
+import ComparisonSection from "@/components/home/ComparisonSection";
 
 const Index = () => {
   const pageRef = useScrollReveal();
@@ -164,6 +170,27 @@ const Index = () => {
           ))}
         </div>
       </section>
+
+      {/* Why Lunor */}
+      <WhyLunorSection />
+
+      {/* How It Works */}
+      <HowItWorksSection />
+
+      {/* Stats */}
+      <StatsSection />
+
+      {/* AI Power */}
+      <AIPowerSection />
+
+      {/* Comparison */}
+      <ComparisonSection />
+
+      {/* Testimonials */}
+      <TestimonialsSection />
+
+      {/* Pricing */}
+      <PricingPreviewSection />
 
       {/* CTA */}
       <section className="container mx-auto px-4 py-20">
