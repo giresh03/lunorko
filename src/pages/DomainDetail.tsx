@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useRef, useState } from "react";
-import { ArrowLeft, BookOpen, Video, FileText, ExternalLink, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, BookOpen, Video, FileText, ExternalLink, CheckCircle2, Maximize2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,7 +8,6 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import CodeAssistant from "@/components/CodeAssistant";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -19,6 +18,7 @@ const DomainDetail = () => {
   const domain = domains.find((d) => d.id === domainId);
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
+  const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const { progress, updateProgress, logActivity } = useDashboard();
@@ -43,6 +43,19 @@ const DomainDetail = () => {
   }
 
   const Icon = domain.icon;
+
+  // Full-screen IDE mode
+  if (isFullscreenIDE) {
+    return (
+      <div className="fixed inset-0 z-50">
+        <CodeEditorComponent
+          ref={editorRef}
+          domainName={domain.name}
+          onExit={() => setIsFullscreenIDE(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,7 +91,6 @@ const DomainDetail = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-6 w-full justify-start bg-card border border-border">
             <TabsTrigger value="guidance">Guidance</TabsTrigger>
-            <TabsTrigger value="assistant">AI Assistant</TabsTrigger>
             <TabsTrigger value="editor">Code Editor</TabsTrigger>
             <TabsTrigger value="videos">Videos</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>
@@ -168,12 +180,23 @@ const DomainDetail = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="assistant">
-            <CodeAssistant domainName={domain.name} onSendToEditor={handleSendToEditor} />
-          </TabsContent>
-
           <TabsContent value="editor">
-            <CodeEditorComponent ref={editorRef} domainName={domain.name} />
+            {/* Launch full-screen IDE */}
+            <div className="rounded-lg border border-border bg-card p-12 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
+                  <Maximize2 className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground">Lunor.AI Code Editor</h3>
+                <p className="text-sm text-muted-foreground max-w-md">
+                  Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant.
+                </p>
+                <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
+                  <Maximize2 className="mr-2 h-4 w-4" />
+                  Open Full-Screen Editor
+                </Button>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="videos">
