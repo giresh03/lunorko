@@ -14,10 +14,23 @@ export const useScrollReveal = () => {
       { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
     );
     const el = ref.current;
-    if (el) {
-      el.querySelectorAll(".scroll-reveal").forEach((child) => observer.observe(child));
-    }
-    return () => observer.disconnect();
+    if (!el) return () => observer.disconnect();
+
+    // Use MutationObserver to pick up dynamically added .scroll-reveal elements
+    const observeAll = () => {
+      el.querySelectorAll(".scroll-reveal:not(.revealed)").forEach((child) =>
+        observer.observe(child)
+      );
+    };
+    observeAll();
+
+    const mutation = new MutationObserver(observeAll);
+    mutation.observe(el, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      mutation.disconnect();
+    };
   }, []);
   return ref;
 };
