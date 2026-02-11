@@ -235,85 +235,107 @@ const GuidanceRoadmap = () => {
                       return (
                         <div
                           key={mentor.id}
-                          className="group flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/40 hover:shadow-md hover:-translate-y-1 cursor-pointer scroll-reveal opacity-0 translate-y-6 duration-500 ease-out"
+                          className="group relative flex flex-col rounded-xl border border-border bg-card overflow-hidden transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-2 cursor-pointer scroll-reveal opacity-0 translate-y-6 duration-500 ease-out"
                           style={{ transitionDelay: `${mi * 80}ms` }}
                           onClick={() => setSelectedMentor(mentor)}
                         >
-                          {/* Header */}
-                          <div className="flex items-start gap-3 mb-4">
-                            <div
-                              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold"
-                              style={{
-                                backgroundColor: domain ? `hsl(${domain.color} / 0.15)` : undefined,
-                                color: domain ? `hsl(${domain.color})` : undefined,
-                              }}
-                            >
-                              {mentor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="font-semibold text-foreground truncate">{mentor.name}</h3>
-                              <p className="text-xs text-muted-foreground truncate">{mentor.role}</p>
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <Building2 className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs font-medium text-foreground">{mentor.company}</span>
-                                <span className="text-xs text-muted-foreground">· {mentor.years_experience}y exp</span>
+                          {/* Domain banner image */}
+                          {domain?.image && (
+                            <div className="relative h-24 w-full overflow-hidden">
+                              <img
+                                src={domain.image}
+                                alt={domain.name}
+                                className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110 brightness-75"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+                              <div className="absolute bottom-0 left-0 right-0 p-3 flex items-end justify-between">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] backdrop-blur-md border-border/30 bg-background/40 text-foreground"
+                                >
+                                  <Briefcase className="mr-1 h-3 w-3" /> {mentor.years_experience}y experience
+                                </Badge>
                               </div>
                             </div>
-                          </div>
-
-                          {/* Journey summary */}
-                          {mentor.journey_summary && (
-                            <p className="mb-4 text-xs text-muted-foreground italic leading-relaxed line-clamp-2">
-                              "{mentor.journey_summary}"
-                            </p>
                           )}
 
-                          {/* Tech stack preview */}
-                          {mentor.tech_stack && mentor.tech_stack.length > 0 && (
-                            <div className="mb-4 flex flex-wrap gap-1.5">
-                              {mentor.tech_stack.slice(0, 5).map((tech) => (
-                                <span
-                                  key={tech}
-                                  className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground"
-                                >
-                                  {tech}
-                                </span>
-                              ))}
-                              {mentor.tech_stack.length > 5 && (
-                                <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                                  +{mentor.tech_stack.length - 5}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* CTA */}
-                          <div className="mt-auto flex items-center justify-between pt-3 border-t border-border">
-                            <span className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
-                              View Roadmap <ChevronRight className="h-3 w-3" />
-                            </span>
-                            <div className="flex gap-1.5">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-[10px] px-2"
-                                onClick={(e) => { e.stopPropagation(); handleBook(mentor); }}
+                          <div className="flex flex-col flex-1 p-5">
+                            {/* Header */}
+                            <div className="flex items-start gap-3 mb-4">
+                              <div
+                              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-2 ring-primary/20 ring-offset-2 ring-offset-card transition-all duration-300 group-hover:ring-primary/50"
+                                style={{
+                                  backgroundColor: domain ? `hsl(${domain.color} / 0.15)` : undefined,
+                                  color: domain ? `hsl(${domain.color})` : undefined,
+                                }}
                               >
-                                <CalendarDays className="mr-1 h-3 w-3" /> Book
-                              </Button>
-                              {mentor.meeting_link && (
+                                {mentor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors duration-300">{mentor.name}</h3>
+                                <p className="text-xs text-muted-foreground truncate">{mentor.role}</p>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <Building2 className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-xs font-medium text-foreground">{mentor.company}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Journey summary */}
+                            {mentor.journey_summary && (
+                              <p className="mb-4 text-xs text-muted-foreground italic leading-relaxed line-clamp-2 border-l-2 border-primary/30 pl-3">
+                                "{mentor.journey_summary}"
+                              </p>
+                            )}
+
+                            {/* Tech stack preview */}
+                            {mentor.tech_stack && mentor.tech_stack.length > 0 && (
+                              <div className="mb-4 flex flex-wrap gap-1.5">
+                                {mentor.tech_stack.slice(0, 5).map((tech) => (
+                                  <span
+                                    key={tech}
+                                    className="rounded-md bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary"
+                                  >
+                                    {tech}
+                                  </span>
+                                ))}
+                                {mentor.tech_stack.length > 5 && (
+                                  <span className="rounded-md bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                                    +{mentor.tech_stack.length - 5}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* CTA */}
+                            <div className="mt-auto flex items-center justify-between pt-3 border-t border-border">
+                              <span className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
+                                View Roadmap <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
+                              </span>
+                              <div className="flex gap-1.5">
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-7 px-2"
-                                  asChild
-                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-7 text-[10px] px-2"
+                                  onClick={(e) => { e.stopPropagation(); handleBook(mentor); }}
                                 >
-                                  <a href={mentor.meeting_link} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
+                                  <CalendarDays className="mr-1 h-3 w-3" /> Book
                                 </Button>
-                              )}
+                                {mentor.meeting_link && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    asChild
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <a href={mentor.meeting_link} target="_blank" rel="noopener noreferrer">
+                                      <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
