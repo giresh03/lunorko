@@ -4,13 +4,85 @@ import {
   Play, RotateCcw, Copy, Check, ChevronRight, Loader2, X,
   File, FolderOpen, FolderClosed, Plus, Trash2, FilePlus, FolderPlus,
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
-  Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen
+  Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
+  FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 
-// -- Types --
+// -- Project types --
+interface SavedProject {
+  id: string;
+  name: string;
+  domain: string;
+  fileTree: FileNode[];
+  lastOpened: number;
+  createdAt: number;
+}
+
+const PROJECTS_KEY = "lunor-ai-projects";
+
+function getSavedProjects(): SavedProject[] {
+  try {
+    return JSON.parse(localStorage.getItem(PROJECTS_KEY) || "[]");
+  } catch { return []; }
+}
+
+function saveProject(project: SavedProject) {
+  const projects = getSavedProjects().filter(p => p.id !== project.id);
+  projects.unshift(project);
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects.slice(0, 20)));
+}
+
+function deleteProject(id: string) {
+  const projects = getSavedProjects().filter(p => p.id !== id);
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+// -- Project templates --
+const PROJECT_TEMPLATES = [
+  { id: "blank", name: "Blank Project", description: "Empty project with a single file", icon: "📄" },
+  { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
+  { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
+  { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
+];
+
+function createProjectFromTemplate(templateId: string, projectName: string, domain: string): FileNode[] {
+  switch (templateId) {
+    case "blank":
+      return [{ id: "main.js", name: "main.js", type: "file", language: "javascript", content: `// ${projectName}\n// ${domain}\n\nconsole.log("Hello, World!");\n` }];
+    case "web-app":
+      return [
+        { id: "src", name: "src", type: "folder", isOpen: true, children: [
+          { id: "src/index.html", name: "index.html", type: "file", language: "html", content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${projectName}</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>${projectName}</h1>\n  <script src="app.js"></script>\n</body>\n</html>` },
+          { id: "src/style.css", name: "style.css", type: "file", language: "css", content: `/* ${projectName} styles */\n* { margin: 0; padding: 0; box-sizing: border-box; }\nbody {\n  font-family: 'Inter', sans-serif;\n  background: #0a0a1a;\n  color: #eee;\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  min-height: 100vh;\n}\nh1 { color: #00d4aa; }\n` },
+          { id: "src/app.js", name: "app.js", type: "file", language: "javascript", content: `// ${projectName} - App\nconsole.log("${projectName} loaded!");\n\ndocument.addEventListener("DOMContentLoaded", () => {\n  console.log("DOM ready!");\n});\n` },
+        ]},
+        { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0"\n}\n` },
+      ];
+    case "node-api":
+      return [
+        { id: "src", name: "src", type: "folder", isOpen: true, children: [
+          { id: "src/server.js", name: "server.js", type: "file", language: "javascript", content: `// ${projectName} - Server\nconst http = require('http');\n\nconst server = http.createServer((req, res) => {\n  res.writeHead(200, { 'Content-Type': 'application/json' });\n  res.end(JSON.stringify({ message: 'Hello from ${projectName}!' }));\n});\n\nconst PORT = 3000;\nserver.listen(PORT, () => {\n  console.log(\`Server running on port \${PORT}\`);\n});\n` },
+          { id: "src/routes.js", name: "routes.js", type: "file", language: "javascript", content: `// Route handlers\n\nmodule.exports = {\n  getHealth: (req, res) => res.json({ status: 'ok' }),\n  getUsers: (req, res) => res.json({ users: [] }),\n};\n` },
+        ]},
+        { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "main": "src/server.js",\n  "scripts": { "start": "node src/server.js" }\n}\n` },
+      ];
+    case "react":
+      return [
+        { id: "src", name: "src", type: "folder", isOpen: true, children: [
+          { id: "src/App.jsx", name: "App.jsx", type: "file", language: "javascript", content: `import React, { useState } from 'react';\n\nfunction App() {\n  const [count, setCount] = useState(0);\n\n  return (\n    <div className="app">\n      <h1>${projectName}</h1>\n      <p>Count: {count}</p>\n      <button onClick={() => setCount(c => c + 1)}>Increment</button>\n    </div>\n  );\n}\n\nexport default App;\n` },
+          { id: "src/index.jsx", name: "index.jsx", type: "file", language: "javascript", content: `import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\n\nReactDOM.createRoot(document.getElementById('root')).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);\n` },
+          { id: "src/App.css", name: "App.css", type: "file", language: "css", content: `.app {\n  text-align: center;\n  padding: 2rem;\n}\n\nh1 { color: #00d4aa; }\n\nbutton {\n  padding: 0.5rem 1rem;\n  background: #00d4aa;\n  border: none;\n  border-radius: 4px;\n  cursor: pointer;\n  font-size: 1rem;\n}\n` },
+        ]},
+        { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "dependencies": { "react": "^18.2.0", "react-dom": "^18.2.0" }\n}\n` },
+      ];
+    default:
+      return createDefaultProject(domain);
+  }
+}
+
 interface FileNode {
   id: string;
   name: string;
@@ -215,6 +287,16 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
+
+  // Project management
+  const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj-${Date.now()}`);
+  const [currentProjectName, setCurrentProjectName] = useState<string>(`${domainName} Workspace`);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectTemplate, setNewProjectTemplate] = useState("web-app");
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const [recentProjects, setRecentProjects] = useState<SavedProject[]>(() => getSavedProjects());
 
   // AI Chat
   const [messages, setMessages] = useState<Message[]>([
@@ -458,6 +540,63 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
   };
 
+  // -- Project management --
+  const handleSaveProject = useCallback(() => {
+    const proj: SavedProject = {
+      id: currentProjectId,
+      name: currentProjectName,
+      domain: domainName,
+      fileTree,
+      lastOpened: Date.now(),
+      createdAt: Date.now(),
+    };
+    saveProject(proj);
+    setRecentProjects(getSavedProjects());
+    setOutput(prev => [...prev, `💾 Project "${currentProjectName}" saved.`]);
+    setShowTerminal(true);
+  }, [currentProjectId, currentProjectName, domainName, fileTree]);
+
+  const handleOpenProject = useCallback((proj: SavedProject) => {
+    // Save current project first
+    handleSaveProject();
+    // Load selected project
+    setFileTree(proj.fileTree);
+    setCurrentProjectId(proj.id);
+    setCurrentProjectName(proj.name);
+    setOpenTabs([]);
+    setActiveTabId(null);
+    setShowWelcome(false);
+    setShowNewProject(false);
+    // Update last opened
+    saveProject({ ...proj, lastOpened: Date.now() });
+    setRecentProjects(getSavedProjects());
+  }, [handleSaveProject]);
+
+  const handleCreateNewProject = useCallback(() => {
+    if (!newProjectName.trim()) return;
+    // Save current first
+    handleSaveProject();
+    const newId = `proj-${Date.now()}`;
+    const newTree = createProjectFromTemplate(newProjectTemplate, newProjectName.trim(), domainName);
+    setFileTree(newTree);
+    setCurrentProjectId(newId);
+    setCurrentProjectName(newProjectName.trim());
+    setOpenTabs([]);
+    setActiveTabId(null);
+    setShowNewProject(false);
+    setShowWelcome(false);
+    // Save the new project
+    const proj: SavedProject = { id: newId, name: newProjectName.trim(), domain: domainName, fileTree: newTree, lastOpened: Date.now(), createdAt: Date.now() };
+    saveProject(proj);
+    setRecentProjects(getSavedProjects());
+    setNewProjectName("");
+  }, [newProjectName, newProjectTemplate, domainName, handleSaveProject]);
+
+  const handleDeleteProject = useCallback((id: string) => {
+    deleteProject(id);
+    setRecentProjects(getSavedProjects());
+  }, []);
+
   const firstFolderId = useMemo(() => {
     const find = (nodes: FileNode[]): string | null => {
       for (const n of nodes) { if (n.type === "folder") return n.id; if (n.children) { const f = find(n.children); if (f) return f; } }
@@ -466,15 +605,211 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     return find(fileTree);
   }, [fileTree]);
 
+  // Welcome / New Project screens
+  if (showWelcome) {
+    return (
+      <div className="flex flex-col h-screen w-full bg-[hsl(var(--background))] text-foreground overflow-hidden">
+        <div className="flex items-center h-9 bg-card border-b border-border px-3 shrink-0 select-none">
+          <span className="text-xs font-semibold text-primary">Lunor.AI</span>
+          <span className="text-[10px] text-muted-foreground ml-2">— Welcome</span>
+          <div className="flex-1" />
+          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowWelcome(false)}>
+            <X className="h-3 w-3" />
+          </Button>
+          {onExit && (
+            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={onExit}>
+              <Minimize2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="max-w-2xl w-full space-y-8">
+            <div className="text-center space-y-2">
+              <h1 className="text-3xl font-bold text-foreground">Lunor.AI <span className="text-primary">Editor</span></h1>
+              <p className="text-sm text-muted-foreground">Start a new project or open a recent one</p>
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => { setShowWelcome(false); setShowNewProject(true); }}
+                className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <FilePlus className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">New Project</p>
+                  <p className="text-[10px] text-muted-foreground">Create from a template</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setShowWelcome(false)}
+                className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 text-left hover:border-primary/50 hover:bg-primary/5 transition-colors"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <FolderInput className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Current Project</p>
+                  <p className="text-[10px] text-muted-foreground">Return to workspace</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Recent projects */}
+            {recentProjects.length > 0 && (
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                  <Clock className="h-3 w-3" /> Recent Projects
+                </h3>
+                <div className="space-y-1.5">
+                  {recentProjects.map((proj) => (
+                    <div key={proj.id} className="group flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5 hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer"
+                      onClick={() => handleOpenProject(proj)}
+                    >
+                      <FileCode2 className="h-4 w-4 text-primary/60 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground truncate">{proj.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{proj.domain} · {new Date(proj.lastOpened).toLocaleDateString()}</p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteProject(proj.id); }}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center h-6 bg-primary/10 border-t border-border px-3 shrink-0">
+          <span className="text-[10px] text-muted-foreground">Lunor.AI Editor · {domainName}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // New Project dialog overlay
+  const newProjectDialog = showNewProject && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" onClick={() => setShowNewProject(false)}>
+      <div className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-foreground">Create New Project</h2>
+          <button onClick={() => setShowNewProject(false)} className="p-1 text-muted-foreground hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Project Name</label>
+            <input
+              autoFocus
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateNewProject()}
+              placeholder="My Awesome Project"
+              className="w-full rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">Choose Template</label>
+            <div className="grid grid-cols-2 gap-2">
+              {PROJECT_TEMPLATES.map((tmpl) => (
+                <button
+                  key={tmpl.id}
+                  onClick={() => setNewProjectTemplate(tmpl.id)}
+                  className={`flex items-center gap-2.5 rounded-md border p-3 text-left transition-colors ${
+                    newProjectTemplate === tmpl.id
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:bg-primary/5"
+                  }`}
+                >
+                  <span className="text-lg">{tmpl.icon}</span>
+                  <div>
+                    <p className="text-xs font-medium">{tmpl.name}</p>
+                    <p className="text-[10px] opacity-70">{tmpl.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowNewProject(false)}>Cancel</Button>
+            <Button size="sm" onClick={handleCreateNewProject} disabled={!newProjectName.trim()}>
+              <Plus className="h-3 w-3 mr-1" /> Create Project
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex flex-col h-screen w-full bg-[hsl(var(--background))] text-foreground overflow-hidden">
-      {/* Title bar */}
+      {newProjectDialog}
+
+      {/* Title bar with File menu */}
       <div className="flex items-center justify-between h-9 bg-card border-b border-border px-3 shrink-0 select-none">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-primary">Lunor.AI</span>
-          <span className="text-[10px] text-muted-foreground">— {domainName} Workspace</span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-semibold text-primary mr-1">Lunor.AI</span>
+
+          {/* File menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowFileMenu(!showFileMenu)}
+              className="flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+            >
+              File <ChevronDown className="h-2.5 w-2.5" />
+            </button>
+            {showFileMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowFileMenu(false)} />
+                <div className="absolute top-full left-0 z-50 mt-0.5 w-48 rounded-md border border-border bg-card py-1 shadow-xl">
+                  <button onClick={() => { setShowNewProject(true); setShowFileMenu(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                    <FilePlus className="h-3 w-3" /> New Project
+                  </button>
+                  <button onClick={() => { setShowWelcome(true); setShowFileMenu(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                    <FolderInput className="h-3 w-3" /> Open Project...
+                  </button>
+                  <button onClick={() => { handleSaveProject(); setShowFileMenu(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                    <Save className="h-3 w-3" /> Save Project
+                  </button>
+                  <div className="my-1 border-t border-border" />
+                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("file"); setNewItemName(""); setShowFileMenu(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                    <File className="h-3 w-3" /> New File
+                  </button>
+                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("folder"); setNewItemName(""); setShowFileMenu(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                    <FolderPlus className="h-3 w-3" /> New Folder
+                  </button>
+                  {recentProjects.length > 0 && (
+                    <>
+                      <div className="my-1 border-t border-border" />
+                      <div className="px-3 py-1 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60">Recent</div>
+                      {recentProjects.slice(0, 5).map((proj) => (
+                        <button key={proj.id} onClick={() => { handleOpenProject(proj); setShowFileMenu(false); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors truncate">
+                          <Clock className="h-3 w-3 shrink-0" /> <span className="truncate">{proj.name}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <span className="text-[10px] text-muted-foreground ml-1">— {currentProjectName}</span>
         </div>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={handleSaveProject} title="Save Project">
+            <Save className="h-3 w-3" />
+          </Button>
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
             {showAIPanel ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
           </Button>
