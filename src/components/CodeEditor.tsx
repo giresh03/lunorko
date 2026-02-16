@@ -5,7 +5,8 @@ import {
   File, FolderOpen, FolderClosed, Plus, Trash2, FilePlus, FolderPlus,
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
-  FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2
+  FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
+  Eye, EyeOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -167,7 +168,51 @@ const LANG_EXT_MAP: Record<string, string> = {
   yaml: "yaml", shell: "sh", bash: "sh", sql: "sql", markdown: "md",
 };
 
-function extractCodeBlocks(markdown: string): { code: string; language: string; filename?: string }[] {
+// Generate a descriptive filename from the user's prompt and code content
+function generateFileName(language: string, code: string, userPrompt?: string): string {
+  const ext = LANG_EXT_MAP[language] || LANG_EXT_MAP[LANG_MAP[language] || ""] || language || "js";
+  
+  // Try to extract a meaningful name from the prompt
+  if (userPrompt) {
+    const prompt = userPrompt.toLowerCase();
+    // Common patterns: "build a login page", "create a todo app", "make a calculator"
+    const patterns = [
+      /(?:build|create|make|generate|write|code)\s+(?:a|an|the)?\s*(.+?)(?:\s+(?:page|app|component|form|function|class|module|script|program|website|site|layout))/i,
+      /(?:build|create|make|generate|write|code)\s+(?:a|an|the)?\s*(.+)/i,
+      /(.+?)(?:\s+(?:page|app|component|form|function|class|module|script|program|website|site|layout))/i,
+    ];
+    for (const pattern of patterns) {
+      const match = prompt.match(pattern);
+      if (match?.[1]) {
+        const name = match[1]
+          .trim()
+          .replace(/[^a-z0-9\s]/gi, "")
+          .trim()
+          .split(/\s+/)
+          .slice(0, 3)
+          .map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join("");
+        if (name && name.length >= 2) return `${name}.${ext}`;
+      }
+    }
+  }
+  
+  // Try to extract name from code content (e.g., title tag, class name, function name)
+  const titleMatch = code.match(/<title>([^<]+)<\/title>/i);
+  if (titleMatch) {
+    const name = titleMatch[1].replace(/[^a-z0-9\s]/gi, "").trim().split(/\s+/).slice(0, 3)
+      .map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
+    if (name) return `${name}.${ext}`;
+  }
+  
+  const classMatch = code.match(/(?:class|function)\s+(\w+)/);
+  if (classMatch) return `${classMatch[1].charAt(0).toLowerCase() + classMatch[1].slice(1)}.${ext}`;
+  
+  // Fallback with readable name
+  return `untitled.${ext}`;
+}
+
+function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
   const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
@@ -182,11 +227,16 @@ function extractCodeBlocks(markdown: string): { code: string; language: string; 
     const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
     let fnMatch;
     while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
-      // Assign to first block without a filename
       const unassigned = blocks.find(b => !b.filename);
       if (unassigned) unassigned.filename = fnMatch[1];
     }
   }
+  // Generate proper filenames for blocks that still don't have one
+  blocks.forEach((block) => {
+    if (!block.filename) {
+      block.filename = generateFileName(block.language, block.code, userPrompt);
+    }
+  });
   return blocks;
 }
 
@@ -287,6 +337,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Project management
   const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj-${Date.now()}`);
@@ -525,7 +576,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     } catch { upsert("❌ Connection error."); }
 
     // Auto-apply: extract code blocks and create appropriate files
-    const codeBlocks = extractCodeBlocks(assistantSoFar);
+    const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
+    const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
       // Apply each block — creates new files for different languages
       codeBlocks.forEach((block) => {
@@ -939,40 +991,78 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                 {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 Run
               </Button>
+              {activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html")) && (
+                <button
+                  onClick={() => setShowPreview(!showPreview)}
+                  className={`p-1 transition-colors ${showPreview ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  title={showPreview ? "Hide Preview" : "Show Web Preview"}
+                >
+                  {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Monaco editor */}
-          <div className="flex-1 overflow-hidden">
-            {activeTab ? (
-              <Editor
-                height="100%"
-                language={activeTab.language}
-                value={activeTab.content}
-                onChange={handleCodeChange}
-                theme="vs-dark"
-                options={{
-                  fontSize: 13,
-                  fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
-                  minimap: { enabled: true, scale: 1, maxColumn: 80 },
-                  scrollBeyondLastLine: false,
-                  lineNumbers: "on",
-                  renderLineHighlight: "line",
-                  padding: { top: 8 },
-                  wordWrap: "on",
-                  tabSize: 2,
-                  automaticLayout: true,
-                  bracketPairColorization: { enabled: true },
-                  cursorBlinking: "smooth",
-                  smoothScrolling: true,
-                  renderWhitespace: "selection",
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                <div className="text-center space-y-2">
-                  <p className="text-lg font-medium">Lunor.AI Editor</p>
-                  <p className="text-xs">Open a file from the explorer to start coding</p>
+          {/* Monaco editor + Preview */}
+          <div className="flex flex-1 overflow-hidden">
+            {/* Editor */}
+            <div className={`flex-1 overflow-hidden ${showPreview ? "w-1/2" : "w-full"}`}>
+              {activeTab ? (
+                <Editor
+                  height="100%"
+                  language={activeTab.language}
+                  value={activeTab.content}
+                  onChange={handleCodeChange}
+                  theme="vs-dark"
+                  options={{
+                    fontSize: 13,
+                    fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
+                    minimap: { enabled: !showPreview, scale: 1, maxColumn: 80 },
+                    scrollBeyondLastLine: false,
+                    lineNumbers: "on",
+                    renderLineHighlight: "line",
+                    padding: { top: 8 },
+                    wordWrap: "on",
+                    tabSize: 2,
+                    automaticLayout: true,
+                    bracketPairColorization: { enabled: true },
+                    cursorBlinking: "smooth",
+                    smoothScrolling: true,
+                    renderWhitespace: "selection",
+                  }}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  <div className="text-center space-y-2">
+                    <p className="text-lg font-medium">Lunor.AI Editor</p>
+                    <p className="text-xs">Open a file from the explorer to start coding</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Web Preview */}
+            {showPreview && activeTab && (
+              <div className="flex flex-col w-1/2 border-l border-border overflow-hidden">
+                <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0">
+                  <Eye className="h-3 w-3 text-primary mr-1.5" />
+                  <span className="text-[10px] font-medium text-foreground">Preview</span>
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => setShowPreview(false)}
+                    className="p-0.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="flex-1 bg-background">
+                  <iframe
+                    key={activeTab.content}
+                    srcDoc={activeTab.content}
+                    className="w-full h-full border-0"
+                    sandbox="allow-scripts allow-modals"
+                    title="Web Preview"
+                  />
                 </div>
               </div>
             )}
@@ -1022,7 +1112,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                     {msg.role === "user" ? <span className="text-[9px] font-medium text-secondary-foreground">U</span> : <Bot className="h-3.5 w-3.5 text-primary" />}
                   </div>
                   <div className={`max-w-[88%] rounded-lg px-3 py-2 text-xs ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                    <div className="prose prose-sm prose-invert max-w-none [&_pre]:bg-background [&_pre]:p-2.5 [&_pre]:rounded-md [&_pre]:text-[10px] [&_pre]:my-2 [&_code]:text-primary [&_code]:bg-background/50 [&_code]:px-1 [&_code]:rounded-sm [&_pre]:relative [&_pre]:border [&_pre]:border-primary/20">
+                    <div className="prose prose-sm prose-invert max-w-none break-words overflow-hidden [&_pre]:bg-background [&_pre]:p-2.5 [&_pre]:rounded-md [&_pre]:text-[10px] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:text-primary [&_code]:bg-background/50 [&_code]:px-1 [&_code]:rounded-sm [&_code]:break-all [&_pre]:relative [&_pre]:border [&_pre]:border-primary/20 [&_pre_code]:break-normal [&_pre_code]:whitespace-pre">
                       <ReactMarkdown
                         components={{
                           pre({ children, ...props }) {
