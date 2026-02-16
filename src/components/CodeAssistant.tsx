@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
+import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import { domains } from "@/lib/domains";
 
 interface Message {
   role: "user" | "assistant";
@@ -16,10 +18,16 @@ interface CodeAssistantProps {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-assistant`;
 
 const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
+  const domainId = useMemo(() => {
+    return domains.find(d => d.name === domainName)?.id ?? domainName.toLowerCase().replace(/\s+/g, "-");
+  }, [domainName]);
+
+  const promptConfig = useMemo(() => getDomainPromptConfig(domainId), [domainId]);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!\n\nTry:\n- "Generate a boilerplate for..."\n- "Explain how... works"\n- "Debug this code..."`,
+      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -209,6 +217,27 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         )}
         <div ref={endRef} />
       </div>
+
+      {/* Starter Prompts */}
+      {messages.length <= 1 && !isLoading && (
+        <div className="border-t border-border px-3 py-2">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-muted-foreground">Try asking</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {promptConfig.starterPrompts.map((prompt, i) => (
+              <button
+                key={i}
+                onClick={() => { setInput(prompt); }}
+                className="rounded-md border border-border bg-secondary/50 px-2.5 py-1 text-xs text-secondary-foreground hover:bg-secondary transition-colors"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <div className="border-t border-border p-3">
