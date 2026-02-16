@@ -833,14 +833,51 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
-      // Apply each block — creates new files for different languages
       codeBlocks.forEach((block) => {
         applyCodeToEditor(block.code, block.language, block.filename);
       });
     }
 
+    // Live debugging hints for app-development domain
+    if (isAppDomain && assistantSoFar) {
+      const lowerInput = chatInput.toLowerCase();
+      const lowerResponse = assistantSoFar.toLowerCase();
+      const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
+
+      if (isDebugging) {
+        const hints: string[] = [];
+        if (/layout|overflow|scroll|flex|position|align|margin|padding|safe.?area/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("🔧 **Layout Tip:** Use the **Grid Debug Overlay** (⊞ icon in preview) to visualize safe areas, padding guides, and column grids across devices.");
+        }
+        if (/render|re-render|performance|slow|lag|memo|usememo|usecallback/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("⚡ **Performance Tip:** Wrap expensive components in `React.memo()` and use `useMemo`/`useCallback` for derived values and handlers passed as props.");
+        }
+        if (/state|usestate|setstate|stale|closure/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("🔄 **State Tip:** Use the functional updater `setState(prev => ...)` to avoid stale closure bugs — especially in event handlers and async callbacks.");
+        }
+        if (/navigation|screen|route|stack|tab|navigate/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("🗺️ **Navigation Tip:** Ensure all screens are registered before navigating. Use `navigation.canGoBack()` before calling `goBack()` to prevent crashes.");
+        }
+        if (/api|fetch|network|timeout|cors|401|403|500/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("🌐 **Network Tip:** Always wrap API calls in try/catch, check `response.ok`, and handle offline gracefully with cached data or retry logic.");
+        }
+        if (/style|css|responsive|breakpoint|device|width|height|pixel/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("📱 **Responsive Tip:** Test across device presets using the device switcher dropdown — iPhone SE (320px) through iPad Pro (834px) to catch layout breaks.");
+        }
+        if (hints.length === 0) {
+          hints.push("💡 **Debug Tip:** Use `console.log()` at key points, check the terminal output, and switch device presets to reproduce layout-specific issues.");
+        }
+
+        const hintBlock = "\n\n---\n\n" + hints.join("\n\n");
+        assistantSoFar += hintBlock;
+        setMessages((prev) =>
+          prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: assistantSoFar } : m))
+        );
+      }
+    }
+
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
