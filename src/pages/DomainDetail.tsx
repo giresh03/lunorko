@@ -5,6 +5,7 @@ import {
   CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
   TrendingUp, Zap, Bookmark, CalendarDays
 } from "lucide-react";
+import VideoLearningHub from "@/components/VideoLearningHub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -485,70 +486,74 @@ const DomainDetail = () => {
           {/* Videos Tab */}
           <TabsContent value="videos">
             {videos.length > 0 ? (
-              <>
-                {/* Featured video */}
-                <div className="mb-8">
-                  <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
-                    <Star className="h-5 w-5 text-primary" /> Featured Course
-                  </h3>
-                  <a
-                    href={videos[0].url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group block overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:border-primary/30 hover:shadow-xl"
-                  >
-                    <div className="grid md:grid-cols-2">
-                      <div className="relative aspect-video overflow-hidden bg-muted">
-                        {videos[0].thumbnail ? (
-                          <img
-                            src={videos[0].thumbnail}
-                            alt={videos[0].title}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full items-center justify-center">
-                            <Video className="h-16 w-16 text-muted-foreground/30" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 flex items-center justify-center bg-background/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/90 text-primary-foreground shadow-lg">
-                            <Play className="h-7 w-7 ml-0.5" />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col justify-center p-8">
-                        <div className="mb-3 flex items-center gap-2">
-                          <Badge variant="outline" className={`text-xs ${sourceColors[videos[0].source] || ""}`}>
-                            {videos[0].source}
-                          </Badge>
-                          {videos[0].duration && (
-                            <Badge variant="outline" className="text-xs border-border text-muted-foreground">
-                              <Clock className="mr-1 h-3 w-3" /> {videos[0].duration}
-                            </Badge>
+              domainId === "app-development" ? (
+                <VideoLearningHub videos={videos} domainColor={domain.color} />
+              ) : (
+                <>
+                  {/* Featured video */}
+                  <div className="mb-8">
+                    <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
+                      <Star className="h-5 w-5 text-primary" /> Featured Course
+                    </h3>
+                    <a
+                      href={videos[0].url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block overflow-hidden rounded-xl border border-border bg-card transition-all duration-300 hover:border-primary/30 hover:shadow-xl"
+                    >
+                      <div className="grid md:grid-cols-2">
+                        <div className="relative aspect-video overflow-hidden bg-muted">
+                          {videos[0].thumbnail ? (
+                            <img
+                              src={videos[0].thumbnail}
+                              alt={videos[0].title}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center">
+                              <Video className="h-16 w-16 text-muted-foreground/30" />
+                            </div>
                           )}
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/90 text-primary-foreground shadow-lg">
+                              <Play className="h-7 w-7 ml-0.5" />
+                            </div>
+                          </div>
                         </div>
-                        <h4 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-                          {videos[0].title}
-                        </h4>
-                        {videos[0].description && (
-                          <p className="mt-2 text-sm text-muted-foreground">{videos[0].description}</p>
-                        )}
-                        <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                          Watch Now <ExternalLink className="h-4 w-4" />
-                        </span>
+                        <div className="flex flex-col justify-center p-8">
+                          <div className="mb-3 flex items-center gap-2">
+                            <Badge variant="outline" className={`text-xs ${sourceColors[videos[0].source] || ""}`}>
+                              {videos[0].source}
+                            </Badge>
+                            {videos[0].duration && (
+                              <Badge variant="outline" className="text-xs border-border text-muted-foreground">
+                                <Clock className="mr-1 h-3 w-3" /> {videos[0].duration}
+                              </Badge>
+                            )}
+                          </div>
+                          <h4 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+                            {videos[0].title}
+                          </h4>
+                          {videos[0].description && (
+                            <p className="mt-2 text-sm text-muted-foreground">{videos[0].description}</p>
+                          )}
+                          <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                            Watch Now <ExternalLink className="h-4 w-4" />
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </a>
-                </div>
+                    </a>
+                  </div>
 
-                {/* All videos grid */}
-                <h3 className="mb-4 text-lg font-bold text-foreground">All Videos & Courses</h3>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {videos.slice(1).map((r) => (
-                    <VideoCard key={r.id} resource={r} />
-                  ))}
-                </div>
-              </>
+                  {/* All videos grid */}
+                  <h3 className="mb-4 text-lg font-bold text-foreground">All Videos & Courses</h3>
+                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {videos.slice(1).map((r) => (
+                      <VideoCard key={r.id} resource={r} />
+                    ))}
+                  </div>
+                </>
+              )
             ) : (
               <div className="rounded-xl border border-dashed border-border bg-card/50 p-16 text-center">
                 <Video className="mx-auto h-12 w-12 text-muted-foreground/30" />
