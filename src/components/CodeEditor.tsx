@@ -343,6 +343,28 @@ interface IDEProps {
 
 const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
 
+const RESPONSIVE_CHECKLIST = [
+  { id: "safe-area", label: "Safe area insets handled", hint: "Use SafeAreaView or env(safe-area-inset-*) for notch/home indicator" },
+  { id: "font-scale", label: "Dynamic font scaling supported", hint: "Use rem/sp units, avoid fixed px for text sizes" },
+  { id: "landscape", label: "Landscape orientation works", hint: "Test rotated layout — scrollable containers, flex-wrap" },
+  { id: "small-screen", label: "Works on 320px width (iPhone SE)", hint: "Check text truncation, button tap targets ≥44px" },
+  { id: "tablet-layout", label: "Tablet layout optimized", hint: "Use split-view or wider grids for 744px+ screens" },
+  { id: "touch-targets", label: "Touch targets ≥ 44×44pt", hint: "Buttons, links, checkboxes must be easily tappable" },
+  { id: "keyboard", label: "Keyboard avoidance handled", hint: "Inputs scroll into view when keyboard appears" },
+  { id: "dark-mode", label: "Dark mode colors tested", hint: "Check contrast ratios meet WCAG AA (4.5:1 for text)" },
+  { id: "loading-states", label: "Loading/skeleton states shown", hint: "Show skeletons or spinners during data fetches" },
+  { id: "offline", label: "Offline fallback provided", hint: "Show cached data or friendly message when offline" },
+];
+
+const LAYOUT_SUGGESTIONS = [
+  { id: "stack", icon: "📱", label: "Stack Layout", desc: "Vertical scroll", prompt: "Generate a React Native ScrollView with a vertical stack layout using SafeAreaView, proper padding, and responsive spacing" },
+  { id: "grid", icon: "🔲", label: "Responsive Grid", desc: "Adaptive columns", prompt: "Generate a responsive grid layout that shows 2 columns on phones and 3 on tablets using FlatList numColumns or flexbox" },
+  { id: "tabs", icon: "📑", label: "Tab Navigation", desc: "Bottom tabs", prompt: "Generate a React Native bottom tab navigator with 4 tabs, icons, and proper safe area handling" },
+  { id: "drawer", icon: "☰", label: "Drawer + Stack", desc: "Side menu", prompt: "Generate a React Native drawer navigator with a hamburger menu and nested stack screens" },
+  { id: "card-list", icon: "🃏", label: "Card List", desc: "Scrollable cards", prompt: "Generate a scrollable card list with pull-to-refresh, image thumbnails, and responsive card sizing" },
+  { id: "form", icon: "📝", label: "Adaptive Form", desc: "Keyboard-aware", prompt: "Generate a keyboard-aware form with TextInput fields, validation, and proper spacing that adapts to screen size" },
+];
+
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode[]>(() => createDefaultProject(domainName));
@@ -396,6 +418,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   });
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [debugOverlay, setDebugOverlay] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -1778,8 +1802,79 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
               <div ref={chatEndRef} />
             </div>
 
+            {/* Responsive Checklist & Layout Suggestions (app-development only) */}
+            {isAppDomain && showChecklist && (
+              <div className="border-t overflow-y-auto shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "260px" }}>
+                <div className="px-3 py-2 flex items-center justify-between border-b" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Ruler className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} /> Responsive Checklist
+                  </span>
+                  <span className="text-[9px] font-mono" style={{ color: currentTheme.uiColors.muted }}>
+                    {Object.values(checklistItems).filter(Boolean).length}/{RESPONSIVE_CHECKLIST.length}
+                  </span>
+                </div>
+                <div className="p-2 space-y-0.5">
+                  {RESPONSIVE_CHECKLIST.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => setChecklistItems(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                      className="flex items-start gap-2 w-full text-left px-2 py-1.5 rounded transition-colors"
+                      style={{ backgroundColor: checklistItems[item.id] ? currentTheme.uiColors.accent + "10" : "transparent" }}
+                    >
+                      <div className="mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[8px]"
+                        style={{
+                          borderColor: checklistItems[item.id] ? currentTheme.uiColors.accent : currentTheme.uiColors.border,
+                          backgroundColor: checklistItems[item.id] ? currentTheme.uiColors.accent : "transparent",
+                          color: checklistItems[item.id] ? "#fff" : "transparent",
+                        }}
+                      >{checklistItems[item.id] ? "✓" : ""}</div>
+                      <div>
+                        <span className="text-[10px] font-medium" style={{ color: currentTheme.uiColors.text, textDecoration: checklistItems[item.id] ? "line-through" : "none", opacity: checklistItems[item.id] ? 0.6 : 1 }}>{item.label}</span>
+                        <p className="text-[8px] mt-0.5" style={{ color: currentTheme.uiColors.muted }}>{item.hint}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {/* Auto-suggest layouts */}
+                <div className="px-3 py-2 border-t" style={{ borderColor: currentTheme.uiColors.border }}>
+                  <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Quick Layout Templates</span>
+                  <div className="mt-1.5 grid grid-cols-2 gap-1">
+                    {LAYOUT_SUGGESTIONS.map((layout) => (
+                      <button
+                        key={layout.id}
+                        onClick={() => {
+                          setChatInput(layout.prompt);
+                          setShowChecklist(false);
+                        }}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-left transition-colors"
+                        style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}
+                      >
+                        <span className="text-sm">{layout.icon}</span>
+                        <div>
+                          <span className="text-[9px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{layout.label}</span>
+                          <span className="text-[7px]" style={{ color: currentTheme.uiColors.muted }}>{layout.desc}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {isAppDomain && (
+                <div className="flex justify-end mb-1">
+                  <button
+                    onClick={() => setShowChecklist(!showChecklist)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showChecklist ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showChecklist ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Ruler className="h-3 w-3" />
+                    Responsive
+                  </button>
+                </div>
+              )}
               <div className="flex gap-1.5">
                 <input
                   value={chatInput}
