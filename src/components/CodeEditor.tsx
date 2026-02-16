@@ -6,7 +6,8 @@ import {
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
-  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler
+  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
+  Maximize2, ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -418,6 +419,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   });
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [debugOverlay, setDebugOverlay] = useState(false);
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
@@ -1433,7 +1435,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 
             {/* Web Preview */}
             {showPreview && activeTab && (
-              <div className="flex flex-col w-1/2 border-l border-border overflow-hidden">
+              <div className={`flex flex-col border-l border-border overflow-hidden ${previewFullscreen ? "fixed inset-0 z-50 w-full h-full border-l-0" : "w-1/2"}`}>
                 <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0 gap-1">
                   {isAppDomain ? <Smartphone className="h-3 w-3 text-primary" /> : <Eye className="h-3 w-3 text-primary" />}
                   <span className="text-[10px] font-medium text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
@@ -1537,6 +1539,27 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                     title="Refresh Preview"
                   >
                     <RefreshCw className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewFullscreen(!previewFullscreen)}
+                    className={`p-0.5 transition-colors ${previewFullscreen ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                    title={previewFullscreen ? "Exit Fullscreen" : "Fullscreen Preview"}
+                  >
+                    {previewFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newWindow = window.open("", "_blank");
+                      if (newWindow) {
+                        newWindow.document.open();
+                        newWindow.document.write(previewContent);
+                        newWindow.document.close();
+                      }
+                    }}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Open in New Tab"
+                  >
+                    <ExternalLink className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => setShowPreview(false)}
