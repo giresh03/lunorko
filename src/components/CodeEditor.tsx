@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import { editorThemes, getThemeById, type EditorTheme } from "@/lib/editorThemes";
+import { getDomainEnvironment } from "@/lib/domainEnvironments";
 
 // -- Project types --
 interface SavedProject {
@@ -130,37 +131,49 @@ const getFileIcon = (name: string) => {
 };
 
 // -- Default project structure --
-const createDefaultProject = (domainName: string): FileNode[] => [
-  {
-    id: "src", name: "src", type: "folder", isOpen: true,
-    children: [
-      { id: "src/index.js", name: "index.js", type: "file", language: "javascript",
-        content: `// Welcome to Lunor.AI Code Editor\n// ${domainName} Workspace\n\nfunction greet(name) {\n  return \`Hello, \${name}! Welcome to Lunor.AI 🚀\`;\n}\n\nconsole.log(greet("Engineer"));\nconsole.log("2 + 2 =", 2 + 2);\n` },
-      { id: "src/app.js", name: "app.js", type: "file", language: "javascript",
-        content: `// App entry point\n\nimport { greet } from './index.js';\n\nconst app = {\n  name: "${domainName} App",\n  version: "1.0.0",\n  init() {\n    console.log("App initialized!");\n  }\n};\n\napp.init();\n` },
-      { id: "src/utils.js", name: "utils.js", type: "file", language: "javascript",
-        content: `// Utility functions\n\nexport function formatDate(date) {\n  return new Date(date).toLocaleDateString();\n}\n\nexport function capitalize(str) {\n  return str.charAt(0).toUpperCase() + str.slice(1);\n}\n` },
-      {
-        id: "src/styles", name: "styles", type: "folder", isOpen: false,
-        children: [
-          { id: "src/styles/main.css", name: "main.css", type: "file", language: "css",
-            content: `/* Main styles */\n:root {\n  --primary: #00d4aa;\n  --bg: #0a0a1a;\n}\n\nbody {\n  font-family: 'Inter', sans-serif;\n  background: var(--bg);\n  color: #eee;\n  margin: 0;\n}\n` },
-        ],
-      },
-    ],
-  },
-  {
-    id: "public", name: "public", type: "folder", isOpen: false,
-    children: [
-      { id: "public/index.html", name: "index.html", type: "file", language: "html",
-        content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${domainName} - Lunor.AI</title>\n</head>\n<body>\n  <div id="root"></div>\n  <script src="/src/index.js"></script>\n</body>\n</html>` },
-    ],
-  },
-  { id: "package.json", name: "package.json", type: "file", language: "json",
-    content: `{\n  "name": "${domainName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "description": "${domainName} project on Lunor.AI",\n  "main": "src/index.js",\n  "scripts": {\n    "start": "node src/index.js",\n    "test": "echo \\"No tests yet\\""\n  }\n}\n` },
-  { id: "README.md", name: "README.md", type: "file", language: "markdown",
-    content: `# ${domainName}\n\nWelcome to your ${domainName} workspace on **Lunor.AI**.\n\n## Getting Started\n\n1. Edit files in the explorer\n2. Run code with the play button\n3. Ask the AI assistant for help\n` },
-];
+const createDefaultProject = (domainName: string): FileNode[] => {
+  const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const env = getDomainEnvironment(domainId);
+
+  // Build file tree from domain environment templates
+  const templateChildren: FileNode[] = env.templateFiles.map((f) => ({
+    id: `src/${f.name}`,
+    name: f.name,
+    type: "file" as const,
+    language: f.language,
+    content: f.content,
+  }));
+
+  // Add domain-specific starter code as main file if not already in templates
+  const hasMainFile = templateChildren.some((f) => f.name === env.defaultFileName);
+  if (!hasMainFile) {
+    templateChildren.unshift({
+      id: `src/${env.defaultFileName}`,
+      name: env.defaultFileName,
+      type: "file",
+      language: env.primaryLanguage,
+      content: env.starterCode,
+    });
+  }
+
+  return [
+    {
+      id: "src", name: "src", type: "folder", isOpen: true,
+      children: templateChildren,
+    },
+    {
+      id: "public", name: "public", type: "folder", isOpen: false,
+      children: [
+        { id: "public/index.html", name: "index.html", type: "file", language: "html",
+          content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${domainName} - Lunor.AI</title>\n</head>\n<body>\n  <div id="root"></div>\n</body>\n</html>` },
+      ],
+    },
+    { id: "package.json", name: "package.json", type: "file", language: "json",
+      content: `{\n  "name": "${domainName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "description": "${domainName} project on Lunor.AI",\n  "main": "src/${env.defaultFileName}"\n}\n` },
+    { id: "README.md", name: "README.md", type: "file", language: "markdown",
+      content: `# ${domainName}\n\nWelcome to your ${domainName} workspace on **Lunor.AI**.\n\n## Environment\n- **Primary Language:** ${env.primaryLanguage}\n- **Supported:** ${env.supportedLanguages.join(", ")}\n- **Runtime:** ${env.runtime === "native" ? "⚡ Native execution" : "🤖 AI-simulated execution"}\n\n## Getting Started\n\n1. Edit files in the explorer\n2. Run code with the play button (supports ${env.supportedLanguages.join(", ")})\n3. Ask the AI assistant for help\n` },
+  ];
+};
 
 // -- Extract code blocks from markdown with filename detection --
 const LANG_EXT_MAP: Record<string, string> = {
@@ -323,16 +336,20 @@ interface IDEProps {
   onExit?: () => void;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-assistant`;
+const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode[]>(() => createDefaultProject(domainName));
   const [openTabs, setOpenTabs] = useState<OpenTab[]>(() => {
-    const defaultFile = createDefaultProject(domainName)[0]?.children?.[0];
+    const tree = createDefaultProject(domainName);
+    const defaultFile = tree[0]?.children?.[0];
     return defaultFile ? [{ id: defaultFile.id, name: defaultFile.name, language: defaultFile.language || "javascript", content: defaultFile.content || "", isModified: false }] : [];
   });
-  const [activeTabId, setActiveTabId] = useState<string | null>("src/index.js");
+  const [activeTabId, setActiveTabId] = useState<string | null>(() => {
+    const tree = createDefaultProject(domainName);
+    return tree[0]?.children?.[0]?.id || null;
+  });
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
@@ -595,25 +612,32 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     if (!activeTab) return;
     setIsRunning(true);
     setShowTerminal(true);
-    setOutput([`$ Running ${activeTab.name}...`]);
     const lang = activeTab.language;
-    if (lang === "javascript" || lang === "typescript") {
-      try {
-        const { data, error } = await supabase.functions.invoke("run-code", {
-          body: { code: activeTab.content, language: lang },
-        });
-        if (error) setOutput((p) => [...p, `❌ ${error.message}`]);
-        else if (data?.output) setOutput((p) => [...p, ...data.output]);
-        else if (data?.error) setOutput((p) => [...p, `❌ ${data.error}`]);
-        else setOutput((p) => [...p, "✅ Done (no output)"]);
-      } catch (err: unknown) {
-        setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
+    const isNative = lang === "javascript" || lang === "typescript";
+    setOutput([`$ Running ${activeTab.name}...`, isNative ? "⚡ Native runtime" : `🤖 AI-simulated ${lang} runtime`]);
+
+    try {
+      const resp = await fetch(CODE_ENGINE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ action: "execute", code: activeTab.content, language: lang, domain: domainName }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setOutput((p) => [...p, `❌ ${data?.error || "Execution failed"}`]);
+      } else if (data?.output) {
+        setOutput((p) => [...p, ...data.output]);
+        if (data.runtime === "ai-simulated") {
+          setOutput((p) => [...p, `\n📋 Runtime: AI-simulated ${data.language} environment`]);
+        }
+      } else {
+        setOutput((p) => [...p, "✅ Done (no output)"]);
       }
-    } else {
-      setOutput((p) => [...p, `⚙️ ${lang} execution not supported yet.`]);
+    } catch (err: unknown) {
+      setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
     }
     setIsRunning(false);
-  }, [activeTab]);
+  }, [activeTab, domainName]);
 
   const handleCopy = () => {
     if (activeTab) navigator.clipboard.writeText(activeTab.content);
@@ -648,10 +672,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     };
 
     try {
-      const resp = await fetch(CHAT_URL, {
+      const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ messages: updated.map((m) => ({ role: m.role, content: m.content })), domain: domainName }),
+        body: JSON.stringify({ action: "generate", messages: updated.map((m) => ({ role: m.role, content: m.content })), domain: domainName }),
       });
       if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
       if (!resp.body) throw new Error("No body");

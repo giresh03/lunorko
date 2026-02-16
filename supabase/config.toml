@@ -1,1 +1,10 @@
 project_id = "lgtpgglphbcncrtaajsg"
+
+[functions.code-assistant]
+verify_jwt = false
+
+[functions.run-code]
+verify_jwt = false
+
+[functions.code-engine]
+verify_jwt = false
