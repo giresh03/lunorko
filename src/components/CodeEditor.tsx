@@ -625,8 +625,8 @@ ${allCss}
 <div id="root"></div>
 <script>
 // React Native component shims — map RN components to HTML equivalents
-window.View = (props) => React.createElement('div', {...props, style: {display:'flex', flexDirection:'column', ...props?.style}}, props?.children);
-window.Text = (props) => React.createElement('span', {...props, style: {fontSize:'14px', ...props?.style}}, props?.children);
+window.View = (props) => React.createElement('div', {...props, style: {display:'flex', flexDirection:'column', padding: props?.style?.padding || '16px', ...props?.style}}, props?.children);
+window.Text = (props) => React.createElement('span', {...props, style: {fontSize:'14px', color:'#e0e0e0', ...props?.style}}, props?.children);
 window.TouchableOpacity = (props) => React.createElement('button', {...props, onClick: props?.onPress, style: {background:'transparent', border:'none', color:'inherit', padding:0, cursor:'pointer', opacity: 1, ...props?.style}}, props?.children);
 window.Pressable = (props) => React.createElement('button', {...props, onClick: props?.onPress, style: {background:'transparent', border:'none', color:'inherit', padding:0, cursor:'pointer', ...props?.style}}, props?.children);
 window.TextInput = (props) => React.createElement('input', {type:'text', placeholder: props?.placeholder, value: props?.value, onChange: (e) => props?.onChangeText?.(e.target.value), style: {padding:'8px 12px', borderRadius:'8px', border:'1px solid #333', background:'#1a1a2e', color:'#e0e0e0', fontSize:'14px', width:'100%', ...props?.style}});
@@ -643,6 +643,12 @@ window.ActivityIndicator = (props) => React.createElement('div', {style:{textAli
 window.Switch = (props) => React.createElement('input', {type:'checkbox', checked: props?.value, onChange: (e) => props?.onValueChange?.(e.target.checked), style:{width:'40px', height:'20px', cursor:'pointer'}});
 window.Modal = (props) => props?.visible ? React.createElement('div', {style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}, React.createElement('div', {style:{background:'#1e1e2e',borderRadius:'12px',padding:'20px',maxWidth:'90%',maxHeight:'90%',overflow:'auto'}}, props?.children)) : null;
 window.KeyboardAvoidingView = (props) => React.createElement('div', props, props?.children);
+// React Native Button shim
+window.Button = (props) => React.createElement('button', {onClick: props?.onPress, disabled: props?.disabled, style: {padding:'10px 20px', borderRadius:'8px', border:'none', background: props?.color || '#6366f1', color:'white', fontSize:'14px', cursor:'pointer', opacity: props?.disabled ? 0.5 : 1, margin:'4px'}}, props?.title || 'Button');
+window.TouchableHighlight = (props) => React.createElement('button', {...props, onClick: props?.onPress, style: {background:'transparent', border:'none', color:'inherit', padding:0, cursor:'pointer', ...props?.style}}, props?.children);
+window.TouchableWithoutFeedback = (props) => React.createElement('div', {...props, onClick: props?.onPress, style: {cursor:'pointer', ...props?.style}}, props?.children);
+window.SectionList = (props) => React.createElement('div', {style: props?.style}, props?.sections?.map?.((section, si) => React.createElement('div', {key:si}, props?.renderSectionHeader?.({section}), section.data?.map?.((item, index) => props?.renderItem?.({item, index, section})))));
+window.Animated = { View: (props) => React.createElement('div', props, props?.children), Text: (props) => React.createElement('span', props, props?.children), Image: (props) => React.createElement('img', {src: props?.source?.uri, alt:'', style: props?.style}), Value: function(v){this._value=v;this.setValue=function(n){this._value=n};this.interpolate=function(){return ''};}, timing: function(){return {start:function(cb){cb&&cb({finished:true})}}}, spring: function(){return {start:function(cb){cb&&cb({finished:true})}}}, parallel: function(){return {start:function(cb){cb&&cb({finished:true})}}}, sequence: function(){return {start:function(cb){cb&&cb({finished:true})}}} };
 // Navigation shim
 window.useNavigation = () => ({ navigate: (s) => console.log('Navigate to:', s), goBack: () => console.log('Go back'), push: (s) => console.log('Push:', s) });
 window.useRoute = () => ({ params: {} });
