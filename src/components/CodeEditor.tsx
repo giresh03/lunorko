@@ -1376,6 +1376,22 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                   {isAppDomain ? <Smartphone className="h-3 w-3 text-primary" /> : <Eye className="h-3 w-3 text-primary" />}
                   <span className="text-[10px] font-medium text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
                   <span className="text-[9px] text-muted-foreground ml-0.5">— Live</span>
+                  {/* Device label & dimensions indicator */}
+                  {isAppDomain && currentDevice.type !== "desktop" && (
+                    <div className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
+                      <span className="text-[9px] font-semibold text-primary">{currentDevice.label}</span>
+                      <span className="text-[8px] text-primary/70">·</span>
+                      <span className="text-[8px] font-mono text-primary/70">{currentDevice.w}×{currentDevice.h}</span>
+                      <span className="text-[8px] text-primary/70">·</span>
+                      <span className="text-[8px] text-primary/60 capitalize">{currentDevice.type}</span>
+                    </div>
+                  )}
+                  {isAppDomain && currentDevice.type === "desktop" && (
+                    <div className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-secondary/50">
+                      <span className="text-[9px] font-semibold text-secondary-foreground/80">Desktop</span>
+                      <span className="text-[8px] text-muted-foreground">· Responsive</span>
+                    </div>
+                  )}
                   <div className="flex-1" />
                   {/* Device switcher - expanded for app domain */}
                   {isAppDomain ? (
