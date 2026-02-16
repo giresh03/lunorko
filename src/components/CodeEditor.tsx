@@ -12,7 +12,12 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import { editorThemes, getThemeById, type EditorTheme } from "@/lib/editorThemes";
-import { getDomainEnvironment } from "@/lib/domainEnvironments";
+import { getDomainEnvironment, domainEnvironments } from "@/lib/domainEnvironments";
+import {
+  syncTemplatesFromImport, getSnippetsForDomain, cacheAIResponse,
+  findCachedAIResponse, isOnline, getOfflineStatus, setOfflineMode,
+  type CachedSnippet,
+} from "@/lib/offlineCache";
 
 // -- Project types --
 interface SavedProject {
@@ -353,8 +358,22 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"files" | "search">("files");
+  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets">("files");
   const [showAIPanel, setShowAIPanel] = useState(true);
+  const [online, setOnline] = useState(isOnline());
+
+  // Sync offline cache on mount
+  useEffect(() => {
+    syncTemplatesFromImport(domainEnvironments);
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
+  }, []);
+
+  const domainId = useMemo(() => domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), [domainName]);
+  const snippets = useMemo(() => getSnippetsForDomain(domainId), [domainId]);
   const [output, setOutput] = useState<string[]>(["$ Ready."]);
   const [isRunning, setIsRunning] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -671,33 +690,45 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       });
     };
 
-    try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ action: "generate", messages: updated.map((m) => ({ role: m.role, content: m.content })), domain: domainName }),
-      });
-      if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
-      if (!resp.body) throw new Error("No body");
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        let idx: number;
-        while ((idx = buf.indexOf("\n")) !== -1) {
-          let line = buf.slice(0, idx); buf = buf.slice(idx + 1);
-          if (line.endsWith("\r")) line = line.slice(0, -1);
-          if (!line.startsWith("data: ") || line.trim() === "" || line.startsWith(":")) continue;
-          const json = line.slice(6).trim();
-          if (json === "[DONE]") break;
-          try { const p = JSON.parse(json); const c = p.choices?.[0]?.delta?.content; if (c) upsert(c); }
-          catch { buf = line + "\n" + buf; break; }
-        }
+    // Check for cached response when offline
+    if (!online) {
+      const cached = findCachedAIResponse(chatInput, domainId);
+      if (cached) {
+        upsert(cached.response);
+      } else {
+        upsert("📴 **Offline mode** — no cached response found for this query.\n\nTry browsing the **Snippets** tab in the sidebar for pre-loaded code examples.");
       }
-    } catch { upsert("❌ Connection error."); }
+    } else {
+      try {
+        const resp = await fetch(CODE_ENGINE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+          body: JSON.stringify({ action: "generate", messages: updated.map((m) => ({ role: m.role, content: m.content })), domain: domainName }),
+        });
+        if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
+        if (!resp.body) throw new Error("No body");
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let idx: number;
+          while ((idx = buf.indexOf("\n")) !== -1) {
+            let line = buf.slice(0, idx); buf = buf.slice(idx + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line.startsWith("data: ") || line.trim() === "" || line.startsWith(":")) continue;
+            const json = line.slice(6).trim();
+            if (json === "[DONE]") break;
+            try { const p = JSON.parse(json); const c = p.choices?.[0]?.delta?.content; if (c) upsert(c); }
+            catch { buf = line + "\n" + buf; break; }
+          }
+        }
+        // Cache the response for offline use
+        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+      } catch { upsert("❌ Connection error. Switching to offline mode."); }
+    }
 
     // Auto-apply: extract code blocks and create appropriate files
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
@@ -1058,6 +1089,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
           <button onClick={() => { setShowSidebar(true); setSidebarTab("search"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "search" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             <Search className="h-4 w-4" />
           </button>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab("snippets"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "snippets" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Offline Snippets">
+            <FileCode2 className="h-4 w-4" />
+          </button>
           <button className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
             <GitBranch className="h-4 w-4" />
           </button>
@@ -1075,8 +1109,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
           <div className="flex flex-col w-56 border-r shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border }}>
               <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
-                {sidebarTab === "files" ? "Explorer" : "Search"}
+                {sidebarTab === "files" ? "Explorer" : sidebarTab === "snippets" ? "Snippets" : "Search"}
               </span>
+              {!online && <span className="text-[8px] px-1 py-0.5 rounded" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>OFFLINE</span>}
               {sidebarTab === "files" && (
                 <div className="flex gap-0.5">
                   <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("file"); setNewItemName(""); }} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="New File">
@@ -1107,6 +1142,36 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                 {fileTree.map((node) => (
                   <FileItem key={node.id} node={node} depth={0} activeFileId={activeTabId} onSelect={handleSelectFile} onToggle={handleToggleFolder} onDelete={handleDeleteNode} onRename={handleRenameNode} themeColors={currentTheme.uiColors} />
                 ))}
+              </div>
+            ) : sidebarTab === "snippets" ? (
+              <div className="flex-1 overflow-y-auto py-1">
+                <div className="px-3 py-1.5 text-[9px] uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
+                  {snippets.length} snippets available offline
+                </div>
+                {snippets.map((snippet) => (
+                  <button
+                    key={snippet.id}
+                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80 border-b"
+                    style={{ color: currentTheme.uiColors.text, borderColor: currentTheme.uiColors.border + "40" }}
+                    onClick={() => {
+                      const fileName = `${snippet.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.${snippet.language === "javascript" ? "js" : snippet.language === "python" ? "py" : snippet.language === "typescript" ? "ts" : snippet.language}`;
+                      const fileId = `src/${fileName}`;
+                      const existing = openTabs.find((t) => t.id === fileId);
+                      if (existing) { setActiveTabId(fileId); return; }
+                      setOpenTabs((prev) => [...prev, { id: fileId, name: fileName, language: snippet.language, content: snippet.code, isModified: false }]);
+                      setActiveTabId(fileId);
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <FileCode2 className="h-3 w-3 shrink-0" style={{ color: currentTheme.uiColors.accent }} />
+                      <span className="font-medium truncate">{snippet.title}</span>
+                    </div>
+                    <span className="text-[10px] mt-0.5 block truncate" style={{ color: currentTheme.uiColors.muted }}>{snippet.language}</span>
+                  </button>
+                ))}
+                {snippets.length === 0 && (
+                  <div className="px-3 py-4 text-center text-xs" style={{ color: currentTheme.uiColors.muted }}>No snippets for this domain</div>
+                )}
               </div>
             ) : (
               <div className="p-3">
