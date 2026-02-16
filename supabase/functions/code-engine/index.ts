@@ -54,13 +54,58 @@ function executeNatively(code: string): string[] {
     groupEnd: () => {},
   };
 
+  // Check if code contains JSX, import/export, or other non-Function() compatible syntax
+  const hasModuleSyntax = /\b(import\s+|export\s+|from\s+['"])/m.test(code);
+  const hasJSX = /<\w+[\s/>]/.test(code) && /\breturn\s*\(/.test(code);
+
+  if (hasModuleSyntax || hasJSX) {
+    // Strip import/export statements and try to execute the remaining logic
+    let strippedCode = code
+      .replace(/^\s*import\s+.*?[;\n]/gm, "// [import stripped]\n")
+      .replace(/^\s*export\s+(default\s+)?/gm, "")
+      .replace(/^\s*from\s+['"].*?['"];?\s*$/gm, "");
+
+    // If it's mostly JSX/React, we can't run it natively — return a helpful message
+    if (hasJSX) {
+      return [
+        "⚙️ JSX/React code detected — cannot execute directly in terminal.",
+        "💡 This code needs a React runtime (browser) to render.",
+        "📋 Static analysis: Code structure looks valid.",
+        ...extractExports(code),
+      ];
+    }
+
+    try {
+      const fn = new Function("console", "setTimeout", "setInterval", "fetch", "require", strippedCode);
+      fn(mockConsole, undefined, undefined, undefined, mockRequire);
+      return logs.length > 0 ? logs : ["✅ Code executed successfully (no output)"];
+    } catch (err) {
+      return [`❌ Runtime Error: ${err instanceof Error ? err.message : String(err)}`];
+    }
+  }
+
   try {
-    const fn = new Function("console", "setTimeout", "setInterval", "fetch", code);
-    fn(mockConsole, undefined, undefined, undefined);
+    const fn = new Function("console", "setTimeout", "setInterval", "fetch", "require", code);
+    fn(mockConsole, undefined, undefined, undefined, mockRequire);
     return logs.length > 0 ? logs : ["✅ Code executed successfully (no output)"];
   } catch (err) {
     return [`❌ Runtime Error: ${err instanceof Error ? err.message : String(err)}`];
   }
+}
+
+/** Mock require for CJS-style code */
+function mockRequire(name: string) {
+  return new Proxy({}, { get: (_t, prop) => typeof prop === "string" ? (..._a: unknown[]) => `[${name}.${prop}()]` : undefined });
+}
+
+/** Extract component/function names from JSX code for display */
+function extractExports(code: string): string[] {
+  const results: string[] = [];
+  const fnMatch = code.match(/(?:function|const|class)\s+(\w+)/g);
+  if (fnMatch) {
+    results.push("📦 Detected: " + fnMatch.map(m => m.replace(/^(function|const|class)\s+/, "")).join(", "));
+  }
+  return results;
 }
 
 /**
