@@ -2,7 +2,10 @@ import { Link } from "react-router-dom";
 import { useRef, useEffect, useCallback } from "react";
 import { domains } from "@/lib/domains";
 import { BackgroundGradient } from "@/components/ui/background-gradient";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/hooks/useAuth";
+import { useDashboard } from "@/hooks/useDashboard";
 
 const useCardParallax = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,6 +34,14 @@ const useCardParallax = () => {
 const DomainCard = ({ domain }: { domain: typeof domains[0] }) => {
   const Icon = domain.icon;
   const { containerRef, imgRef } = useCardParallax();
+  const { user } = useAuth();
+  const { progress } = useDashboard();
+  
+  const dp = progress.find((p) => p.domain_id === domain.id);
+  const completedCount = dp?.completed_topics.length ?? 0;
+  const totalTopics = domain.topics.length;
+  const progressPct = totalTopics > 0 ? Math.round((completedCount / totalTopics) * 100) : 0;
+  const hasProgress = user && completedCount > 0;
 
   return (
     <BackgroundGradient containerClassName="rounded-xl h-full">
@@ -90,8 +101,21 @@ const DomainCard = ({ domain }: { domain: typeof domains[0] }) => {
               <span className="text-xs text-muted-foreground px-1 py-1">+{domain.topics.length - 3}</span>
             )}
           </div>
+          {/* Progress indicator */}
+          {hasProgress && (
+            <div className="flex items-center gap-2">
+              <Progress value={progressPct} className="h-1.5 flex-1" />
+              <span className="text-[10px] font-semibold text-muted-foreground whitespace-nowrap">
+                {progressPct === 100 ? (
+                  <span className="flex items-center gap-0.5 text-primary"><CheckCircle2 className="h-3 w-3" /> Done</span>
+                ) : (
+                  `${progressPct}%`
+                )}
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-1 text-xs font-medium text-primary opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0">
-            Explore <ArrowRight className="h-3 w-3" />
+            {hasProgress ? "Continue" : "Explore"} <ArrowRight className="h-3 w-3" />
           </div>
         </div>
       </Link>
