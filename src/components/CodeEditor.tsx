@@ -607,20 +607,70 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 button { padding: 8px 16px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
 button:active { opacity: 0.8; }
 input, textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; width: 100%; margin: 4px 0; }
-h1 { font-size: 24px; margin-bottom: 12px; } h2 { font-size: 20px; margin-bottom: 8px; }
+select { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; }
+h1 { font-size: 24px; margin-bottom: 12px; } h2 { font-size: 20px; margin-bottom: 8px; } h3 { font-size: 16px; margin-bottom: 6px; }
 p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+img { max-width: 100%; border-radius: 8px; }
+a { color: #818cf8; text-decoration: none; }
+.error-boundary { padding: 16px; background: #1a0000; border: 1px solid #ff4444; border-radius: 8px; margin: 16px; }
+.error-boundary h3 { color: #ff6b6b; margin-bottom: 8px; }
+.error-boundary pre { font-size: 11px; color: #ff9999; white-space: pre-wrap; word-break: break-all; }
 ${allCss}
 </style>
 </head><body>
 <div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useRef, useCallback, useMemo, useReducer, useContext, createContext } = React;
+<script>
+// React Native component shims — map RN components to HTML equivalents
+window.View = (props) => React.createElement('div', {...props, style: {display:'flex', flexDirection:'column', ...props?.style}}, props?.children);
+window.Text = (props) => React.createElement('span', {...props, style: {fontSize:'14px', ...props?.style}}, props?.children);
+window.TouchableOpacity = (props) => React.createElement('button', {...props, onClick: props?.onPress, style: {background:'transparent', border:'none', color:'inherit', padding:0, cursor:'pointer', opacity: 1, ...props?.style}}, props?.children);
+window.Pressable = (props) => React.createElement('button', {...props, onClick: props?.onPress, style: {background:'transparent', border:'none', color:'inherit', padding:0, cursor:'pointer', ...props?.style}}, props?.children);
+window.TextInput = (props) => React.createElement('input', {type:'text', placeholder: props?.placeholder, value: props?.value, onChange: (e) => props?.onChangeText?.(e.target.value), style: {padding:'8px 12px', borderRadius:'8px', border:'1px solid #333', background:'#1a1a2e', color:'#e0e0e0', fontSize:'14px', width:'100%', ...props?.style}});
+window.ScrollView = (props) => React.createElement('div', {...props, style: {overflowY:'auto', flex:1, ...props?.style}}, props?.children);
+window.FlatList = (props) => React.createElement('div', {style: props?.style}, props?.data?.map?.((item, index) => props?.renderItem?.({item, index})));
+window.Image = (props) => React.createElement('img', {src: props?.source?.uri || props?.source, alt: '', style: {maxWidth:'100%', ...props?.style}});
+window.SafeAreaView = (props) => React.createElement('div', {...props, style: {padding:'44px 0 34px', ...props?.style}}, props?.children);
+window.StatusBar = () => null;
+window.StyleSheet = { create: (s) => s, flatten: (s) => Object.assign({}, ...(Array.isArray(s) ? s : [s])) };
+window.Alert = { alert: (title, msg) => window.alert(title + (msg ? '\\n' + msg : '')) };
+window.Dimensions = { get: () => ({width: window.innerWidth, height: window.innerHeight}) };
+window.Platform = { OS: 'web', select: (o) => o.web || o.default || o.ios };
+window.ActivityIndicator = (props) => React.createElement('div', {style:{textAlign:'center', padding:'20px', color: props?.color || '#6366f1'}}, '⏳ Loading...');
+window.Switch = (props) => React.createElement('input', {type:'checkbox', checked: props?.value, onChange: (e) => props?.onValueChange?.(e.target.checked), style:{width:'40px', height:'20px', cursor:'pointer'}});
+window.Modal = (props) => props?.visible ? React.createElement('div', {style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}, React.createElement('div', {style:{background:'#1e1e2e',borderRadius:'12px',padding:'20px',maxWidth:'90%',maxHeight:'90%',overflow:'auto'}}, props?.children)) : null;
+window.KeyboardAvoidingView = (props) => React.createElement('div', props, props?.children);
+// Navigation shim
+window.useNavigation = () => ({ navigate: (s) => console.log('Navigate to:', s), goBack: () => console.log('Go back'), push: (s) => console.log('Push:', s) });
+window.useRoute = () => ({ params: {} });
+// AsyncStorage shim
+window.AsyncStorage = { getItem: (k) => Promise.resolve(localStorage.getItem(k)), setItem: (k,v) => Promise.resolve(localStorage.setItem(k,v)), removeItem: (k) => Promise.resolve(localStorage.removeItem(k)) };
+<\/script>
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useRef, useCallback, useMemo, useReducer, useContext, createContext, Fragment } = React;
+
+// Error Boundary
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement('div', {className:'error-boundary'}, 
+        React.createElement('h3', null, '⚠️ Render Error'),
+        React.createElement('pre', null, this.state.error?.message || 'Unknown error'),
+        React.createElement('button', {onClick: () => this.setState({hasError:false, error:null}), style:{marginTop:'8px',padding:'6px 12px',fontSize:'12px'}}, 'Try Again')
+      );
+    }
+    return this.props.children;
+  }
+}
+
 ${strippedCode}
+
 try {
   const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(React.createElement(${componentName}));
+  root.render(React.createElement(ErrorBoundary, null, React.createElement(${componentName})));
 } catch(e) {
-  document.getElementById('root').innerHTML = '<div style="padding:16px;color:#ff6b6b;"><h3>Render Error</h3><pre style="font-size:12px;margin-top:8px;white-space:pre-wrap;">' + e.message + '</pre></div>';
+  document.getElementById('root').innerHTML = '<div class="error-boundary"><h3>⚠️ Initialization Error</h3><pre>' + e.message + '</pre></div>';
 }
 <\/script>
 </body></html>`;
