@@ -964,6 +964,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                       ))}
                     </>
                   )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <span className="text-[10px] text-muted-foreground ml-1">— {currentProjectName}</span>
+        </div>
+        <div className="flex items-center gap-1">
           {/* Theme picker */}
           <div className="relative">
             <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
@@ -996,14 +1004,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
               </>
             )}
           </div>
-        </div>
-              </>
-            )}
-          </div>
-
-          <span className="text-[10px] text-muted-foreground ml-1">— {currentProjectName}</span>
-        </div>
-        <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={handleSaveProject} title="Save Project">
             <Save className="h-3 w-3" />
           </Button>
