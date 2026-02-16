@@ -380,7 +380,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showTerminal, setShowTerminal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
-  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">(() => {
+    const id = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    return id === "app-development" ? "mobile" : "desktop";
+  });
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -538,6 +541,81 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     return files;
   }, []);
 
+  // Build an app preview HTML for JS/JSX/React code (app-development domain)
+  const buildAppPreviewHtml = useCallback((code: string, language: string, allFiles: Record<string, string>) => {
+    const allCss = Object.entries(allFiles)
+      .filter(([name]) => name.endsWith(".css"))
+      .map(([name, content]) => `/* ${name} */\n${content}`)
+      .join("\n");
+    const strippedCode = code
+      .replace(/^\s*import\s+.*?[;\n]/gm, "")
+      .replace(/^\s*export\s+(default\s+)?/gm, "");
+    const hasJSX = /<\w+[\s/>]/.test(code);
+    const componentMatch = code.match(/(?:function|const)\s+(\w+)/);
+    const componentName = componentMatch?.[1] || "App";
+
+    if (hasJSX) {
+      return `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<script src="https://unpkg.com/react@18/umd/react.development.js"><\/script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; }
+.app { padding: 16px; }
+button { padding: 8px 16px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
+button:active { opacity: 0.8; }
+input, textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; width: 100%; margin: 4px 0; }
+h1 { font-size: 24px; margin-bottom: 12px; } h2 { font-size: 20px; margin-bottom: 8px; }
+p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
+${allCss}
+</style>
+</head><body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo, useReducer, useContext, createContext } = React;
+${strippedCode}
+try {
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(React.createElement(${componentName}));
+} catch(e) {
+  document.getElementById('root').innerHTML = '<div style="padding:16px;color:#ff6b6b;"><h3>Render Error</h3><pre style="font-size:12px;margin-top:8px;white-space:pre-wrap;">' + e.message + '</pre></div>';
+}
+<\/script>
+</body></html>`;
+    }
+
+    return `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0f0f23; color: #e0e0e0; padding: 16px; font-size: 13px; }
+.log-line { padding: 2px 0; white-space: pre-wrap; word-break: break-all; border-bottom: 1px solid #1a1a2e; }
+.error { color: #ff6b6b; } .warn { color: #fbbf24; }
+h3 { color: #6366f1; margin-bottom: 8px; font-size: 14px; }
+${allCss}
+</style>
+</head><body>
+<h3>📱 App Output</h3>
+<div id="output"></div>
+<script>
+const output = document.getElementById('output');
+const _log = console.log;
+const addLine = (text, cls) => { const d = document.createElement('div'); d.className = 'log-line ' + (cls||''); d.textContent = text; output.appendChild(d); };
+console.log = (...args) => { addLine(args.map(a => typeof a === 'object' ? JSON.stringify(a,null,2) : String(a)).join(' ')); _log(...args); };
+console.error = (...args) => { addLine('ERROR ' + args.map(String).join(' '), 'error'); };
+console.warn = (...args) => { addLine('WARN ' + args.map(String).join(' '), 'warn'); };
+try {
+${strippedCode}
+} catch(e) { addLine('ERROR ' + e.message, 'error'); }
+if(!output.children.length) addLine('Code executed successfully (no output)');
+<\/script>
+</body></html>`;
+  }, []);
+
   // Build a full HTML document for preview by injecting sibling CSS/JS
   const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
     let html = htmlContent;
@@ -565,16 +643,21 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     return html;
   }, []);
 
+  const isAppDomain = domainId === "app-development";
+
   // Update preview content with debouncing
   const updatePreview = useCallback(() => {
-    if (!activeTab) return;
-    const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
-    if (!isHtml || !showPreview) return;
-    
+    if (!activeTab || !showPreview) return;
     const allFiles = collectFiles(fileTree);
-    const fullHtml = buildPreviewHtml(activeTab.content, allFiles);
-    setPreviewContent(fullHtml);
-  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml]);
+    const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
+    const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
+
+    if (isHtml) {
+      setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+    } else if (isAppDomain && isJsLike) {
+      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+    }
+  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, isAppDomain]);
 
   // Debounced preview update when content changes
   useEffect(() => {
@@ -584,12 +667,15 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
   }, [activeTab?.content, showPreview, updatePreview]);
 
-  // Auto-open preview when switching to HTML file
+  // Auto-open preview when switching to HTML file or JS file in app-dev domain
   useEffect(() => {
-    if (activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html"))) {
+    if (!activeTab) return;
+    const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
+    const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
+    if (isHtml || (isAppDomain && isJsLike)) {
       setShowPreview(true);
     }
-  }, [activeTabId]);
+  }, [activeTabId, isAppDomain]);
 
   const handleCodeChange = (val: string | undefined) => {
     if (!activeTabId) return;
@@ -1217,13 +1303,17 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                 {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 Run
               </Button>
-              {activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html")) && (
+              {activeTab && (
+                (activeTab.language === "html" || activeTab.name.endsWith(".html") ||
+                  (isAppDomain && (["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name)))
+                )
+              ) && (
                 <button
                   onClick={() => setShowPreview(!showPreview)}
                   className={`p-1 transition-colors ${showPreview ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                  title={showPreview ? "Hide Preview" : "Show Web Preview"}
+                  title={showPreview ? "Hide Preview" : isAppDomain ? "Show App Preview" : "Show Web Preview"}
                 >
-                  {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : isAppDomain ? <Smartphone className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 </button>
               )}
             </div>
@@ -1271,8 +1361,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
             {showPreview && activeTab && (
               <div className="flex flex-col w-1/2 border-l border-border overflow-hidden">
                 <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0 gap-1">
-                  <Eye className="h-3 w-3 text-primary" />
-                  <span className="text-[10px] font-medium text-foreground">Preview</span>
+                  {isAppDomain ? <Smartphone className="h-3 w-3 text-primary" /> : <Eye className="h-3 w-3 text-primary" />}
+                  <span className="text-[10px] font-medium text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
                   <span className="text-[9px] text-muted-foreground ml-0.5">— Live</span>
                   <div className="flex-1" />
                   {/* Device switcher */}
@@ -1312,19 +1402,48 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                     <X className="h-3 w-3" />
                   </button>
                 </div>
-                <div className="flex-1 bg-[#1a1a2e] flex items-start justify-center overflow-auto p-0">
-                  <iframe
-                    ref={iframeRef}
-                    srcDoc={previewContent}
-                    className="border-0 bg-background transition-all duration-200"
-                    style={{
-                      width: previewDevice === "mobile" ? "375px" : previewDevice === "tablet" ? "768px" : "100%",
-                      height: "100%",
-                      maxWidth: "100%",
-                    }}
-                    sandbox="allow-scripts allow-modals allow-forms allow-popups"
-                    title="Web Preview"
-                  />
+                <div className={`flex-1 flex items-center justify-center overflow-auto ${isAppDomain && previewDevice === "mobile" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
+                  {isAppDomain && previewDevice === "mobile" ? (
+                    /* Phone frame for app-development domain */
+                    <div className="relative flex flex-col items-center">
+                      <div className="relative rounded-[2.5rem] border-[3px] border-[#333] bg-[#111] shadow-2xl overflow-hidden" style={{ width: "320px", height: "640px" }}>
+                        {/* Notch */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-[#111] rounded-b-2xl z-10 flex items-center justify-center">
+                          <div className="w-12 h-3 rounded-full bg-[#222]" />
+                        </div>
+                        {/* Status bar */}
+                        <div className="h-10 bg-[#0f0f23] flex items-end justify-between px-6 pb-1 text-[9px] text-[#888]">
+                          <span>9:41</span>
+                          <div className="flex items-center gap-1">
+                            <span>📶</span><span>🔋</span>
+                          </div>
+                        </div>
+                        <iframe
+                          ref={iframeRef}
+                          srcDoc={previewContent}
+                          className="border-0 w-full"
+                          style={{ height: "calc(100% - 40px)" }}
+                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                          title="App Preview"
+                        />
+                        {/* Home indicator */}
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 rounded-full bg-[#555]" />
+                      </div>
+                    </div>
+                  ) : (
+                    <iframe
+                      ref={iframeRef}
+                      srcDoc={previewContent}
+                      className="border-0 bg-background transition-all duration-200"
+                      style={{
+                        width: previewDevice === "mobile" ? "375px" : previewDevice === "tablet" ? "768px" : "100%",
+                        height: "100%",
+                        maxWidth: "100%",
+                      }}
+                      sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                      title="Web Preview"
+                    />
+                  )}
                 </div>
               </div>
             )}
