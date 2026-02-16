@@ -6,7 +6,7 @@ import {
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
-  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette
+  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -395,6 +395,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     return id === "app-development" ? "iphone-15" : "desktop";
   });
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
+  const [debugOverlay, setDebugOverlay] = useState(false);
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -1456,6 +1457,18 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                       </button>
                     </>
                   )}
+                  {isAppDomain && currentDevice.type !== "desktop" && (
+                    <>
+                      <div className="w-px h-3.5 bg-border mx-0.5" />
+                      <button
+                        onClick={() => setDebugOverlay(!debugOverlay)}
+                        className={`p-0.5 transition-colors ${debugOverlay ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                        title="Layout Debug Overlay"
+                      >
+                        <Grid3X3 className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
                     onClick={updatePreview}
@@ -1505,6 +1518,44 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
+                        {/* Debug overlay - phone */}
+                        {debugOverlay && (
+                          <div className="absolute inset-0 z-20 pointer-events-none" style={{ top: "48px" }}>
+                            {/* Safe area top */}
+                            <div className="absolute top-0 left-0 right-0 h-11 border-b border-dashed border-cyan-400/50 bg-cyan-400/5">
+                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-top</span>
+                            </div>
+                            {/* Safe area bottom */}
+                            <div className="absolute bottom-0 left-0 right-0 h-8 border-t border-dashed border-cyan-400/50 bg-cyan-400/5">
+                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-bottom</span>
+                            </div>
+                            {/* Center crosshair */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6">
+                              <div className="absolute top-1/2 left-0 right-0 h-px bg-red-400/40" />
+                              <div className="absolute left-1/2 top-0 bottom-0 w-px bg-red-400/40" />
+                            </div>
+                            {/* Grid columns */}
+                            <div className="absolute inset-0 flex">
+                              {[...Array(4)].map((_, i) => (
+                                <div key={i} className="flex-1 border-r border-dashed border-purple-400/20" />
+                              ))}
+                            </div>
+                            {/* Horizontal thirds */}
+                            <div className="absolute left-0 right-0" style={{ top: "33%" }}>
+                              <div className="h-px bg-purple-400/15" />
+                            </div>
+                            <div className="absolute left-0 right-0" style={{ top: "66%" }}>
+                              <div className="h-px bg-purple-400/15" />
+                            </div>
+                            {/* Padding guides */}
+                            <div className="absolute top-0 bottom-0 left-4 w-px border-l border-dotted border-yellow-400/30" />
+                            <div className="absolute top-0 bottom-0 right-4 w-px border-r border-dotted border-yellow-400/30" />
+                            {/* Breakpoint label */}
+                            <div className="absolute top-12 left-1 bg-[#000]/70 rounded px-1.5 py-0.5 text-[7px] font-mono text-green-400">
+                              {currentDevice.w}px · {currentDevice.w <= 375 ? "compact" : currentDevice.w <= 414 ? "regular" : "wide"}
+                            </div>
+                          </div>
+                        )}
                         {/* Home indicator */}
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 rounded-full bg-[#555]" />
                       </div>
@@ -1526,6 +1577,31 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
+                        {/* Debug overlay - tablet */}
+                        {debugOverlay && (
+                          <div className="absolute inset-0 z-20 pointer-events-none" style={{ top: "32px" }}>
+                            <div className="absolute top-0 left-0 right-0 h-6 border-b border-dashed border-cyan-400/50 bg-cyan-400/5">
+                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-top</span>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 h-5 border-t border-dashed border-cyan-400/50 bg-cyan-400/5">
+                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-bottom</span>
+                            </div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8">
+                              <div className="absolute top-1/2 left-0 right-0 h-px bg-red-400/40" />
+                              <div className="absolute left-1/2 top-0 bottom-0 w-px bg-red-400/40" />
+                            </div>
+                            <div className="absolute inset-0 flex">
+                              {[...Array(6)].map((_, i) => (
+                                <div key={i} className="flex-1 border-r border-dashed border-purple-400/15" />
+                              ))}
+                            </div>
+                            <div className="absolute top-0 bottom-0 left-5 w-px border-l border-dotted border-yellow-400/25" />
+                            <div className="absolute top-0 bottom-0 right-5 w-px border-r border-dotted border-yellow-400/25" />
+                            <div className="absolute top-7 left-1 bg-[#000]/70 rounded px-1.5 py-0.5 text-[8px] font-mono text-green-400">
+                              {currentDevice.w}px · tablet
+                            </div>
+                          </div>
+                        )}
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full bg-[#555]" />
                       </div>
                       <span className="mt-2 text-[9px] text-[#666]">{currentDevice.label} — {currentDevice.w}×{currentDevice.h}</span>
