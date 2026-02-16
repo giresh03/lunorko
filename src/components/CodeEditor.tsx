@@ -1,16 +1,17 @@
 import { useState, useCallback, useImperativeHandle, forwardRef, useMemo, useRef, useEffect } from "react";
-import Editor from "@monaco-editor/react";
+import Editor, { loader } from "@monaco-editor/react";
 import {
   Play, RotateCcw, Copy, Check, ChevronRight, Loader2, X,
   File, FolderOpen, FolderClosed, Plus, Trash2, FilePlus, FolderPlus,
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
-  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet
+  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
+import { editorThemes, getThemeById, type EditorTheme } from "@/lib/editorThemes";
 
 // -- Project types --
 interface SavedProject {
@@ -342,6 +343,31 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Theme state
+  const [currentThemeId, setCurrentThemeId] = useState<string>(() => localStorage.getItem("lunor-editor-theme") || "vs-dark");
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const currentTheme = useMemo(() => getThemeById(currentThemeId), [currentThemeId]);
+  const themesRegistered = useRef(false);
+
+  // Register custom Monaco themes on mount
+  useEffect(() => {
+    if (themesRegistered.current) return;
+    loader.init().then((monaco) => {
+      editorThemes.forEach((t) => {
+        if (!t.isBuiltin && t.definition) {
+          monaco.editor.defineTheme(t.monacoTheme, t.definition as any);
+        }
+      });
+      themesRegistered.current = true;
+    });
+  }, []);
+
+  const handleThemeChange = useCallback((theme: EditorTheme) => {
+    setCurrentThemeId(theme.id);
+    localStorage.setItem("lunor-editor-theme", theme.id);
+    setShowThemeMenu(false);
+  }, []);
 
   // Project management
   const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj-${Date.now()}`);
@@ -891,13 +917,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   );
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[hsl(var(--background))] text-foreground overflow-hidden">
+    <div className="flex flex-col h-screen w-full overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.text }}>
       {newProjectDialog}
 
       {/* Title bar with File menu */}
-      <div className="flex items-center justify-between h-9 bg-card border-b border-border px-3 shrink-0 select-none">
+      <div className="flex items-center justify-between h-9 border-b px-3 shrink-0 select-none" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
         <div className="flex items-center gap-1">
-          <span className="text-xs font-semibold text-primary mr-1">Lunor.AI</span>
+          <span className="text-xs font-semibold mr-1" style={{ color: currentTheme.uiColors.accent }}>Lunor.AI</span>
 
           {/* File menu */}
           <div className="relative">
@@ -938,7 +964,39 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                       ))}
                     </>
                   )}
+          {/* Theme picker */}
+          <div className="relative">
+            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
+              <Palette className="h-3 w-3" />
+            </Button>
+            {showThemeMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowThemeMenu(false)} />
+                <div className="absolute top-full right-0 z-50 mt-0.5 w-52 rounded-md border py-1 shadow-xl max-h-80 overflow-y-auto" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
+                  <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Editor Theme</div>
+                  {editorThemes.map((theme) => (
+                    <button
+                      key={theme.id}
+                      onClick={() => handleThemeChange(theme)}
+                      className="flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors hover:opacity-80"
+                      style={{
+                        color: currentThemeId === theme.id ? theme.preview.accent : currentTheme.uiColors.text,
+                        backgroundColor: currentThemeId === theme.id ? `${theme.preview.accent}15` : "transparent",
+                      }}
+                    >
+                      <div className="flex gap-0.5 shrink-0">
+                        <span className="h-3 w-3 rounded-sm border" style={{ backgroundColor: theme.preview.bg, borderColor: theme.preview.accent + "40" }} />
+                        <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: theme.preview.accent }} />
+                      </div>
+                      <span className="truncate">{theme.label}</span>
+                      {currentThemeId === theme.id && <Check className="h-3 w-3 ml-auto shrink-0" />}
+                    </button>
+                  ))}
                 </div>
+              </>
+            )}
+          </div>
+        </div>
               </>
             )}
           </div>
@@ -965,7 +1023,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
       <div className="flex flex-1 overflow-hidden">
         {/* Activity bar */}
-        <div className="flex flex-col items-center w-10 bg-card border-r border-border py-2 gap-1 shrink-0">
+        <div className="flex flex-col items-center w-10 border-r py-2 gap-1 shrink-0" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
           <button onClick={() => { setShowSidebar(true); setSidebarTab("files"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "files" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             <File className="h-4 w-4" />
           </button>
@@ -986,7 +1044,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
         {/* Sidebar - file explorer */}
         {showSidebar && (
-          <div className="flex flex-col w-56 bg-card border-r border-border shrink-0 overflow-hidden">
+          <div className="flex flex-col w-56 border-r shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             <div className="flex items-center justify-between px-3 py-2 border-b border-border">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {sidebarTab === "files" ? "Explorer" : "Search"}
@@ -1083,7 +1141,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                   language={activeTab.language}
                   value={activeTab.content}
                   onChange={handleCodeChange}
-                  theme="vs-dark"
+                  theme={currentTheme.monacoTheme}
                   options={{
                     fontSize: 13,
                     fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
@@ -1289,7 +1347,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center justify-between h-6 bg-primary/10 border-t border-border px-3 shrink-0 select-none">
+      <div className="flex items-center justify-between h-6 border-t px-3 shrink-0 select-none" style={{ backgroundColor: currentTheme.uiColors.accent + "18", borderColor: currentTheme.uiColors.border }}>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1"><GitBranch className="h-3 w-3" /> main</span>
           {isRunning && <span className="flex items-center gap-1 text-primary"><Loader2 className="h-3 w-3 animate-spin" /> Running...</span>}
