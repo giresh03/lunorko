@@ -2,7 +2,8 @@ import { useParams, Link } from "react-router-dom";
 import { useRef, useState } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
-  CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked
+  CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
+  TrendingUp, Zap, Bookmark, CalendarDays
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -123,7 +124,7 @@ const DomainDetail = () => {
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { progress, updateProgress, logActivity } = useDashboard();
+  const { progress, bookmarks, activity, bookings, updateProgress, logActivity } = useDashboard();
 
   const handleSendToEditor = (code: string, language: string) => {
     editorRef.current?.setExternalCode(code, language);
@@ -223,7 +224,98 @@ const DomainDetail = () => {
       </section>
 
       <main className="container mx-auto px-4 pb-20">
-        {/* Tabs */}
+        {/* Domain Dashboard Overview */}
+        {(() => {
+          const dp = progress.find((p) => p.domain_id === domainId);
+          const completedCount = dp?.completed_topics.length ?? 0;
+          const totalTopics = domain.topics.length;
+          const progressPct = totalTopics > 0 ? Math.round((completedCount / totalTopics) * 100) : 0;
+          const domainBookmarks = bookmarks.filter((b) => b.domain_id === domainId);
+          const domainActivity = activity.filter((a) => a.domain_id === domainId);
+          const domainBookingsCount = bookings.filter((b) => b.domain_id === domainId).length;
+          const lastAccessed = dp?.last_accessed_at ? new Date(dp.last_accessed_at) : null;
+
+          return (
+            <div className="mb-8 grid gap-3 grid-cols-2 lg:grid-cols-4">
+              {/* Progress Card */}
+              <div className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/20">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Progress</p>
+                    <p className="text-2xl font-bold text-foreground">{progressPct}%</p>
+                  </div>
+                </div>
+                <Progress value={progressPct} className="h-1.5 mb-2" />
+                <p className="text-xs text-muted-foreground">
+                  {completedCount}/{totalTopics} topics completed
+                </p>
+              </div>
+
+              {/* Resources Card */}
+              <div className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/20">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: `hsl(${domain.color} / 0.1)` }}>
+                    <BookOpen className="h-5 w-5" style={{ color: `hsl(${domain.color})` }} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Resources</p>
+                    <p className="text-2xl font-bold text-foreground">{domain.resources.length}</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><Video className="h-3 w-3" /> {videos.length} videos</span>
+                  <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> {articles.length} articles</span>
+                </div>
+              </div>
+
+              {/* Bookmarks Card */}
+              <div className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/20">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
+                    <Bookmark className="h-5 w-5 text-accent-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Saved</p>
+                    <p className="text-2xl font-bold text-foreground">{domainBookmarks.length}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {domainActivity.length} activities logged
+                </p>
+              </div>
+
+              {/* Status Card */}
+              <div className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/20">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                    <Zap className="h-5 w-5 text-secondary-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Status</p>
+                    <p className="text-sm font-bold text-foreground">
+                      {progressPct === 100 ? "Completed ✨" : progressPct > 0 ? "In Progress" : "Not Started"}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {lastAccessed
+                    ? `Last active ${lastAccessed.toLocaleDateString()}`
+                    : user ? "Start learning today!" : "Sign in to track"
+                  }
+                </p>
+                {domainBookingsCount > 0 && (
+                  <p className="mt-1 text-xs text-primary flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" /> {domainBookingsCount} mentor session{domainBookingsCount > 1 ? "s" : ""}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-8 w-full justify-start border-b border-border bg-transparent p-0 rounded-none">
             <TabsTrigger
