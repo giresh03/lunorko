@@ -380,10 +380,22 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showTerminal, setShowTerminal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
-  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">(() => {
+  type DevicePreset = "iphone-se" | "iphone-15" | "pixel-8" | "ipad-mini" | "ipad-pro" | "android-tab" | "desktop";
+  const DEVICE_PRESETS: Record<DevicePreset, { label: string; w: number; h: number; type: "phone" | "tablet" | "desktop"; notch: "dynamic-island" | "notch" | "punch-hole" | "none" }> = {
+    "iphone-se": { label: "iPhone SE", w: 320, h: 568, type: "phone", notch: "none" },
+    "iphone-15": { label: "iPhone 15 Pro", w: 393, h: 852, type: "phone", notch: "dynamic-island" },
+    "pixel-8": { label: "Pixel 8", w: 412, h: 915, type: "phone", notch: "punch-hole" },
+    "ipad-mini": { label: "iPad Mini", w: 744, h: 1133, type: "tablet", notch: "none" },
+    "ipad-pro": { label: 'iPad Pro 11"', w: 834, h: 1194, type: "tablet", notch: "none" },
+    "android-tab": { label: "Android Tablet", w: 800, h: 1280, type: "tablet", notch: "none" },
+    "desktop": { label: "Desktop", w: 0, h: 0, type: "desktop", notch: "none" },
+  };
+  const [previewDevice, setPreviewDevice] = useState<DevicePreset>(() => {
     const id = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    return id === "app-development" ? "mobile" : "desktop";
+    return id === "app-development" ? "iphone-15" : "desktop";
   });
+  const [showDeviceMenu, setShowDeviceMenu] = useState(false);
+  const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -1365,28 +1377,69 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                   <span className="text-[10px] font-medium text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
                   <span className="text-[9px] text-muted-foreground ml-0.5">— Live</span>
                   <div className="flex-1" />
-                  {/* Device switcher */}
-                  <button
-                    onClick={() => setPreviewDevice("mobile")}
-                    className={`p-0.5 transition-colors ${previewDevice === "mobile" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                    title="Mobile (375px)"
-                  >
-                    <Smartphone className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setPreviewDevice("tablet")}
-                    className={`p-0.5 transition-colors ${previewDevice === "tablet" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                    title="Tablet (768px)"
-                  >
-                    <Tablet className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setPreviewDevice("desktop")}
-                    className={`p-0.5 transition-colors ${previewDevice === "desktop" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                    title="Desktop (100%)"
-                  >
-                    <Monitor className="h-3 w-3" />
-                  </button>
+                  {/* Device switcher - expanded for app domain */}
+                  {isAppDomain ? (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowDeviceMenu(!showDeviceMenu)}
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors hover:bg-secondary/50"
+                        style={{ color: currentTheme.uiColors.text }}
+                      >
+                        {currentDevice.type === "phone" ? <Smartphone className="h-3 w-3" /> : currentDevice.type === "tablet" ? <Tablet className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
+                        {currentDevice.label}
+                        <ChevronDown className="h-2.5 w-2.5" />
+                      </button>
+                      {showDeviceMenu && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowDeviceMenu(false)} />
+                          <div className="absolute top-full right-0 z-50 mt-1 w-44 rounded-md border py-1 shadow-xl" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
+                            <div className="px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Phones</div>
+                            {(["iphone-se", "iphone-15", "pixel-8"] as DevicePreset[]).map((d) => (
+                              <button key={d} onClick={() => { setPreviewDevice(d); setShowDeviceMenu(false); }}
+                                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-[10px] transition-colors ${previewDevice === d ? "font-semibold" : ""}`}
+                                style={{ color: previewDevice === d ? currentTheme.uiColors.accent : currentTheme.uiColors.text }}
+                              >
+                                <Smartphone className="h-3 w-3" />
+                                {DEVICE_PRESETS[d].label}
+                                <span className="ml-auto text-[8px]" style={{ color: currentTheme.uiColors.muted }}>{DEVICE_PRESETS[d].w}×{DEVICE_PRESETS[d].h}</span>
+                              </button>
+                            ))}
+                            <div className="my-0.5 border-t" style={{ borderColor: currentTheme.uiColors.border }} />
+                            <div className="px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Tablets</div>
+                            {(["ipad-mini", "ipad-pro", "android-tab"] as DevicePreset[]).map((d) => (
+                              <button key={d} onClick={() => { setPreviewDevice(d); setShowDeviceMenu(false); }}
+                                className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-[10px] transition-colors ${previewDevice === d ? "font-semibold" : ""}`}
+                                style={{ color: previewDevice === d ? currentTheme.uiColors.accent : currentTheme.uiColors.text }}
+                              >
+                                <Tablet className="h-3 w-3" />
+                                {DEVICE_PRESETS[d].label}
+                                <span className="ml-auto text-[8px]" style={{ color: currentTheme.uiColors.muted }}>{DEVICE_PRESETS[d].w}×{DEVICE_PRESETS[d].h}</span>
+                              </button>
+                            ))}
+                            <div className="my-0.5 border-t" style={{ borderColor: currentTheme.uiColors.border }} />
+                            <button onClick={() => { setPreviewDevice("desktop"); setShowDeviceMenu(false); }}
+                              className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-[10px] transition-colors ${previewDevice === "desktop" ? "font-semibold" : ""}`}
+                              style={{ color: previewDevice === "desktop" ? currentTheme.uiColors.accent : currentTheme.uiColors.text }}
+                            >
+                              <Monitor className="h-3 w-3" /> Desktop <span className="ml-auto text-[8px]" style={{ color: currentTheme.uiColors.muted }}>100%</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <button onClick={() => setPreviewDevice("iphone-15")} className={`p-0.5 transition-colors ${currentDevice.type === "phone" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Mobile">
+                        <Smartphone className="h-3 w-3" />
+                      </button>
+                      <button onClick={() => setPreviewDevice("ipad-mini")} className={`p-0.5 transition-colors ${currentDevice.type === "tablet" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Tablet">
+                        <Tablet className="h-3 w-3" />
+                      </button>
+                      <button onClick={() => setPreviewDevice("desktop")} className={`p-0.5 transition-colors ${previewDevice === "desktop" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Desktop">
+                        <Monitor className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
                     onClick={updatePreview}
@@ -1402,17 +1455,27 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                     <X className="h-3 w-3" />
                   </button>
                 </div>
-                <div className={`flex-1 flex items-center justify-center overflow-auto ${isAppDomain && previewDevice === "mobile" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
-                  {isAppDomain && previewDevice === "mobile" ? (
-                    /* Phone frame for app-development domain */
-                    <div className="relative flex flex-col items-center">
-                      <div className="relative rounded-[2.5rem] border-[3px] border-[#333] bg-[#111] shadow-2xl overflow-hidden" style={{ width: "320px", height: "640px" }}>
-                        {/* Notch */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-[#111] rounded-b-2xl z-10 flex items-center justify-center">
-                          <div className="w-12 h-3 rounded-full bg-[#222]" />
-                        </div>
+                <div className={`flex-1 flex items-center justify-center overflow-auto ${isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
+                  {isAppDomain && currentDevice.type === "phone" ? (
+                    /* Phone frame */
+                    <div className="relative flex flex-col items-center" style={{ transform: currentDevice.h > 700 ? "scale(0.72)" : "scale(0.85)", transformOrigin: "top center" }}>
+                      <div className="relative rounded-[2.5rem] border-[3px] border-[#333] bg-[#111] shadow-2xl overflow-hidden" style={{ width: `${currentDevice.w}px`, height: `${currentDevice.h}px` }}>
+                        {/* Notch / Dynamic Island / Punch Hole */}
+                        {currentDevice.notch === "dynamic-island" && (
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[120px] h-[34px] bg-[#000] rounded-[20px] z-10 flex items-center justify-center">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#1a1a2e] mr-6" />
+                          </div>
+                        )}
+                        {currentDevice.notch === "notch" && (
+                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-36 h-7 bg-[#111] rounded-b-2xl z-10 flex items-center justify-center">
+                            <div className="w-14 h-3.5 rounded-full bg-[#222]" />
+                          </div>
+                        )}
+                        {currentDevice.notch === "punch-hole" && (
+                          <div className="absolute top-3 left-1/2 -translate-x-1/2 w-3.5 h-3.5 bg-[#1a1a2e] rounded-full z-10 border border-[#333]" />
+                        )}
                         {/* Status bar */}
-                        <div className="h-10 bg-[#0f0f23] flex items-end justify-between px-6 pb-1 text-[9px] text-[#888]">
+                        <div className="h-12 bg-[#0f0f23] flex items-end justify-between px-6 pb-1 text-[9px] text-[#888]">
                           <span>9:41</span>
                           <div className="flex items-center gap-1">
                             <span>📶</span><span>🔋</span>
@@ -1422,13 +1485,34 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                           ref={iframeRef}
                           srcDoc={previewContent}
                           className="border-0 w-full"
-                          style={{ height: "calc(100% - 40px)" }}
+                          style={{ height: "calc(100% - 48px)" }}
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
                         {/* Home indicator */}
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 rounded-full bg-[#555]" />
                       </div>
+                      <span className="mt-2 text-[9px] text-[#666]">{currentDevice.label} — {currentDevice.w}×{currentDevice.h}</span>
+                    </div>
+                  ) : isAppDomain && currentDevice.type === "tablet" ? (
+                    /* Tablet frame */
+                    <div className="relative flex flex-col items-center" style={{ transform: "scale(0.5)", transformOrigin: "top center" }}>
+                      <div className="relative rounded-[1.5rem] border-[4px] border-[#333] bg-[#111] shadow-2xl overflow-hidden" style={{ width: `${currentDevice.w}px`, height: `${currentDevice.h}px` }}>
+                        <div className="h-8 bg-[#0f0f23] flex items-end justify-between px-6 pb-1 text-[10px] text-[#888]">
+                          <span>9:41</span>
+                          <div className="flex items-center gap-1"><span>📶</span><span>🔋</span></div>
+                        </div>
+                        <iframe
+                          ref={iframeRef}
+                          srcDoc={previewContent}
+                          className="border-0 w-full"
+                          style={{ height: "calc(100% - 32px)" }}
+                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                          title="App Preview"
+                        />
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-28 h-1 rounded-full bg-[#555]" />
+                      </div>
+                      <span className="mt-2 text-[9px] text-[#666]">{currentDevice.label} — {currentDevice.w}×{currentDevice.h}</span>
                     </div>
                   ) : (
                     <iframe
@@ -1436,7 +1520,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                       srcDoc={previewContent}
                       className="border-0 bg-background transition-all duration-200"
                       style={{
-                        width: previewDevice === "mobile" ? "375px" : previewDevice === "tablet" ? "768px" : "100%",
+                        width: currentDevice.type === "phone" ? `${currentDevice.w}px` : currentDevice.type === "tablet" ? `${currentDevice.w}px` : "100%",
                         height: "100%",
                         maxWidth: "100%",
                       }}
