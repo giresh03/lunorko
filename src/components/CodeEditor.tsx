@@ -1090,7 +1090,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         {/* Center: Editor */}
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           {/* Editor tabs */}
-          <div className="flex items-center h-8 bg-card border-b border-border overflow-x-auto shrink-0">
+          <div className="flex items-center h-8 border-b overflow-x-auto shrink-0" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             {openTabs.map((tab) => (
               <div
                 key={tab.id}
@@ -1234,17 +1234,17 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
           {/* Terminal panel (bottom) */}
           {showTerminal && (
-            <div className="flex flex-col h-40 border-t border-border shrink-0 bg-card">
-              <div className="flex items-center h-7 border-b border-border px-2 shrink-0">
-                <span className="px-2 py-1 text-[10px] font-medium text-foreground">Terminal</span>
+            <div className="flex flex-col h-40 border-t shrink-0" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
+              <div className="flex items-center h-7 border-b px-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border }}>
+                <span className="px-2 py-1 text-[10px] font-medium" style={{ color: currentTheme.uiColors.text }}>Terminal</span>
                 <div className="flex-1" />
-                <button onClick={() => setShowTerminal(false)} className="p-0.5 text-muted-foreground hover:text-foreground">
+                <button onClick={() => setShowTerminal(false)} className="p-0.5" style={{ color: currentTheme.uiColors.muted }}>
                   <X className="h-3 w-3" />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 font-mono text-xs bg-background">
+              <div className="flex-1 overflow-y-auto p-3 font-mono text-xs" style={{ backgroundColor: currentTheme.uiColors.bg }}>
                 {output.map((line, i) => (
-                  <div key={i} className="text-foreground/80 whitespace-pre-wrap">{line}</div>
+                  <div key={i} className="whitespace-pre-wrap" style={{ color: currentTheme.uiColors.text + "cc" }}>{line}</div>
                 ))}
               </div>
             </div>
@@ -1253,30 +1253,44 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
         {/* Right: AI Assistant Panel */}
         {showAIPanel && (
-          <div className="flex flex-col w-80 lg:w-96 border-l border-border bg-card shrink-0 overflow-hidden">
+          <div className="flex flex-col w-80 lg:w-96 border-l shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             {/* AI Header */}
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xs font-semibold text-foreground">AI Assistant</span>
-              <span className="rounded-sm bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">Auto-Apply</span>
+            <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0" style={{ borderColor: currentTheme.uiColors.border }}>
+              <Sparkles className="h-4 w-4" style={{ color: currentTheme.uiColors.accent }} />
+              <span className="text-xs font-semibold" style={{ color: currentTheme.uiColors.text }}>AI Assistant</span>
+              <span className="rounded-sm px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>Auto-Apply</span>
               <div className="flex-1" />
-              <button onClick={handleClearChat} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Clear chat">
+              <button onClick={handleClearChat} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="Clear chat">
                 <Trash2 className="h-3 w-3" />
               </button>
-              <button onClick={() => setShowAIPanel(false)} className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+              <button onClick={() => setShowAIPanel(false)} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }}>
                 <X className="h-3 w-3" />
               </button>
             </div>
 
             {/* Chat messages */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3 space-y-3" style={{ backgroundColor: currentTheme.uiColors.bg }}>
               {messages.map((msg, i) => (
                 <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                  <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${msg.role === "user" ? "bg-secondary" : "bg-primary/10"}`}>
-                    {msg.role === "user" ? <span className="text-[9px] font-medium text-secondary-foreground">U</span> : <Bot className="h-3.5 w-3.5 text-primary" />}
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: msg.role === "user" ? currentTheme.uiColors.border : currentTheme.uiColors.accent + "20" }}>
+                    {msg.role === "user" ? <span className="text-[9px] font-medium" style={{ color: currentTheme.uiColors.text }}>U</span> : <Bot className="h-3.5 w-3.5" style={{ color: currentTheme.uiColors.accent }} />}
                   </div>
-                  <div className={`max-w-[88%] rounded-lg px-3 py-2 text-xs ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                    <div className="prose prose-sm prose-invert max-w-none break-words overflow-hidden [&_pre]:bg-background [&_pre]:p-2.5 [&_pre]:rounded-md [&_pre]:text-[10px] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:text-primary [&_code]:bg-background/50 [&_code]:px-1 [&_code]:rounded-sm [&_code]:break-all [&_pre]:relative [&_pre]:border [&_pre]:border-primary/20 [&_pre_code]:break-normal [&_pre_code]:whitespace-pre">
+                  <div
+                    className="max-w-[88%] rounded-lg px-3 py-2 text-xs"
+                    style={{
+                      backgroundColor: msg.role === "user" ? currentTheme.uiColors.accent : currentTheme.uiColors.card,
+                      color: msg.role === "user" ? "#ffffff" : currentTheme.uiColors.text,
+                      border: msg.role === "user" ? "none" : `1px solid ${currentTheme.uiColors.border}`,
+                    }}
+                  >
+                    <div className="prose prose-sm max-w-none break-words overflow-hidden [&_pre]:p-2.5 [&_pre]:rounded-md [&_pre]:text-[10px] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:px-1 [&_code]:rounded-sm [&_code]:break-all [&_pre]:relative [&_pre_code]:break-normal [&_pre_code]:whitespace-pre"
+                      style={{
+                        // Override prose colors to match theme
+                        ["--tw-prose-body" as string]: msg.role === "user" ? "#ffffff" : currentTheme.uiColors.text,
+                        ["--tw-prose-headings" as string]: msg.role === "user" ? "#ffffff" : currentTheme.uiColors.text,
+                        ["--tw-prose-code" as string]: currentTheme.uiColors.accent,
+                      }}
+                    >
                       <ReactMarkdown
                         components={{
                           pre({ children, ...props }) {
@@ -1286,12 +1300,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                             const lang = className.replace("language-", "") || "javascript";
                             return (
                               <div className="relative group">
-                                <div className="flex items-center justify-between bg-background/80 rounded-t-md border border-b-0 border-primary/20 px-2 py-1">
-                                  <span className="text-[9px] text-muted-foreground font-mono">{lang}</span>
+                                <div className="flex items-center justify-between rounded-t-md px-2 py-1" style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, borderBottom: "none" }}>
+                                  <span className="text-[9px] font-mono" style={{ color: currentTheme.uiColors.muted }}>{lang}</span>
                                   <div className="flex gap-1">
                                     <button
                                       onClick={() => applyCodeToEditor(String(codeText).trim(), lang)}
-                                      className="flex items-center gap-1 rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-medium text-primary hover:bg-primary/30 transition-colors"
+                                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-medium transition-colors"
+                                      style={{ backgroundColor: currentTheme.uiColors.accent + "25", color: currentTheme.uiColors.accent }}
                                       title="Apply to Editor"
                                     >
                                       <ArrowRightToLine className="h-2.5 w-2.5" />
@@ -1299,9 +1314,19 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
                                     </button>
                                   </div>
                                 </div>
-                                <pre {...props} className="!rounded-t-none !mt-0">{children}</pre>
+                                <pre {...props} className="!rounded-t-none !mt-0" style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, color: currentTheme.uiColors.text }}>{children}</pre>
                               </div>
                             );
+                          },
+                          code({ children, className, ...props }) {
+                            const isInline = !className;
+                            if (isInline) {
+                              return <code style={{ color: currentTheme.uiColors.accent, backgroundColor: currentTheme.uiColors.bg + "80" }} {...props}>{children}</code>;
+                            }
+                            return <code style={{ color: currentTheme.uiColors.text }} {...props}>{children}</code>;
+                          },
+                          strong({ children }) {
+                            return <strong style={{ color: currentTheme.uiColors.accent }}>{children}</strong>;
                           },
                         }}
                       >
@@ -1313,10 +1338,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
               ))}
               {chatLoading && messages[messages.length - 1]?.role !== "assistant" && (
                 <div className="flex gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10"><Bot className="h-3.5 w-3.5 text-primary" /></div>
-                  <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                    <span className="text-xs text-muted-foreground">Thinking...</span>
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md" style={{ backgroundColor: currentTheme.uiColors.accent + "20" }}><Bot className="h-3.5 w-3.5" style={{ color: currentTheme.uiColors.accent }} /></div>
+                  <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: currentTheme.uiColors.accent }} />
+                    <span className="text-xs" style={{ color: currentTheme.uiColors.muted }}>Thinking...</span>
                   </div>
                 </div>
               )}
@@ -1324,22 +1349,32 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
             </div>
 
             {/* AI Input */}
-            <div className="border-t border-border p-2 shrink-0">
+            <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex gap-1.5">
                 <input
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
                   placeholder={`Ask about ${domainName.toLowerCase()}...`}
-                  className="flex-1 rounded-md border border-border bg-input px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 rounded-md px-2.5 py-1.5 text-xs outline-none"
+                  style={{
+                    backgroundColor: currentTheme.uiColors.bg,
+                    color: currentTheme.uiColors.text,
+                    border: `1px solid ${currentTheme.uiColors.border}`,
+                  }}
                   disabled={chatLoading}
                 />
-                <Button size="sm" className="h-7 px-2" onClick={handleChatSend} disabled={chatLoading || !chatInput.trim()}>
+                <button
+                  className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
+                  onClick={handleChatSend}
+                  disabled={chatLoading || !chatInput.trim()}
+                >
                   <Send className="h-3.5 w-3.5" />
-                </Button>
+                </button>
               </div>
-              <p className="mt-1.5 text-[9px] text-muted-foreground text-center">
-                Code is <span className="text-primary font-medium">auto-applied</span> to your active file
+              <p className="mt-1.5 text-[9px] text-center" style={{ color: currentTheme.uiColors.muted }}>
+                Code is <span className="font-medium" style={{ color: currentTheme.uiColors.accent }}>auto-applied</span> to your active file
               </p>
             </div>
           </div>
