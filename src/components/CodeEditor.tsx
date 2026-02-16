@@ -6,7 +6,7 @@ import {
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
-  Eye, EyeOff
+  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -338,6 +338,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [copied, setCopied] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [previewContent, setPreviewContent] = useState("");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Project management
   const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj-${Date.now()}`);
@@ -454,6 +458,72 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       setActiveTabId(remaining.length > 0 ? remaining[remaining.length - 1].id : null);
     }
   };
+
+  // Collect all file contents from the tree (for injecting CSS/JS into preview)
+  const collectFiles = useCallback((nodes: FileNode[]): Record<string, string> => {
+    const files: Record<string, string> = {};
+    const walk = (ns: FileNode[]) => {
+      for (const n of ns) {
+        if (n.type === "file" && n.content) files[n.name] = n.content;
+        if (n.children) walk(n.children);
+      }
+    };
+    walk(nodes);
+    return files;
+  }, []);
+
+  // Build a full HTML document for preview by injecting sibling CSS/JS
+  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
+    let html = htmlContent;
+    
+    // Find referenced CSS files and inject inline if they exist in the project
+    const cssLinkRegex = /<link[^>]+href=["']([^"']+\.css)["'][^>]*>/gi;
+    let cssMatch;
+    while ((cssMatch = cssLinkRegex.exec(htmlContent)) !== null) {
+      const cssFileName = cssMatch[1].split("/").pop() || "";
+      if (allFiles[cssFileName]) {
+        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${allFiles[cssFileName]}</style>`);
+      }
+    }
+    
+    // Find referenced JS files and inject inline if they exist in the project
+    const jsScriptRegex = /<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/gi;
+    let jsMatch;
+    while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
+      const jsFileName = jsMatch[1].split("/").pop() || "";
+      if (allFiles[jsFileName]) {
+        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}</script>`);
+      }
+    }
+    
+    return html;
+  }, []);
+
+  // Update preview content with debouncing
+  const updatePreview = useCallback(() => {
+    if (!activeTab) return;
+    const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
+    if (!isHtml || !showPreview) return;
+    
+    const allFiles = collectFiles(fileTree);
+    const fullHtml = buildPreviewHtml(activeTab.content, allFiles);
+    setPreviewContent(fullHtml);
+  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml]);
+
+  // Debounced preview update when content changes
+  useEffect(() => {
+    if (!showPreview || !activeTab) return;
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = setTimeout(updatePreview, 300);
+    return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
+  }, [activeTab?.content, showPreview, updatePreview]);
+
+  // Auto-open preview when switching to HTML file
+  useEffect(() => {
+    if (activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html"))) {
+      setShowPreview(true);
+    }
+  }, [activeTabId]);
 
   const handleCodeChange = (val: string | undefined) => {
     if (!activeTabId) return;
@@ -1044,23 +1114,59 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
             {/* Web Preview */}
             {showPreview && activeTab && (
               <div className="flex flex-col w-1/2 border-l border-border overflow-hidden">
-                <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0">
-                  <Eye className="h-3 w-3 text-primary mr-1.5" />
+                <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0 gap-1">
+                  <Eye className="h-3 w-3 text-primary" />
                   <span className="text-[10px] font-medium text-foreground">Preview</span>
+                  <span className="text-[9px] text-muted-foreground ml-0.5">— Live</span>
                   <div className="flex-1" />
+                  {/* Device switcher */}
+                  <button
+                    onClick={() => setPreviewDevice("mobile")}
+                    className={`p-0.5 transition-colors ${previewDevice === "mobile" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                    title="Mobile (375px)"
+                  >
+                    <Smartphone className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewDevice("tablet")}
+                    className={`p-0.5 transition-colors ${previewDevice === "tablet" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                    title="Tablet (768px)"
+                  >
+                    <Tablet className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewDevice("desktop")}
+                    className={`p-0.5 transition-colors ${previewDevice === "desktop" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                    title="Desktop (100%)"
+                  >
+                    <Monitor className="h-3 w-3" />
+                  </button>
+                  <div className="w-px h-3.5 bg-border mx-0.5" />
+                  <button
+                    onClick={updatePreview}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Refresh Preview"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </button>
                   <button
                     onClick={() => setShowPreview(false)}
-                    className="p-0.5 text-muted-foreground hover:text-foreground"
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <X className="h-3 w-3" />
                   </button>
                 </div>
-                <div className="flex-1 bg-background">
+                <div className="flex-1 bg-[#1a1a2e] flex items-start justify-center overflow-auto p-0">
                   <iframe
-                    key={activeTab.content}
-                    srcDoc={activeTab.content}
-                    className="w-full h-full border-0"
-                    sandbox="allow-scripts allow-modals"
+                    ref={iframeRef}
+                    srcDoc={previewContent}
+                    className="border-0 bg-background transition-all duration-200"
+                    style={{
+                      width: previewDevice === "mobile" ? "375px" : previewDevice === "tablet" ? "768px" : "100%",
+                      height: "100%",
+                      maxWidth: "100%",
+                    }}
+                    sandbox="allow-scripts allow-modals allow-forms allow-popups"
                     title="Web Preview"
                   />
                 </div>
