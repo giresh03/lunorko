@@ -243,11 +243,12 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
 
 // -- File Explorer Item --
 const FileItem = ({
-  node, depth, activeFileId, onSelect, onToggle, onDelete, onRename,
+  node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
 }: {
   node: FileNode; depth: number; activeFileId: string | null;
   onSelect: (node: FileNode) => void; onToggle: (id: string) => void;
   onDelete: (id: string) => void; onRename: (id: string, name: string) => void;
+  themeColors: EditorTheme["uiColors"];
 }) => {
   const isActive = node.id === activeFileId;
   const [isEditing, setIsEditing] = useState(false);
@@ -267,17 +268,19 @@ const FileItem = ({
   return (
     <div>
       <div
-        className={`group flex items-center gap-1 px-2 py-[3px] cursor-pointer text-xs hover:bg-secondary/50 transition-colors ${
-          isActive ? "bg-primary/15 text-primary" : "text-muted-foreground"
-        }`}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        className="group flex items-center gap-1 px-2 py-[3px] cursor-pointer text-xs transition-colors"
+        style={{
+          paddingLeft: `${depth * 12 + 8}px`,
+          backgroundColor: isActive ? `${themeColors.accent}20` : "transparent",
+          color: isActive ? themeColors.accent : themeColors.text,
+        }}
         onClick={() => node.type === "folder" ? onToggle(node.id) : onSelect(node)}
         onDoubleClick={handleDoubleClick}
       >
         {node.type === "folder" ? (
           <>
-            <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${node.isOpen ? "rotate-90" : ""}`} />
-            {node.isOpen ? <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" /> : <FolderClosed className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            <ChevronRight className={`h-3 w-3 shrink-0 transition-transform ${node.isOpen ? "rotate-90" : ""}`} style={{ color: themeColors.muted }} />
+            {node.isOpen ? <FolderOpen className="h-3.5 w-3.5 shrink-0" style={{ color: themeColors.accent }} /> : <FolderClosed className="h-3.5 w-3.5 shrink-0" style={{ color: themeColors.muted }} />}
           </>
         ) : (
           <>
@@ -291,18 +294,19 @@ const FileItem = ({
             onChange={(e) => setEditName(e.target.value)}
             onBlur={handleRename}
             onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") setIsEditing(false); }}
-            className="flex-1 bg-input border border-border rounded px-1 text-xs text-foreground outline-none"
+            className="flex-1 rounded px-1 text-xs outline-none"
+            style={{ backgroundColor: themeColors.bg, borderColor: themeColors.border, color: themeColors.text, border: `1px solid ${themeColors.border}` }}
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
           <span className="truncate flex-1">{node.name}</span>
         )}
-        <button onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:text-destructive">
+        <button onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5" style={{ color: themeColors.muted }}>
           <X className="h-3 w-3" />
         </button>
       </div>
       {node.type === "folder" && node.isOpen && node.children?.map((child) => (
-        <FileItem key={child.id} node={child} depth={depth + 1} activeFileId={activeFileId} onSelect={onSelect} onToggle={onToggle} onDelete={onDelete} onRename={onRename} />
+        <FileItem key={child.id} node={child} depth={depth + 1} activeFileId={activeFileId} onSelect={onSelect} onToggle={onToggle} onDelete={onDelete} onRename={onRename} themeColors={themeColors} />
       ))}
     </div>
   );
@@ -1045,16 +1049,16 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         {/* Sidebar - file explorer */}
         {showSidebar && (
           <div className="flex flex-col w-56 border-r shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border }}>
+              <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
                 {sidebarTab === "files" ? "Explorer" : "Search"}
               </span>
               {sidebarTab === "files" && (
                 <div className="flex gap-0.5">
-                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("file"); setNewItemName(""); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="New File">
+                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("file"); setNewItemName(""); }} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="New File">
                     <FilePlus className="h-3.5 w-3.5" />
                   </button>
-                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("folder"); setNewItemName(""); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="New Folder">
+                  <button onClick={() => { setNewItemParent(firstFolderId); setNewItemType("folder"); setNewItemName(""); }} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="New Folder">
                     <FolderPlus className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1064,24 +1068,25 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
               <div className="flex-1 overflow-y-auto py-1 text-xs">
                 {newItemParent !== null && (
                   <div className="flex items-center gap-1 px-3 py-1">
-                    {newItemType === "folder" ? <FolderClosed className="h-3 w-3 text-muted-foreground" /> : <File className="h-3 w-3 text-muted-foreground" />}
+                    {newItemType === "folder" ? <FolderClosed className="h-3 w-3" style={{ color: currentTheme.uiColors.muted }} /> : <File className="h-3 w-3" style={{ color: currentTheme.uiColors.muted }} />}
                     <input
                       autoFocus value={newItemName}
                       onChange={(e) => setNewItemName(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") handleCreateItem(); if (e.key === "Escape") setNewItemParent(null); }}
                       onBlur={handleCreateItem}
                       placeholder={`New ${newItemType}...`}
-                      className="flex-1 bg-input border border-border rounded px-1 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      className="flex-1 rounded px-1 py-0.5 text-xs outline-none"
+                      style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, color: currentTheme.uiColors.text }}
                     />
                   </div>
                 )}
                 {fileTree.map((node) => (
-                  <FileItem key={node.id} node={node} depth={0} activeFileId={activeTabId} onSelect={handleSelectFile} onToggle={handleToggleFolder} onDelete={handleDeleteNode} onRename={handleRenameNode} />
+                  <FileItem key={node.id} node={node} depth={0} activeFileId={activeTabId} onSelect={handleSelectFile} onToggle={handleToggleFolder} onDelete={handleDeleteNode} onRename={handleRenameNode} themeColors={currentTheme.uiColors} />
                 ))}
               </div>
             ) : (
               <div className="p-3">
-                <input placeholder="Search files..." className="w-full rounded-md border border-border bg-input px-2 py-1.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary" />
+                <input placeholder="Search files..." className="w-full rounded-md px-2 py-1.5 text-xs outline-none" style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, color: currentTheme.uiColors.text }} />
               </div>
             )}
           </div>
@@ -1094,15 +1099,19 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
             {openTabs.map((tab) => (
               <div
                 key={tab.id}
-                className={`group flex items-center gap-1.5 px-3 h-full border-r border-border cursor-pointer text-xs transition-colors shrink-0 ${
-                  tab.id === activeTabId ? "bg-background text-foreground border-t-2 border-t-primary" : "text-muted-foreground hover:bg-secondary/30"
-                }`}
+                className="group flex items-center gap-1.5 px-3 h-full cursor-pointer text-xs transition-colors shrink-0"
+                style={{
+                  backgroundColor: tab.id === activeTabId ? currentTheme.uiColors.bg : "transparent",
+                  color: tab.id === activeTabId ? currentTheme.uiColors.text : currentTheme.uiColors.muted,
+                  borderRight: `1px solid ${currentTheme.uiColors.border}`,
+                  borderTop: tab.id === activeTabId ? `2px solid ${currentTheme.uiColors.accent}` : "2px solid transparent",
+                }}
                 onClick={() => setActiveTabId(tab.id)}
               >
                 <File className={`h-3 w-3 ${getFileIcon(tab.name)}`} />
                 <span className="whitespace-nowrap">{tab.name}</span>
-                {tab.isModified && <span className="h-2 w-2 rounded-full bg-primary/60" />}
-                <button onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.id); }} className="opacity-0 group-hover:opacity-100 ml-1 hover:text-destructive transition-opacity">
+                {tab.isModified && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: currentTheme.uiColors.accent + "99" }} />}
+                <button onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.id); }} className="opacity-0 group-hover:opacity-100 ml-1 transition-opacity" style={{ color: currentTheme.uiColors.muted }}>
                   <X className="h-3 w-3" />
                 </button>
               </div>
