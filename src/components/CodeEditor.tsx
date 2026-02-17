@@ -822,22 +822,92 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   const isAppDomain = domainId === "app-development";
 
   // Update preview content with debouncing
+  // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
+  const buildVanillaJsPreview = useCallback((jsCode: string, allFiles: Record<string, string>) => {
+    // Collect all CSS from project
+    const allCss = Object.entries(allFiles)
+      .filter(([name]) => name.endsWith(".css"))
+      .map(([, content]) => content)
+      .join("\n");
+
+    // Find the project's HTML file to use as a shell
+    const htmlFile = allFiles["index.html"] || Object.entries(allFiles).find(([name]) => name.endsWith(".html"))?.[1];
+
+    if (htmlFile) {
+      // Inject all CSS and the active JS into the HTML file
+      let html = htmlFile;
+      // Remove existing script/link refs so we inject fresh
+      html = html.replace(/<link[^>]+href=["'][^"']+\.css["'][^>]*>/gi, "");
+      html = html.replace(/<script[^>]+src=["'][^"']+\.js["'][^>]*><\/script>/gi, "");
+      // Inject CSS before </head> or at start
+      const cssTag = `<style>${allCss}</style>`;
+      if (html.includes("</head>")) {
+        html = html.replace("</head>", `${cssTag}</head>`);
+      } else {
+        html = cssTag + html;
+      }
+      // Inject ALL JS files (not just active) so DOM references work
+      const allJs = Object.entries(allFiles)
+        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .map(([name, content]) => `/* ${name} */\n${content}`)
+        .join("\n");
+      const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
+      if (html.includes("</body>")) {
+        html = html.replace("</body>", `${jsTag}</body>`);
+      } else {
+        html += jsTag;
+      }
+      return html;
+    }
+
+    // No HTML file found — create a minimal DOM-ready shell
+    return `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; padding: 16px; }
+${allCss}
+</style>
+</head><body>
+<div id="root"></div>
+<div id="app"></div>
+<div id="cart-items"></div>
+<div id="subtotal"></div>
+<div id="total"></div>
+<div id="output"></div>
+<script>
+try {
+${jsCode}
+} catch(e) {
+  document.body.innerHTML += '<div style="padding:16px;background:#1a0000;border:1px solid #ff4444;border-radius:8px;margin:16px;"><h3 style="color:#ff6b6b">⚠️ Runtime Error</h3><pre style="color:#ff9999;font-size:12px;white-space:pre-wrap">' + e.message + '</pre></div>';
+}
+<\/script>
+</body></html>`;
+  }, [activeTab?.name]);
+
   const updatePreview = useCallback(() => {
     if (!activeTab || !showPreview) return;
     const allFiles = collectFiles(fileTree);
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
     const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
+    const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
     if (isHtml) {
       setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
     } else if (isJsLike && hasJSX) {
-      // Render React/JSX preview for ANY domain when JSX is detected
       setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
       setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+    } else if (isJsLike && usesDOM) {
+      // Vanilla JS with DOM usage — render in an HTML shell with DOM available
+      setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+    } else if (isJsLike) {
+      // Pure JS without DOM — run and capture console output
+      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     }
-  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, isAppDomain]);
+  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain]);
 
   // Debounced preview update when content or active tab changes
   useEffect(() => {
@@ -847,13 +917,12 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
   }, [activeTabId, activeTab?.content, showPreview, updatePreview]);
 
-  // Auto-open preview when switching to HTML file or JS file in app-dev domain
+  // Auto-open preview when switching to HTML file or any JS file
   useEffect(() => {
     if (!activeTab) return;
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
-    const hasJSX = /<\w+[\s/>]/.test(activeTab.content || "") && /\breturn\s*[\s(]/.test(activeTab.content || "");
-    if (isHtml || (isAppDomain && isJsLike) || (isJsLike && hasJSX)) {
+    if (isHtml || isJsLike) {
       setShowPreview(true);
     }
   }, [activeTabId, isAppDomain]);
