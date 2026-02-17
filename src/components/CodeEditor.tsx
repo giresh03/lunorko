@@ -809,9 +809,13 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     const allFiles = collectFiles(fileTree);
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
+    const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
 
     if (isHtml) {
       setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+    } else if (isJsLike && hasJSX) {
+      // Render React/JSX preview for ANY domain when JSX is detected
+      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
       setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     }
@@ -830,7 +834,8 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     if (!activeTab) return;
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
-    if (isHtml || (isAppDomain && isJsLike)) {
+    const hasJSX = /<\w+[\s/>]/.test(activeTab.content || "") && /\breturn\s*[\s(]/.test(activeTab.content || "");
+    if (isHtml || (isAppDomain && isJsLike) || (isJsLike && hasJSX)) {
       setShowPreview(true);
     }
   }, [activeTabId, isAppDomain]);
