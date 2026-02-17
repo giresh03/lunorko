@@ -821,13 +821,13 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     }
   }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, isAppDomain]);
 
-  // Debounced preview update when content changes
+  // Debounced preview update when content or active tab changes
   useEffect(() => {
     if (!showPreview || !activeTab) return;
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     previewTimerRef.current = setTimeout(updatePreview, 300);
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
-  }, [activeTab?.content, showPreview, updatePreview]);
+  }, [activeTabId, activeTab?.content, showPreview, updatePreview]);
 
   // Auto-open preview when switching to HTML file or JS file in app-dev domain
   useEffect(() => {
