@@ -216,8 +216,9 @@ serve(async (req) => {
 
     // ============= ACTION: generate (AI code generation with streaming) =============
     if (action === "generate") {
-      const { messages } = body;
-      console.log(`[code-engine] generate domain=${domain}, messages=${messages?.length}`);
+      const { messages, model } = body;
+      const selectedModel = model || "google/gemini-3-flash-preview";
+      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
       const systemPrompt = `${basePrompt}
@@ -237,7 +238,7 @@ Rules:
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: selectedModel,
           messages: [
             { role: "system", content: systemPrompt },
             ...messages,
@@ -338,8 +339,126 @@ Rules:
       );
     }
 
+    // ============= ACTION: generate-tests =============
+    if (action === "generate-tests") {
+      const { code, language, filename, model } = body;
+      const selectedModel = model || "google/gemini-3-flash-preview";
+      console.log(`[code-engine] generate-tests lang=${language}, file=${filename}`);
+
+      const testPrompt = `Generate comprehensive unit tests for the following ${language} code. Use appropriate testing frameworks (Jest for JS/TS, pytest for Python, etc.). Include edge cases, error cases, and happy paths. Return ONLY the test code in a single code block.
+
+File: ${filename || "unknown"}
+\`\`\`${language}
+${code}
+\`\`\``;
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            { role: "system", content: `You are an expert test engineer. Generate thorough, production-quality tests. Use markdown code blocks with syntax highlighting.` },
+            { role: "user", content: testPrompt },
+          ],
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error(`[code-engine] test gen error: ${response.status}`, text);
+        return new Response(JSON.stringify({ error: "Test generation failed" }), {
+          status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(response.body, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+    }
+
+    // ============= ACTION: generate-docs =============
+    if (action === "generate-docs") {
+      const { code, language, filename, model } = body;
+      const selectedModel = model || "google/gemini-3-flash-preview";
+      console.log(`[code-engine] generate-docs lang=${language}, file=${filename}`);
+
+      const docsPrompt = `Generate comprehensive documentation for the following ${language} code. Include:
+1. Module/file overview
+2. Function/class documentation with parameters, return types, and examples
+3. Usage examples
+4. Any important notes or caveats
+
+Return the documentation as a well-formatted markdown document.
+
+File: ${filename || "unknown"}
+\`\`\`${language}
+${code}
+\`\`\``;
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            { role: "system", content: `You are a technical documentation expert. Write clear, comprehensive docs with examples.` },
+            { role: "user", content: docsPrompt },
+          ],
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error(`[code-engine] docs gen error: ${response.status}`, text);
+        return new Response(JSON.stringify({ error: "Documentation generation failed" }), {
+          status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(response.body, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+    }
+
+    // ============= ACTION: autocomplete (ghost text) =============
+    if (action === "autocomplete") {
+      const { code, language, cursorLine, cursorColumn, model } = body;
+      const selectedModel = model || "google/gemini-2.5-flash-lite";
+      console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
+
+      const lines = code.split("\n");
+      const contextBefore = lines.slice(Math.max(0, cursorLine - 20), cursorLine + 1).join("\n");
+      const contextAfter = lines.slice(cursorLine + 1, cursorLine + 5).join("\n");
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            { role: "system", content: `You are an intelligent code autocomplete engine. Given code context, predict the next 1-3 lines of code the developer would write. Return ONLY the completion text — no markdown, no explanation, no code fences. Just the raw code to insert.` },
+            { role: "user", content: `Language: ${language}\n\nCode before cursor:\n${contextBefore}\n\nCode after cursor:\n${contextAfter}\n\nComplete the code at the cursor position:` },
+          ],
+          stream: false,
+          max_tokens: 150,
+        }),
+      });
+
+      if (!response.ok) {
+        return new Response(JSON.stringify({ suggestion: "" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const data = await response.json();
+      const suggestion = data.choices?.[0]?.message?.content?.trim() || "";
+      // Clean up: remove markdown code fences if the model accidentally adds them
+      const cleaned = suggestion.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
+
+      return new Response(JSON.stringify({ suggestion: cleaned }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(
-      JSON.stringify({ error: `Unknown action: ${action}. Use "generate", "execute", or "get-environment".` }),
+      JSON.stringify({ error: `Unknown action: ${action}` }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -7,7 +7,7 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,8 @@ import {
   findCachedAIResponse, isOnline, getOfflineStatus, setOfflineMode,
   type CachedSnippet,
 } from "@/lib/offlineCache";
+import DiffPreview from "@/components/editor/DiffPreview";
+import ModelSelector, { AI_MODELS } from "@/components/editor/ModelSelector";
 
 // -- Project types --
 interface SavedProject {
@@ -462,12 +464,28 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [recentProjects, setRecentProjects] = useState<SavedProject[]>(() => getSavedProjects());
 
   // AI Chat
+  const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Cursor! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your active file. 🚀` },
+    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Cursor! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Generate tests** 🧪 or **docs** 📖 from toolbar\n\nCode I generate is **reviewed in diff view** before applying. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Diff preview state
+  const [diffPreview, setDiffPreview] = useState<{
+    originalCode: string;
+    newCode: string;
+    filename: string;
+    language: string;
+    targetTabId: string | null;
+    targetFilename?: string;
+  } | null>(null);
+
+  // Ghost text state
+  const ghostTextTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const monacoEditorRef = useRef<any>(null);
+  const ghostDisposableRef = useRef<any>(null);
 
   // New file/folder input
   const [newItemParent, setNewItemParent] = useState<string | null>(null);
@@ -846,25 +864,67 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
 
-  // Auto-apply code to editor — creates new file if language doesn't match active file
-  const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
+  // Auto-apply code to editor — shows diff preview first
+  const applyCodeToEditor = useCallback((code: string, language: string, filename?: string, skipDiff?: boolean) => {
     const activeLanguage = activeTab?.language;
     const normalizedLang = LANG_MAP[language] || language;
     const langMatches = activeLanguage === normalizedLang || activeLanguage === language;
 
     if (activeTabId && langMatches && !filename) {
-      // Same language — update active file
-      setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: code, isModified: true } : t));
-      setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: code })));
+      if (!skipDiff && activeTab && activeTab.content.trim() !== code.trim()) {
+        // Show diff preview instead of auto-applying
+        setDiffPreview({
+          originalCode: activeTab.content,
+          newCode: code,
+          filename: activeTab.name,
+          language: normalizedLang || language,
+          targetTabId: activeTabId,
+        });
+      } else {
+        // Same language — update active file directly
+        setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: code, isModified: true } : t));
+        setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: code })));
+      }
     } else {
-      // Different language or explicit filename — create a new file
+      // Different language or explicit filename — show diff for new file creation
       const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[language] || language || "js";
       const newName = filename || `untitled-${Date.now().toString(36)}.${ext}`;
       const newId = `src/${newName}`;
-      const newNode: FileNode = { id: newId, name: newName, type: "file", language: normalizedLang || getLang(newName), content: code };
-      const newTab: OpenTab = { id: newId, name: newName, language: normalizedLang || getLang(newName), content: code, isModified: true };
 
-      // Add to src folder
+      if (!skipDiff) {
+        setDiffPreview({
+          originalCode: "",
+          newCode: code,
+          filename: newName,
+          language: normalizedLang || getLang(newName),
+          targetTabId: null,
+          targetFilename: newName,
+        });
+      } else {
+        const newNode: FileNode = { id: newId, name: newName, type: "file", language: normalizedLang || getLang(newName), content: code };
+        const newTab: OpenTab = { id: newId, name: newName, language: normalizedLang || getLang(newName), content: code, isModified: true };
+        setFileTree((prev) => {
+          const srcFolder = prev.find(n => n.id === "src" && n.type === "folder");
+          if (srcFolder) return addChild(prev, "src", newNode);
+          return [...prev, newNode];
+        });
+        setOpenTabs((prev) => [...prev, newTab]);
+        setActiveTabId(newId);
+      }
+    }
+  }, [activeTabId, activeTab, updateNode, addChild]);
+
+  // Handle diff accept
+  const handleDiffAccept = useCallback(() => {
+    if (!diffPreview) return;
+    if (diffPreview.targetTabId) {
+      setOpenTabs((prev) => prev.map((t) => t.id === diffPreview.targetTabId ? { ...t, content: diffPreview.newCode, isModified: true } : t));
+      setFileTree((prev) => updateNode(prev, diffPreview.targetTabId!, (n) => ({ ...n, content: diffPreview.newCode })));
+    } else {
+      const newName = diffPreview.targetFilename || diffPreview.filename;
+      const newId = `src/${newName}`;
+      const newNode: FileNode = { id: newId, name: newName, type: "file", language: diffPreview.language, content: diffPreview.newCode };
+      const newTab: OpenTab = { id: newId, name: newName, language: diffPreview.language, content: diffPreview.newCode, isModified: true };
       setFileTree((prev) => {
         const srcFolder = prev.find(n => n.id === "src" && n.type === "folder");
         if (srcFolder) return addChild(prev, "src", newNode);
@@ -873,7 +933,178 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       setOpenTabs((prev) => [...prev, newTab]);
       setActiveTabId(newId);
     }
-  }, [activeTabId, activeTab, updateNode, addChild]);
+    setDiffPreview(null);
+  }, [diffPreview, updateNode, addChild]);
+
+  const handleDiffReject = useCallback(() => {
+    setDiffPreview(null);
+  }, []);
+
+  // Model change handler
+  const handleModelChange = useCallback((modelId: string) => {
+    setSelectedModel(modelId);
+    localStorage.setItem("lunor-ai-model", modelId);
+  }, []);
+
+  // -- Ghost text inline completions --
+  const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
+    try {
+      const resp = await fetch(CODE_ENGINE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainName, model: selectedModel }),
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return data.suggestion || null;
+    } catch { return null; }
+  }, [domainName, selectedModel]);
+
+  // Register Monaco inline completion provider
+  useEffect(() => {
+    if (!monacoEditorRef.current) return;
+    const editor = monacoEditorRef.current;
+    const monaco = (window as any).monaco;
+    if (!monaco) return;
+
+    // Dispose previous registration
+    if (ghostDisposableRef.current) {
+      ghostDisposableRef.current.dispose();
+      ghostDisposableRef.current = null;
+    }
+
+    const disposable = monaco.languages.registerInlineCompletionsProvider("*", {
+      provideInlineCompletions: async (model: any, position: any) => {
+        const code = model.getValue();
+        if (code.length < 10) return { items: [] };
+
+        const suggestion = await fetchGhostSuggestion(code, activeTab?.language || "javascript", position.lineNumber - 1, position.column - 1);
+        if (!suggestion) return { items: [] };
+
+        return {
+          items: [{
+            insertText: suggestion,
+            range: {
+              startLineNumber: position.lineNumber,
+              startColumn: position.column,
+              endLineNumber: position.lineNumber,
+              endColumn: position.column,
+            },
+          }],
+        };
+      },
+      freeInlineCompletions: () => {},
+    });
+
+    ghostDisposableRef.current = disposable;
+    return () => disposable.dispose();
+  }, [fetchGhostSuggestion, activeTab?.language]);
+
+  // -- AI-powered test generation --
+  const handleGenerateTests = useCallback(async () => {
+    if (!activeTab || chatLoading) return;
+    setChatLoading(true);
+    const userMsg: Message = { role: "user", content: `🧪 Generate tests for \`${activeTab.name}\`` };
+    setMessages(prev => [...prev, userMsg]);
+    let assistantSoFar = "";
+    const upsert = (chunk: string) => {
+      assistantSoFar += chunk;
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && prev.length > 1) return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+        return [...prev, { role: "assistant", content: assistantSoFar }];
+      });
+    };
+
+    try {
+      const resp = await fetch(CODE_ENGINE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ action: "generate-tests", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel }),
+      });
+      if (!resp.ok || !resp.body) { upsert("❌ Test generation failed."); setChatLoading(false); return; }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n")) !== -1) {
+          let line = buf.slice(0, idx); buf = buf.slice(idx + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") break;
+          try { const p = JSON.parse(json); const c = p.choices?.[0]?.delta?.content; if (c) upsert(c); }
+          catch { buf = line + "\n" + buf; break; }
+        }
+      }
+      // Auto-apply test file
+      if (assistantSoFar) {
+        const blocks = extractCodeBlocks(assistantSoFar);
+        if (blocks.length > 0) {
+          const testFilename = activeTab.name.replace(/\.(\w+)$/, ".test.$1");
+          applyCodeToEditor(blocks[0].code, blocks[0].language, testFilename);
+        }
+      }
+    } catch { upsert("❌ Connection error."); }
+    setChatLoading(false);
+  }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor]);
+
+  // -- AI-powered doc generation --
+  const handleGenerateDocs = useCallback(async () => {
+    if (!activeTab || chatLoading) return;
+    setChatLoading(true);
+    const userMsg: Message = { role: "user", content: `📖 Generate documentation for \`${activeTab.name}\`` };
+    setMessages(prev => [...prev, userMsg]);
+    let assistantSoFar = "";
+    const upsert = (chunk: string) => {
+      assistantSoFar += chunk;
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && prev.length > 1) return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+        return [...prev, { role: "assistant", content: assistantSoFar }];
+      });
+    };
+
+    try {
+      const resp = await fetch(CODE_ENGINE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ action: "generate-docs", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel }),
+      });
+      if (!resp.ok || !resp.body) { upsert("❌ Doc generation failed."); setChatLoading(false); return; }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n")) !== -1) {
+          let line = buf.slice(0, idx); buf = buf.slice(idx + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") break;
+          try { const p = JSON.parse(json); const c = p.choices?.[0]?.delta?.content; if (c) upsert(c); }
+          catch { buf = line + "\n" + buf; break; }
+        }
+      }
+      // Auto-apply doc file
+      if (assistantSoFar) {
+        const blocks = extractCodeBlocks(assistantSoFar);
+        if (blocks.length > 0) {
+          const docFilename = activeTab.name.replace(/\.\w+$/, ".docs.md");
+          applyCodeToEditor(blocks[0].code, blocks[0].language, docFilename);
+        }
+      }
+    } catch { upsert("❌ Connection error."); }
+    setChatLoading(false);
+  }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor]);
 
   // -- Run Code --
   const handleRun = useCallback(async () => {
@@ -922,6 +1153,8 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    // Add file context to the user message
+    const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
     const updated = [...messages, userMsg];
     setMessages(updated);
@@ -949,10 +1182,17 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
     } else {
       try {
+        // Append file context to the last user message for AI awareness
+        const messagesWithContext = updated.map((m, i) => {
+          if (i === updated.length - 1 && m.role === "user") {
+            return { role: m.role, content: m.content + fileContext };
+          }
+          return { role: m.role, content: m.content };
+        });
         const resp = await fetch(CODE_ENGINE_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-          body: JSON.stringify({ action: "generate", messages: updated.map((m) => ({ role: m.role, content: m.content })), domain: domainName }),
+          body: JSON.stringify({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel }),
         });
         if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
         if (!resp.body) throw new Error("No body");
@@ -1027,7 +1267,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -1264,6 +1504,18 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.text }}>
       {newProjectDialog}
+      {/* Diff Preview Modal */}
+      {diffPreview && (
+        <DiffPreview
+          originalCode={diffPreview.originalCode}
+          newCode={diffPreview.newCode}
+          filename={diffPreview.filename}
+          language={diffPreview.language}
+          themeColors={currentTheme.uiColors}
+          onAccept={handleDiffAccept}
+          onReject={handleDiffReject}
+        />
+      )}
 
       {/* Title bar with File menu */}
       <div className="flex items-center justify-between h-9 border-b px-3 shrink-0 select-none" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
@@ -1499,6 +1751,12 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
               <button onClick={handleReset} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Reset">
                 <RotateCcw className="h-3.5 w-3.5" />
               </button>
+              <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Tests">
+                <TestTube2 className="h-3.5 w-3.5" />
+              </button>
+              <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Docs">
+                <BookOpen className="h-3.5 w-3.5" />
+              </button>
               <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-6 gap-1 px-2.5 text-[10px]">
                 {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 Run
@@ -1530,6 +1788,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                   value={activeTab.content}
                   onChange={handleCodeChange}
                   theme={currentTheme.monacoTheme}
+                  onMount={(editor, monaco) => {
+                    monacoEditorRef.current = editor;
+                    (window as any).monaco = monaco;
+                  }}
                   options={{
                     fontSize: 13,
                     fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
@@ -1545,6 +1807,8 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                     cursorBlinking: "smooth",
                     smoothScrolling: true,
                     renderWhitespace: "selection",
+                    inlineSuggest: { enabled: true },
+                    quickSuggestions: true,
                   }}
                 />
               ) : (
@@ -1859,7 +2123,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
             <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0" style={{ borderColor: currentTheme.uiColors.border }}>
               <Sparkles className="h-4 w-4" style={{ color: currentTheme.uiColors.accent }} />
               <span className="text-xs font-semibold" style={{ color: currentTheme.uiColors.text }}>AI Assistant</span>
-              <span className="rounded-sm px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>Auto-Apply</span>
+              <span className="rounded-sm px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>Diff Review</span>
               <div className="flex-1" />
               <button onClick={handleClearChat} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="Clear chat">
                 <Trash2 className="h-3 w-3" />
@@ -2010,18 +2274,21 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
-              {isAppDomain && (
-                <div className="flex justify-end mb-1">
-                  <button
-                    onClick={() => setShowChecklist(!showChecklist)}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
-                    style={{ color: showChecklist ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showChecklist ? currentTheme.uiColors.accent + "15" : "transparent" }}
-                  >
-                    <Ruler className="h-3 w-3" />
-                    Responsive
-                  </button>
+              <div className="flex items-center justify-between mb-1">
+                <ModelSelector selectedModel={selectedModel} onSelect={handleModelChange} themeColors={currentTheme.uiColors} />
+                <div className="flex items-center gap-1">
+                  {isAppDomain && (
+                    <button
+                      onClick={() => setShowChecklist(!showChecklist)}
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                      style={{ color: showChecklist ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showChecklist ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                    >
+                      <Ruler className="h-3 w-3" />
+                      Responsive
+                    </button>
+                  )}
                 </div>
-              )}
+              </div>
               <div className="flex gap-1.5">
                 <input
                   value={chatInput}
@@ -2046,7 +2313,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
                 </button>
               </div>
               <p className="mt-1.5 text-[9px] text-center" style={{ color: currentTheme.uiColors.muted }}>
-                Code is <span className="font-medium" style={{ color: currentTheme.uiColors.accent }}>auto-applied</span> to your active file
+                Code changes shown in <span className="font-medium" style={{ color: currentTheme.uiColors.accent }}>diff review</span> before applying
               </p>
             </div>
           </div>
