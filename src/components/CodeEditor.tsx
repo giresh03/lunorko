@@ -1185,10 +1185,37 @@ ${jsCode}
   const handleRun = useCallback(async () => {
     if (!activeTab) return;
     setIsRunning(true);
-    setShowTerminal(true);
     const lang = activeTab.language;
-    const isNative = lang === "javascript" || lang === "typescript";
-    setOutput([`$ Running ${activeTab.name}...`, isNative ? "⚡ Native runtime" : `🤖 AI-simulated ${lang} runtime`]);
+    const isHtml = lang === "html" || activeTab.name.endsWith(".html");
+    const isJsLike = ["javascript", "typescript"].includes(lang) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
+
+    // For HTML/JS/React files, render visually in the preview iframe
+    if (isHtml || isJsLike) {
+      setShowPreview(true);
+      setShowTerminal(true);
+      setOutput([`$ Running ${activeTab.name}...`, "🌐 Live preview rendering..."]);
+      // Trigger preview update immediately
+      const allFiles = collectFiles(fileTree);
+      const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
+      const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
+
+      if (isHtml) {
+        setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+      } else if (isJsLike && hasJSX) {
+        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+      } else if (isJsLike && usesDOM) {
+        setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+      } else {
+        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+      }
+      setOutput(prev => [...prev, "✅ Preview rendered successfully"]);
+      setIsRunning(false);
+      return;
+    }
+
+    // For non-web languages (Python, C++, etc.), use edge function AI-simulated execution
+    setShowTerminal(true);
+    setOutput([`$ Running ${activeTab.name}...`, `🤖 AI-simulated ${lang} runtime`]);
 
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
@@ -1211,7 +1238,7 @@ ${jsCode}
       setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
     }
     setIsRunning(false);
-  }, [activeTab, domainName]);
+  }, [activeTab, domainName, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview]);
 
   const handleCopy = () => {
     if (activeTab) navigator.clipboard.writeText(activeTab.content);
@@ -1301,6 +1328,11 @@ ${jsCode}
       codeBlocks.forEach((block) => {
         applyCodeToEditor(block.code, block.language, block.filename);
       });
+      // Auto-open preview for web files
+      const hasWebCode = codeBlocks.some(b => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(b.language));
+      if (hasWebCode) {
+        setShowPreview(true);
+      }
     }
 
     // Live debugging hints for app-development domain
