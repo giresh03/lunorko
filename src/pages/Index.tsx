@@ -16,6 +16,7 @@ import PricingPreviewSection from "@/components/home/PricingPreviewSection";
 import ComparisonSection from "@/components/home/ComparisonSection";
 import VideoSection from "@/components/home/VideoSection";
 import FAQSection from "@/components/home/FAQSection";
+import HeroSection from "@/components/home/HeroSection";
 
 const Index = () => {
   const pageRef = useScrollReveal();
@@ -25,80 +26,7 @@ const Index = () => {
       <Navbar />
 
       {/* Hero */}
-      <section className="relative overflow-hidden pt-16 min-h-[90vh] flex items-center">
-        {/* Animated CSS background */}
-        <div className="absolute inset-0 z-0 overflow-hidden bg-background">
-          {/* Floating particles */}
-          <div className="absolute inset-0">
-            {Array.from({ length: 30 }).map((_, i) => (
-              <div
-                key={i}
-                className="absolute rounded-full bg-primary/20 animate-float"
-                style={{
-                  width: `${Math.random() * 6 + 2}px`,
-                  height: `${Math.random() * 6 + 2}px`,
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                  animationDuration: `${Math.random() * 8 + 6}s`,
-                  animationDelay: `${Math.random() * 5}s`,
-                }}
-              />
-            ))}
-          </div>
-          {/* Gradient mesh blobs */}
-          <div className="absolute -top-1/4 -left-1/4 h-[60%] w-[60%] rounded-full bg-primary/10 blur-[120px] animate-mesh-1" />
-          <div className="absolute -bottom-1/4 -right-1/4 h-[50%] w-[50%] rounded-full bg-accent/10 blur-[100px] animate-mesh-2" />
-          <div className="absolute top-1/3 right-1/4 h-[40%] w-[40%] rounded-full bg-secondary/10 blur-[80px] animate-mesh-3" />
-        </div>
-
-        {/* Gradient overlay */}
-        <div className="absolute inset-0 z-[1] bg-gradient-to-b from-background/30 via-background/60 to-background" />
-
-        <div className="relative z-10 mx-auto flex flex-col items-center px-6 py-32 text-center md:py-44 max-w-5xl">
-          <div
-            className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 backdrop-blur-sm scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out"
-          >
-            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-            <span className="text-xs font-medium text-primary">AI-Powered Learning for Engineers</span>
-          </div>
-          <div className="scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-150 ease-out">
-            <TypewriterEffectSmooth
-              words={[
-                { text: "Code" },
-                { text: "Smarter" },
-                { text: "with" },
-                { text: "Lunor.AI", className: "text-primary dark:text-primary" },
-              ]}
-              className="font-serif justify-center"
-            />
-          </div>
-          <p
-            className="mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-300 ease-out"
-          >
-            Your AI-powered coding companion. Learn any engineering domain with personalized guidance,
-            intelligent code assistants, curated resources, and hands-on projects.
-          </p>
-          <div
-            className="mt-10 flex flex-wrap items-center justify-center gap-3 scroll-reveal opacity-0 translate-y-6 transition-all duration-700 delay-500 ease-out"
-          >
-            <Button size="lg" className="hover-scale" asChild>
-              <Link to="/domains">
-                Explore Domains <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button variant="outline" size="lg" className="hover-scale" asChild>
-              <Link to="/about">Learn More</Link>
-            </Button>
-          </div>
-        </div>
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 animate-bounce">
-          <span className="text-xs text-muted-foreground">Scroll</span>
-          <div className="h-6 w-4 rounded-full border-2 border-muted-foreground/50 flex items-start justify-center p-1">
-            <div className="h-1.5 w-1 rounded-full bg-muted-foreground/50 animate-pulse" />
-          </div>
-        </div>
-      </section>
+      <HeroSection />
 
       {/* Features */}
       <section className="container mx-auto px-4 py-20">
@@ -225,30 +153,32 @@ const Index = () => {
 
       <style>{`
         ${scrollRevealStyle}
-        @keyframes float {
-          0%, 100% { transform: translateY(0) translateX(0); opacity: 0.4; }
-          25% { transform: translateY(-20px) translateX(10px); opacity: 0.8; }
-          50% { transform: translateY(-40px) translateX(-5px); opacity: 0.5; }
-          75% { transform: translateY(-20px) translateX(15px); opacity: 0.7; }
+        @keyframes gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
-        @keyframes mesh1 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(5%, 10%) scale(1.1); }
-          66% { transform: translate(-5%, 5%) scale(0.95); }
+        .animate-gradient-shift { animation: gradient-shift 4s ease infinite; }
+        @keyframes hero-badge {
+          0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
-        @keyframes mesh2 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(-8%, -5%) scale(1.05); }
-          66% { transform: translate(3%, -8%) scale(1.1); }
+        .animate-hero-badge { animation: hero-badge 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both; }
+        @keyframes hero-title {
+          0% { opacity: 0; transform: translateY(30px); filter: blur(8px); }
+          100% { opacity: 1; transform: translateY(0); filter: blur(0); }
         }
-        @keyframes mesh3 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          50% { transform: translate(10%, -10%) scale(1.15); }
+        .animate-hero-title { animation: hero-title 1s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both; }
+        @keyframes hero-subtitle {
+          0% { opacity: 0; transform: translateY(20px); }
+          100% { opacity: 1; transform: translateY(0); }
         }
-        .animate-float { animation: float linear infinite; }
-        .animate-mesh-1 { animation: mesh1 15s ease-in-out infinite; }
-        .animate-mesh-2 { animation: mesh2 18s ease-in-out infinite; }
-        .animate-mesh-3 { animation: mesh3 12s ease-in-out infinite; }
+        .animate-hero-subtitle { animation: hero-subtitle 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.7s both; }
+        @keyframes hero-cta {
+          0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-hero-cta { animation: hero-cta 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.9s both; }
       `}</style>
     </div>
   );
