@@ -103,14 +103,28 @@ export const HeroParallax = ({
 export const Header = () => {
   return (
     <div className="max-w-7xl relative mx-auto py-20 md:py-40 px-4 w-full left-0 top-0">
-      <h1 className="text-2xl md:text-7xl font-bold font-serif text-foreground">
+      <motion.h1
+        initial={{ opacity: 0, y: 40 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        viewport={{ once: true }}
+        className="text-4xl md:text-7xl lg:text-8xl font-bold font-serif text-foreground tracking-tight leading-[1.05]"
+      >
         Master Every <br />
-        <span className="text-primary">Engineering Domain</span>
-      </h1>
-      <p className="max-w-2xl text-base md:text-xl mt-8 text-muted-foreground">
+        <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary via-[hsl(192,91%,50%)] to-primary bg-[length:200%_200%] animate-gradient-shift">
+          Engineering Domain
+        </span>
+      </motion.h1>
+      <motion.p
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        viewport={{ once: true }}
+        className="max-w-2xl text-lg md:text-2xl mt-8 text-muted-foreground leading-relaxed"
+      >
         Dive into 12+ specialized domains with curated resources, AI-powered code
-        assistants, structured roadmaps, and hands-on projects — all in one platform.
-      </p>
+        assistants, structured roadmaps, and hands-on projects.
+      </motion.p>
     </div>
   );
 };
@@ -135,22 +149,25 @@ export const ProductCard = ({
         y: -20,
       }}
       key={product.title}
-      className="group/product h-96 w-[30rem] relative shrink-0"
+      className="group/product h-96 w-[30rem] relative shrink-0 rounded-xl overflow-hidden"
     >
       <Link
         to={product.link}
-        className="block group-hover/product:shadow-2xl"
+        className="block h-full w-full"
       >
         <img
           src={product.thumbnail}
-          className="object-cover object-left-top absolute h-full w-full inset-0 rounded-lg"
+          className="object-cover object-center absolute h-full w-full inset-0"
           alt={product.title}
         />
+        {/* Always-visible gradient overlay with title */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        <h2 className="absolute bottom-5 left-5 right-5 text-white text-xl md:text-2xl font-bold tracking-tight drop-shadow-lg">
+          {product.title}
+        </h2>
+        {/* Hover glow border */}
+        <div className="absolute inset-0 rounded-xl border-2 border-transparent group-hover/product:border-primary/50 transition-colors duration-300 pointer-events-none" />
       </Link>
-      <div className="absolute inset-0 h-full w-full opacity-0 group-hover/product:opacity-80 bg-background rounded-lg pointer-events-none transition-opacity duration-300" />
-      <h2 className="absolute bottom-4 left-4 opacity-0 group-hover/product:opacity-100 text-foreground font-semibold transition-opacity duration-300">
-        {product.title}
-      </h2>
     </motion.div>
   );
 };
