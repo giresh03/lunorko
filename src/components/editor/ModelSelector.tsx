@@ -53,7 +53,7 @@ const ModelSelector = ({ selectedModel, onSelect, themeColors }: ModelSelectorPr
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full mb-1 right-0 z-50 w-56 rounded-md border py-1 shadow-xl" style={{ backgroundColor: themeColors.card, borderColor: themeColors.border }}>
+          <div className="absolute bottom-full mb-1 right-0 z-50 w-56 rounded-md border py-1 shadow-xl" style={{ backgroundColor: themeColors.bg, borderColor: themeColors.border, boxShadow: `0 8px 32px rgba(0,0,0,0.5)` }}>
             <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: themeColors.muted }}>AI Model</div>
             {AI_MODELS.map(model => {
               const Icon = iconMap[model.icon];
@@ -64,14 +64,16 @@ const ModelSelector = ({ selectedModel, onSelect, themeColors }: ModelSelectorPr
                   onClick={() => { onSelect(model.id); setOpen(false); }}
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors"
                   style={{
-                    color: isSelected ? themeColors.accent : themeColors.text,
-                    backgroundColor: isSelected ? themeColors.accent + "15" : "transparent",
+                    color: isSelected ? themeColors.accent : "#e0e0e0",
+                    backgroundColor: isSelected ? themeColors.accent + "20" : "transparent",
                   }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = themeColors.accent + "10"; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
                 >
                   <Icon className="h-3 w-3 shrink-0" style={{ color: isSelected ? themeColors.accent : themeColors.muted }} />
                   <div className="flex-1 text-left">
                     <span className="font-medium">{model.label}</span>
-                    <span className="block text-[9px]" style={{ color: themeColors.muted }}>{model.description}</span>
+                    <span className="block text-[9px]" style={{ color: "#999" }}>{model.description}</span>
                   </div>
                   {isSelected && <Check className="h-3 w-3 shrink-0" />}
                 </button>
