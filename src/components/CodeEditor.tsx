@@ -805,6 +805,9 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       html = baseStyle + html;
     }
     
+    // Track which CSS/JS files were already referenced and injected
+    const injectedFiles = new Set<string>();
+
     // Find referenced CSS files and inject inline if they exist in the project
     const cssLinkRegex = /<link[^>]+href=["']([^"']+\.css)["'][^>]*>/gi;
     let cssMatch;
@@ -812,6 +815,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       const cssFileName = cssMatch[1].split("/").pop() || "";
       if (allFiles[cssFileName]) {
         html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${allFiles[cssFileName]}</style>`);
+        injectedFiles.add(cssFileName);
       }
     }
     
@@ -821,7 +825,35 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
       if (allFiles[jsFileName]) {
-        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}</script>`);
+        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
+        injectedFiles.add(jsFileName);
+      }
+    }
+
+    // Also inject any remaining CSS/JS files that weren't explicitly referenced
+    const remainingCss = Object.entries(allFiles)
+      .filter(([name]) => name.endsWith(".css") && !injectedFiles.has(name) && !name.includes("/"))
+      .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
+      .join("\n");
+    const remainingJs = Object.entries(allFiles)
+      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
+      .join("\n");
+
+    if (remainingCss) {
+      if (html.includes("</head>")) {
+        html = html.replace("</head>", `${remainingCss}\n</head>`);
+      } else if (html.includes("</body>")) {
+        html = html.replace("</body>", `${remainingCss}\n</body>`);
+      } else {
+        html = remainingCss + html;
+      }
+    }
+    if (remainingJs) {
+      if (html.includes("</body>")) {
+        html = html.replace("</body>", `${remainingJs}\n</body>`);
+      } else {
+        html += remainingJs;
       }
     }
     
@@ -1362,60 +1394,95 @@ ${jsCode}
       } catch { upsert("❌ Connection error. Switching to offline mode."); }
     }
 
-    // Auto-apply: extract code blocks and create files automatically (skip diff approval)
+    // Auto-apply: extract code blocks, batch all file operations, then trigger preview
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
-      let firstHtmlOrJsId: string | null = null;
+      // Prepare all new files/updates in one pass
+      const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
         const newId = `src/${fname}`;
-        
-        // Check if file already exists and update it, otherwise create new
-        const existingFile = findFile(fileTree, newId);
-        if (existingFile) {
-          // Update existing file
-          setOpenTabs(prev => prev.map(t => t.id === newId ? { ...t, content: block.code, isModified: true } : t));
-          setFileTree(prev => updateNode(prev, newId, n => ({ ...n, content: block.code })));
-        } else {
-          // Create new file
-          const newNode: FileNode = { id: newId, name: fname, type: "file", language: normalizedLang || getLang(fname), content: block.code };
-          const newTab: OpenTab = { id: newId, name: fname, language: normalizedLang || getLang(fname), content: block.code, isModified: true };
-          setFileTree(prev => {
-            const srcFolder = prev.find(n => n.id === "src" && n.type === "folder");
-            if (srcFolder) return addChild(prev, "src", newNode);
-            // Create src folder if it doesn't exist
-            if (prev.length === 0 || !prev.some(n => n.type === "folder")) {
-              return [{ id: "src", name: "src", type: "folder", isOpen: true, children: [newNode] }];
-            }
-            return [...prev, newNode];
-          });
-          setOpenTabs(prev => [...prev, newTab]);
-        }
-
-        // Track the first previewable file
-        if (!firstHtmlOrJsId && ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(normalizedLang || block.language)) {
-          firstHtmlOrJsId = newId;
-        }
+        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
       });
 
-      // Auto-select the best file for preview (prefer HTML, then JS)
-      const htmlBlock = codeBlocks.find(b => b.language === "html" || b.filename?.endsWith(".html"));
-      const bestId = htmlBlock ? `src/${htmlBlock.filename}` : firstHtmlOrJsId;
-      if (bestId) {
-        setActiveTabId(bestId);
-      }
+      // Batch update file tree in a single setState
+      setFileTree(prev => {
+        let tree = [...prev];
+        // Ensure src folder exists
+        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
+        if (!srcFolder) {
+          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
+          tree = [srcFolder, ...tree];
+        }
 
-      // Auto-open preview and trigger run for web files
-      const hasWebCode = codeBlocks.some(b => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(b.language));
+        newFiles.forEach(({ id, name, lang, code }) => {
+          const existingInTree = findFile(tree, id);
+          if (existingInTree) {
+            tree = updateNode(tree, id, n => ({ ...n, content: code }));
+          } else {
+            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
+            tree = addChild(tree, "src", newNode);
+          }
+        });
+        return tree;
+      });
+
+      // Batch update tabs in a single setState
+      setOpenTabs(prev => {
+        let tabs = [...prev];
+        newFiles.forEach(({ id, name, lang, code }) => {
+          const existingTab = tabs.find(t => t.id === id);
+          if (existingTab) {
+            tabs = tabs.map(t => t.id === id ? { ...t, content: code, isModified: true } : t);
+          } else {
+            tabs = [...tabs, { id, name, language: lang, content: code, isModified: true }];
+          }
+        });
+        return tabs;
+      });
+
+      // Auto-select the best file for preview (prefer HTML, then first JS)
+      const htmlFile = newFiles.find(f => f.lang === "html" || f.name.endsWith(".html"));
+      const jsFile = newFiles.find(f => ["javascript", "typescript"].includes(f.lang) || /\.(js|jsx|ts|tsx)$/.test(f.name));
+      const bestFile = htmlFile || jsFile || newFiles[0];
+      if (bestFile) setActiveTabId(bestFile.id);
+
+      // Auto-open preview and build it directly from the code blocks (don't rely on stale state)
+      const hasWebCode = newFiles.some(f => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(f.lang));
       if (hasWebCode) {
         setShowPreview(true);
-        // Force preview update after state settles
+
+        // Build a complete file map from existing tree + new files for immediate preview
         setTimeout(() => {
-          updatePreview();
-        }, 150);
+          // Collect files from current (updated) tree via a fresh read
+          setFileTree(currentTree => {
+            const allFiles = collectFiles(currentTree);
+
+            // Determine which file to preview
+            const previewFile = htmlFile || jsFile || newFiles[0];
+            if (previewFile) {
+              const isHtml = previewFile.lang === "html" || previewFile.name.endsWith(".html");
+              const isJsLike = ["javascript", "typescript"].includes(previewFile.lang) || /\.(js|jsx|ts|tsx)$/.test(previewFile.name);
+              const hasJSX = /<\w+[\s/>]/.test(previewFile.code) && /\breturn\s*[\s(]/.test(previewFile.code);
+              const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(previewFile.code);
+
+              if (isHtml) {
+                setPreviewContent(buildPreviewHtml(previewFile.code, allFiles));
+              } else if (isJsLike && hasJSX) {
+                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+              } else if (isJsLike && usesDOM) {
+                setPreviewContent(buildVanillaJsPreview(previewFile.code, allFiles));
+              } else if (isJsLike) {
+                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+              }
+            }
+
+            return currentTree; // Don't modify tree, just reading
+          });
+        }, 200);
       }
     }
 
