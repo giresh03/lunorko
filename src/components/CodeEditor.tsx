@@ -836,12 +836,30 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([, content]) => content)
       .join("\n");
 
+    // Extract all getElementById references to auto-create missing elements
+    const idRefs = [...jsCode.matchAll(/getElementById\(['"]([^'"]+)['"]\)/g)].map(m => m[1]);
+    const queryRefs = [...jsCode.matchAll(/querySelector\(['"]#([^'"]+)['"]\)/g)].map(m => m[1]);
+    const allIds = [...new Set([...idRefs, ...queryRefs])];
+
     // Find the project's HTML file to use as a shell
     const htmlFile = allFiles["index.html"] || Object.entries(allFiles).find(([name]) => name.endsWith(".html"))?.[1];
 
     if (htmlFile) {
-      // Inject all CSS and the active JS into the HTML file
       let html = htmlFile;
+      // Check which referenced IDs are missing from the HTML
+      const missingIds = allIds.filter(id => !html.includes(`id="${id}"`) && !html.includes(`id='${id}'`));
+      
+      if (missingIds.length > 0) {
+        // Create placeholder elements for missing IDs
+        const placeholders = missingIds.map(id => `  <div id="${id}"></div>`).join("\n");
+        // Inject before </body> or at end of body content
+        if (html.includes("</body>")) {
+          html = html.replace("</body>", `${placeholders}\n</body>`);
+        } else {
+          html += placeholders;
+        }
+      }
+
       // Remove existing script/link refs so we inject fresh
       html = html.replace(/<link[^>]+href=["'][^"']+\.css["'][^>]*>/gi, "");
       html = html.replace(/<script[^>]+src=["'][^"']+\.js["'][^>]*><\/script>/gi, "");
@@ -866,21 +884,26 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       return html;
     }
 
-    // No HTML file found — create a minimal DOM-ready shell
+    // No HTML file found — create a DOM-ready shell with auto-detected elements
+    const elementDivs = allIds.map(id => `<div id="${id}"></div>`).join("\n");
     return `<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; padding: 16px; }
+button { padding: 8px 16px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
+button:active { opacity: 0.8; }
+input, textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; width: 100%; margin: 4px 0; }
+h1 { font-size: 24px; margin-bottom: 12px; color: #6366f1; }
+h2 { font-size: 20px; margin-bottom: 8px; }
+p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
 ${allCss}
 </style>
 </head><body>
 <div id="root"></div>
 <div id="app"></div>
-<div id="cart-items"></div>
-<div id="subtotal"></div>
-<div id="total"></div>
+${elementDivs}
 <div id="output"></div>
 <script>
 try {
@@ -923,7 +946,7 @@ ${jsCode}
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
   }, [activeTabId, activeTab?.content, showPreview, updatePreview]);
 
-  // Auto-open preview when switching to HTML file or any JS file
+  // Auto-open preview when switching to HTML/JS file OR when content changes
   useEffect(() => {
     if (!activeTab) return;
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
@@ -931,7 +954,7 @@ ${jsCode}
     if (isHtml || isJsLike) {
       setShowPreview(true);
     }
-  }, [activeTabId, isAppDomain]);
+  }, [activeTabId, activeTab?.content, isAppDomain]);
 
   const handleCodeChange = (val: string | undefined) => {
     if (!activeTabId) return;
@@ -1008,8 +1031,16 @@ ${jsCode}
       setOpenTabs((prev) => [...prev, newTab]);
       setActiveTabId(newId);
     }
+    // Auto-open preview for web files and force immediate refresh
+    const isWebLang = ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(diffPreview.language) ||
+      /\.(html|js|jsx|ts|tsx|css)$/.test(diffPreview.filename);
+    if (isWebLang) {
+      setShowPreview(true);
+      // Force immediate preview update after state settles
+      setTimeout(() => updatePreview(), 50);
+    }
     setDiffPreview(null);
-  }, [diffPreview, updateNode, addChild]);
+  }, [diffPreview, updateNode, addChild, updatePreview]);
 
   const handleDiffReject = useCallback(() => {
     setDiffPreview(null);
