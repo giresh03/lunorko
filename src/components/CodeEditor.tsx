@@ -586,11 +586,17 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   };
 
   // Collect all file contents from the tree (for injecting CSS/JS into preview)
+  // Stores by both name and full path; src/ files take priority over public/ for same name
   const collectFiles = useCallback((nodes: FileNode[]): Record<string, string> => {
     const files: Record<string, string> = {};
     const walk = (ns: FileNode[]) => {
       for (const n of ns) {
-        if (n.type === "file" && n.content) files[n.name] = n.content;
+        if (n.type === "file" && n.content) {
+          // Store by full path id
+          files[n.id] = n.content;
+          // Store by name — prefer src/ files (first occurrence wins since src is walked first)
+          if (!files[n.name]) files[n.name] = n.content;
+        }
         if (n.children) walk(n.children);
       }
     };
