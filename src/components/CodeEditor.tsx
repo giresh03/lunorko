@@ -466,7 +466,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Cursor! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Generate tests** 🧪 or **docs** 📖 from toolbar\n\nCode I generate is **reviewed in diff view** before applying. 🚀` },
+    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Cursor! Ask me to:\n\n- **Generate code** — it auto-creates files & runs instantly\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Generate tests** 🧪 or **docs** 📖 from toolbar\n\nCode I generate is **automatically applied** to the editor with proper filenames. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1369,12 +1369,12 @@ ${jsCode}
       } catch { upsert("❌ Connection error. Switching to offline mode."); }
     }
 
-    // Auto-apply: extract code blocks and create appropriate files
+    // Auto-apply: extract code blocks and create files automatically (skip diff approval)
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
       codeBlocks.forEach((block) => {
-        applyCodeToEditor(block.code, block.language, block.filename);
+        applyCodeToEditor(block.code, block.language, block.filename, true);
       });
       // Auto-open preview for web files
       const hasWebCode = codeBlocks.some(b => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(b.language));
