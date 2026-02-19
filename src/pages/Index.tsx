@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { TypewriterEffectSmooth } from "@/components/ui/typewriter-effect";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import DomainCard from "@/components/DomainCard";
-import { domains } from "@/lib/domains";
 import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 import WhyLunorSection from "@/components/home/WhyLunorSection";
+import Domains3DSection from "@/components/home/Domains3DSection";
 import HowItWorksSection from "@/components/home/HowItWorksSection";
 import StatsSection from "@/components/home/StatsSection";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
@@ -71,35 +70,8 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Domains Preview */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="mb-12 flex items-end justify-between scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
-          <div>
-            <TypewriterEffectSmooth
-              words={[
-                { text: "Explore" },
-                { text: "Domains", className: "text-primary dark:text-primary" },
-              ]}
-              className="font-serif justify-start text-foreground"
-            />
-            <p className="mt-2 text-muted-foreground">Dive into any engineering discipline</p>
-          </div>
-          <Button variant="outline" size="sm" className="hover-scale" asChild>
-            <Link to="/domains">View All <ArrowRight className="ml-1 h-3 w-3" /></Link>
-          </Button>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {domains.slice(0, 8).map((d, i) => (
-            <div
-              key={d.id}
-              className="scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out hover-scale"
-              style={{ transitionDelay: `${i * 80}ms` }}
-            >
-              <DomainCard domain={d} />
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* 3D Domains Showcase */}
+      <Domains3DSection />
 
       {/* Video Demo */}
       <VideoSection />
