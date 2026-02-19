@@ -1,52 +1,52 @@
 import { Link } from "react-router-dom";
 import { domains } from "@/lib/domains";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Users, Globe2, BookOpen } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef, useCallback, lazy, Suspense } from "react";
 
 const World = lazy(() => import("@/components/ui/globe").then((m) => ({ default: m.World })));
 
 const globeConfig = {
-  pointSize: 4,
-  globeColor: "#062056",
-  showAtmosphere: true,
-  atmosphereColor: "#FFFFFF",
-  atmosphereAltitude: 0.1,
-  emissive: "#062056",
-  emissiveIntensity: 0.1,
-  shininess: 0.9,
-  polygonColor: "rgba(255,255,255,0.7)",
-  ambientLight: "#38bdf8",
-  directionalLeftLight: "#ffffff",
-  directionalTopLight: "#ffffff",
-  pointLight: "#ffffff",
-  arcTime: 1000,
-  arcLength: 0.9,
-  rings: 1,
-  maxRings: 3,
-  initialPosition: { lat: 22.3193, lng: 114.1694 },
-  autoRotate: true,
-  autoRotateSpeed: 0.5,
+  autoRotateSpeed: 0.4,
 };
 
-const colors = ["#06b6d4", "#3b82f6", "#6366f1"];
-const sampleArcs = [
-  { order: 1, startLat: -19.885592, startLng: -43.951191, endLat: -22.9068, endLng: -43.1729, arcAlt: 0.1, color: colors[0] },
-  { order: 1, startLat: 28.6139, startLng: 77.209, endLat: 3.139, endLng: 101.6869, arcAlt: 0.2, color: colors[1] },
-  { order: 2, startLat: 1.3521, startLng: 103.8198, endLat: 35.6762, endLng: 139.6503, arcAlt: 0.2, color: colors[2] },
-  { order: 2, startLat: 51.5072, startLng: -0.1276, endLat: 3.139, endLng: 101.6869, arcAlt: 0.3, color: colors[0] },
-  { order: 3, startLat: -33.8688, startLng: 151.2093, endLat: 22.3193, endLng: 114.1694, arcAlt: 0.3, color: colors[1] },
-  { order: 3, startLat: 21.3099, startLng: -157.8581, endLat: 40.7128, endLng: -74.006, arcAlt: 0.3, color: colors[2] },
-  { order: 4, startLat: 11.986597, startLng: 8.571831, endLat: -15.595412, endLng: -56.05918, arcAlt: 0.5, color: colors[0] },
-  { order: 4, startLat: -34.6037, startLng: -58.3816, endLat: 22.3193, endLng: 114.1694, arcAlt: 0.7, color: colors[1] },
-  { order: 5, startLat: 14.5995, startLng: 120.9842, endLat: 51.5072, endLng: -0.1276, arcAlt: 0.3, color: colors[2] },
-  { order: 5, startLat: 34.0522, startLng: -118.2437, endLat: 48.8566, endLng: -2.3522, arcAlt: 0.2, color: colors[0] },
-  { order: 6, startLat: 37.5665, startLng: 126.978, endLat: 35.6762, endLng: 139.6503, arcAlt: 0.1, color: colors[1] },
-  { order: 7, startLat: 52.52, startLng: 13.405, endLat: 34.0522, endLng: -118.2437, arcAlt: 0.2, color: colors[2] },
-  { order: 8, startLat: 49.2827, startLng: -123.1207, endLat: 52.3676, endLng: 4.9041, arcAlt: 0.2, color: colors[0] },
-  { order: 9, startLat: 22.3193, startLng: 114.1694, endLat: -22.9068, endLng: -43.1729, arcAlt: 0.7, color: colors[1] },
-  { order: 10, startLat: -22.9068, startLng: -43.1729, endLat: 28.6139, endLng: 77.209, arcAlt: 0.7, color: colors[2] },
+// Arcs representing popular learner paths between domain hubs worldwide
+const learnerArcs = [
+  // India → Singapore (Web Dev)
+  { startLat: 28.6139, startLng: 77.209, endLat: 1.3521, endLng: 103.8198, color: "#06b6d4" },
+  // India → USA (Data Science)
+  { startLat: 12.9716, startLng: 77.5946, endLat: 37.7595, endLng: -122.4367, color: "#f59e0b" },
+  // UK → Germany (DevOps)
+  { startLat: 51.5072, startLng: -0.1276, endLat: 52.52, endLng: 13.405, color: "#ec4899" },
+  // USA → Japan (Cybersecurity)
+  { startLat: 40.7128, startLng: -74.006, endLat: 35.6762, endLng: 139.6503, color: "#ef4444" },
+  // Australia → Hong Kong (Cloud)
+  { startLat: -33.8688, startLng: 151.2093, endLat: 22.3193, endLng: 114.1694, color: "#3b82f6" },
+  // Brazil → India (App Dev)
+  { startLat: -22.9068, startLng: -43.1729, endLat: 28.6139, endLng: 77.209, color: "#8b5cf6" },
+  // Korea → USA (AI/ML)
+  { startLat: 37.5665, startLng: 126.978, endLat: 34.0522, endLng: -118.2437, color: "#f59e0b" },
+  // France → Singapore (Blockchain)
+  { startLat: 48.8566, startLng: 2.3522, endLat: 1.3521, endLng: 103.8198, color: "#06b6d4" },
+  // Canada → UK (IoT)
+  { startLat: 49.2827, startLng: -123.1207, endLat: 51.5072, endLng: -0.1276, color: "#22c55e" },
+  // India (Chennai) → Australia (UI/UX)
+  { startLat: 13.0827, startLng: 80.2707, endLat: -33.8688, endLng: 151.2093, color: "#a855f7" },
+  // Japan → Germany (System Design)
+  { startLat: 35.6762, startLng: 139.6503, endLat: 52.52, endLng: 13.405, color: "#6366f1" },
+  // USA → Brazil (Database)
+  { startLat: 34.0522, startLng: -118.2437, endLat: -22.9068, endLng: -43.1729, color: "#14b8a6" },
+  // Mumbai → Dubai (DSA)
+  { startLat: 19.076, startLng: 72.8777, endLat: 25.2048, endLng: 55.2708, color: "#f97316" },
+  // Singapore → Korea (Web Dev)
+  { startLat: 1.3521, startLng: 103.8198, endLat: 37.5665, endLng: 126.978, color: "#06b6d4" },
+];
+
+const globeStats = [
+  { icon: Users, label: "Active Learners", value: "50K+" },
+  { icon: Globe2, label: "Countries", value: "120+" },
+  { icon: BookOpen, label: "Learning Paths", value: "200+" },
 ];
 
 const Domain3DCard = ({ domain, index }: { domain: typeof domains[0]; index: number }) => {
@@ -135,7 +135,7 @@ const Domains3DSection = () => {
           {/* Text */}
           <div className="flex-1 text-center lg:text-left scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
             <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase text-primary">
-              12+ Domains
+              12+ Domains · 120+ Countries
             </span>
             <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl lg:text-5xl mt-4">
               Explore Every{" "}
@@ -147,8 +147,29 @@ const Domains3DSection = () => {
               Click any domain to dive into curated resources, AI coding assistance, and guided roadmaps.
             </p>
             <p className="mt-2 text-muted-foreground/70 text-sm">
-              Our learners connect from around the world — join the global community.
+              Watch live learner paths connecting across the globe in real-time.
             </p>
+
+            {/* Globe Stats */}
+            <div className="flex flex-wrap gap-6 mt-6 justify-center lg:justify-start">
+              {globeStats.map((stat) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="flex items-center gap-2"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                    <stat.icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-foreground">{stat.value}</div>
+                    <div className="text-xs text-muted-foreground">{stat.label}</div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
 
           {/* Globe */}
@@ -158,7 +179,7 @@ const Domains3DSection = () => {
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               </div>
             }>
-              <World globeConfig={globeConfig} data={sampleArcs} />
+              <World globeConfig={globeConfig} data={learnerArcs} />
             </Suspense>
           </div>
         </div>
