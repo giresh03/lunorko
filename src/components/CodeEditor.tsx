@@ -370,16 +370,9 @@ const LAYOUT_SUGGESTIONS = [
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
-  const [fileTree, setFileTree] = useState<FileNode[]>(() => createDefaultProject(domainName));
-  const [openTabs, setOpenTabs] = useState<OpenTab[]>(() => {
-    const tree = createDefaultProject(domainName);
-    const defaultFile = tree[0]?.children?.[0];
-    return defaultFile ? [{ id: defaultFile.id, name: defaultFile.name, language: defaultFile.language || "javascript", content: defaultFile.content || "", isModified: false }] : [];
-  });
-  const [activeTabId, setActiveTabId] = useState<string | null>(() => {
-    const tree = createDefaultProject(domainName);
-    return tree[0]?.children?.[0]?.id || null;
-  });
+  const [fileTree, setFileTree] = useState<FileNode[]>([]);
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
@@ -466,7 +459,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Cursor! Ask me to:\n\n- **Generate code** — it auto-creates files & runs instantly\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Generate tests** 🧪 or **docs** 📖 from toolbar\n\nCode I generate is **automatically applied** to the editor with proper filenames. 🚀` },
+    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant!\n\nYour workspace starts **empty** — just tell me what to build and I'll:\n\n1. 📁 **Create files** with proper names\n2. ✍️ **Write the code** automatically\n3. ▶️ **Run the preview** instantly\n\nNo manual approval needed — just describe what you want! 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1373,13 +1366,56 @@ ${jsCode}
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
+      let firstHtmlOrJsId: string | null = null;
       codeBlocks.forEach((block) => {
-        applyCodeToEditor(block.code, block.language, block.filename, true);
+        const normalizedLang = LANG_MAP[block.language] || block.language;
+        const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
+        const fname = block.filename || `untitled.${ext}`;
+        const newId = `src/${fname}`;
+        
+        // Check if file already exists and update it, otherwise create new
+        const existingFile = findFile(fileTree, newId);
+        if (existingFile) {
+          // Update existing file
+          setOpenTabs(prev => prev.map(t => t.id === newId ? { ...t, content: block.code, isModified: true } : t));
+          setFileTree(prev => updateNode(prev, newId, n => ({ ...n, content: block.code })));
+        } else {
+          // Create new file
+          const newNode: FileNode = { id: newId, name: fname, type: "file", language: normalizedLang || getLang(fname), content: block.code };
+          const newTab: OpenTab = { id: newId, name: fname, language: normalizedLang || getLang(fname), content: block.code, isModified: true };
+          setFileTree(prev => {
+            const srcFolder = prev.find(n => n.id === "src" && n.type === "folder");
+            if (srcFolder) return addChild(prev, "src", newNode);
+            // Create src folder if it doesn't exist
+            if (prev.length === 0 || !prev.some(n => n.type === "folder")) {
+              return [{ id: "src", name: "src", type: "folder", isOpen: true, children: [newNode] }];
+            }
+            return [...prev, newNode];
+          });
+          setOpenTabs(prev => [...prev, newTab]);
+        }
+
+        // Track the first previewable file
+        if (!firstHtmlOrJsId && ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(normalizedLang || block.language)) {
+          firstHtmlOrJsId = newId;
+        }
       });
-      // Auto-open preview for web files
+
+      // Auto-select the best file for preview (prefer HTML, then JS)
+      const htmlBlock = codeBlocks.find(b => b.language === "html" || b.filename?.endsWith(".html"));
+      const bestId = htmlBlock ? `src/${htmlBlock.filename}` : firstHtmlOrJsId;
+      if (bestId) {
+        setActiveTabId(bestId);
+      }
+
+      // Auto-open preview and trigger run for web files
       const hasWebCode = codeBlocks.some(b => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(b.language));
       if (hasWebCode) {
         setShowPreview(true);
+        // Force preview update after state settles
+        setTimeout(() => {
+          updatePreview();
+        }, 150);
       }
     }
 
