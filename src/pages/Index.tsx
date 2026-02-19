@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 import { ParallaxLayer } from "@/hooks/useParallax";
+import DomainParallaxSection from "@/components/home/DomainParallaxSection";
 import WhyLunorSection from "@/components/home/WhyLunorSection";
 import Domains3DSection from "@/components/home/Domains3DSection";
 import HowItWorksSection from "@/components/home/HowItWorksSection";
@@ -27,6 +28,9 @@ const Index = () => {
 
       {/* Hero – no parallax (has its own scroll-driven opacity) */}
       <HeroSection />
+
+      {/* Domain Parallax Showcase */}
+      <DomainParallaxSection />
 
       {/* Features */}
       <ParallaxLayer speed={0.04}>
