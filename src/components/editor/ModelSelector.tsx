@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Check, Zap, Brain, Sparkles } from "lucide-react";
+import { createPortal } from "react-dom";
 import type { EditorTheme } from "@/lib/editorThemes";
 
 export interface AIModel {
@@ -35,11 +36,68 @@ interface ModelSelectorProps {
 
 const ModelSelector = ({ selectedModel, onSelect, themeColors }: ModelSelectorProps) => {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const current = AI_MODELS.find(m => m.id === selectedModel) || AI_MODELS[0];
+
+  useEffect(() => {
+    if (open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.top,
+        left: Math.max(8, rect.right - 240),
+      });
+    }
+  }, [open]);
+
+  const dropdown = open ? createPortal(
+    <>
+      <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+      <div
+        className="fixed z-[9999] w-60 rounded-lg border py-1 overflow-y-auto"
+        style={{
+          top: Math.max(8, pos.top - AI_MODELS.length * 40 - 30),
+          left: pos.left,
+          maxHeight: "min(400px, 80vh)",
+          backgroundColor: "#1a1a2e",
+          borderColor: "#333",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)",
+        }}
+      >
+        <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: "#888" }}>
+          AI Model
+        </div>
+        {AI_MODELS.map(model => {
+          const Icon = iconMap[model.icon];
+          const isSelected = model.id === selectedModel;
+          return (
+            <button
+              key={model.id}
+              onClick={() => { onSelect(model.id); setOpen(false); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/5"
+              style={{
+                color: isSelected ? "#818cf8" : "#e0e0e0",
+                backgroundColor: isSelected ? "rgba(129,140,248,0.12)" : "transparent",
+              }}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: isSelected ? "#818cf8" : "#888" }} />
+              <div className="flex-1 text-left">
+                <span className="font-medium">{model.label}</span>
+                <span className="block text-[9px]" style={{ color: "#999" }}>{model.description}</span>
+              </div>
+              {isSelected && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "#818cf8" }} />}
+            </button>
+          );
+        })}
+      </div>
+    </>,
+    document.body
+  ) : null;
 
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
         style={{ color: themeColors.muted, backgroundColor: open ? themeColors.accent + "15" : "transparent" }}
@@ -49,39 +107,7 @@ const ModelSelector = ({ selectedModel, onSelect, themeColors }: ModelSelectorPr
         <span className="hidden lg:inline">{current.label}</span>
         <ChevronDown className="h-2.5 w-2.5" />
       </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full mb-1 right-0 z-50 w-56 rounded-md border py-1 shadow-xl" style={{ backgroundColor: themeColors.bg, borderColor: themeColors.border, boxShadow: `0 8px 32px rgba(0,0,0,0.5)` }}>
-            <div className="px-3 py-1.5 text-[9px] font-semibold uppercase tracking-wider" style={{ color: themeColors.muted }}>AI Model</div>
-            {AI_MODELS.map(model => {
-              const Icon = iconMap[model.icon];
-              const isSelected = model.id === selectedModel;
-              return (
-                <button
-                  key={model.id}
-                  onClick={() => { onSelect(model.id); setOpen(false); }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs transition-colors"
-                  style={{
-                    color: isSelected ? themeColors.accent : "#e0e0e0",
-                    backgroundColor: isSelected ? themeColors.accent + "20" : "transparent",
-                  }}
-                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = themeColors.accent + "10"; }}
-                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent"; }}
-                >
-                  <Icon className="h-3 w-3 shrink-0" style={{ color: isSelected ? themeColors.accent : themeColors.muted }} />
-                  <div className="flex-1 text-left">
-                    <span className="font-medium">{model.label}</span>
-                    <span className="block text-[9px]" style={{ color: "#999" }}>{model.description}</span>
-                  </div>
-                  {isSelected && <Check className="h-3 w-3 shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
+      {dropdown}
     </div>
   );
 };
