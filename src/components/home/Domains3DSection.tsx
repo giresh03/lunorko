@@ -1,8 +1,8 @@
-import { useRef, useState, useMemo, useEffect, useCallback } from "react";
+import { useRef, useState, useMemo, useEffect } from "react";
 import { Canvas, useFrame, useThree, ThreeEvent } from "@react-three/fiber";
-import { Float, Text, RoundedBox } from "@react-three/drei";
+import { Float, Text, RoundedBox, Html } from "@react-three/drei";
 import * as THREE from "three";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { domains } from "@/lib/domains";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -35,10 +35,11 @@ interface DomainCard3DProps {
   domain: typeof domains[0];
   index: number;
   onHover: (id: string | null) => void;
+  onClick: (id: string) => void;
   hovered: boolean;
 }
 
-function DomainCard3D({ position, domain, index, onHover, hovered }: DomainCard3DProps) {
+function DomainCard3D({ position, domain, index, onHover, onClick, hovered }: DomainCard3DProps) {
   const meshRef = useRef<THREE.Group>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const color = useMemo(() => new THREE.Color(hslToHex(domain.color)), [domain.color]);
@@ -67,8 +68,19 @@ function DomainCard3D({ position, domain, index, onHover, hovered }: DomainCard3
       <group
         ref={meshRef}
         position={position}
-        onPointerEnter={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); onHover(domain.id); }}
-        onPointerLeave={() => onHover(null)}
+        onPointerEnter={(e: ThreeEvent<PointerEvent>) => {
+          e.stopPropagation();
+          onHover(domain.id);
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerLeave={() => {
+          onHover(null);
+          document.body.style.cursor = "auto";
+        }}
+        onClick={(e: ThreeEvent<MouseEvent>) => {
+          e.stopPropagation();
+          onClick(domain.id);
+        }}
       >
         {/* Card body */}
         <RoundedBox args={[2.6, 1.5, 0.1]} radius={0.08} smoothness={4}>
@@ -106,16 +118,16 @@ function DomainCard3D({ position, domain, index, onHover, hovered }: DomainCard3
           {domain.name}
         </Text>
 
-        {/* Topic count */}
+        {/* Topic count + arrow hint */}
         <Text
           position={[1.1, 0.2, 0.06]}
           fontSize={0.09}
-          color="#8b949e"
+          color={hovered ? "#ffffff" : "#8b949e"}
           anchorX="right"
           anchorY="middle"
           font="https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiA.woff2"
         >
-          {domain.topics.length} topics
+          {hovered ? "Open →" : `${domain.topics.length} topics`}
         </Text>
 
         {/* Description */}
@@ -167,8 +179,8 @@ function Particles() {
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 18;
-      arr[i * 3 + 1] = (Math.random() - 0.5) * 12;
+      arr[i * 3] = (Math.random() - 0.5) * 20;
+      arr[i * 3 + 1] = (Math.random() - 0.5) * 16;
       arr[i * 3 + 2] = (Math.random() - 0.5) * 6 - 3;
     }
     return arr;
@@ -209,7 +221,7 @@ function CameraRig() {
   return null;
 }
 
-/* ───── Grid layout ───── */
+/* ───── Grid layout for all 12 domains ───── */
 function getGridPositions(count: number): [number, number, number][] {
   const cols = 4;
   const spacingX = 3.0;
@@ -228,10 +240,9 @@ function getGridPositions(count: number): [number, number, number][] {
 }
 
 /* ───── Scene ───── */
-function Scene() {
+function Scene({ onCardClick }: { onCardClick: (id: string) => void }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const visibleDomains = useMemo(() => domains.slice(0, 8), []);
-  const positions = useMemo(() => getGridPositions(visibleDomains.length), [visibleDomains.length]);
+  const positions = useMemo(() => getGridPositions(domains.length), []);
 
   return (
     <>
@@ -243,13 +254,14 @@ function Scene() {
       <Particles />
       <CameraRig />
 
-      {visibleDomains.map((domain, i) => (
+      {domains.map((domain, i) => (
         <DomainCard3D
           key={domain.id}
           domain={domain}
           index={i}
           position={positions[i]}
           onHover={setHoveredId}
+          onClick={onCardClick}
           hovered={hoveredId === domain.id}
         />
       ))}
@@ -259,6 +271,12 @@ function Scene() {
 
 /* ───── Main exported component ───── */
 const Domains3DSection = () => {
+  const navigate = useNavigate();
+
+  const handleCardClick = (domainId: string) => {
+    navigate(`/domains/${domainId}`);
+  };
+
   return (
     <section className="relative py-20 overflow-hidden">
       <div className="container mx-auto px-4">
@@ -268,29 +286,28 @@ const Domains3DSection = () => {
           </span>
           <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl lg:text-5xl mt-4">
             Explore Every{" "}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-[hsl(var(--secondary))]">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-[hsl(var(--chart-2))]">
               Engineering Domain
             </span>
           </h2>
           <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-            Immerse yourself in 12+ specialized domains with curated resources, AI coding assistance, and guided roadmaps.
+            Click any domain to dive into curated resources, AI coding assistance, and guided roadmaps.
           </p>
         </div>
       </div>
 
-      {/* 3D Canvas */}
-      <div className="relative w-full h-[600px] md:h-[550px] scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out rounded-xl mx-auto max-w-7xl overflow-hidden">
-        {/* Dark background for the canvas */}
+      {/* 3D Canvas – taller to fit all 12 cards */}
+      <div className="relative w-full h-[700px] md:h-[650px] scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out rounded-xl mx-auto max-w-7xl overflow-hidden">
         <div className="absolute inset-0 bg-[#0a0a1a] rounded-xl" />
         <Canvas
-          camera={{ position: [0, 0.3, 9], fov: 55 }}
+          camera={{ position: [0, 0.3, 10], fov: 55 }}
           dpr={[1, 1.5]}
           gl={{ antialias: true, alpha: false }}
           style={{ borderRadius: "0.75rem" }}
         >
           <color attach="background" args={["#0a0a1a"]} />
-          <fog attach="fog" args={["#0a0a1a", 12, 20]} />
-          <Scene />
+          <fog attach="fog" args={["#0a0a1a", 14, 22]} />
+          <Scene onCardClick={handleCardClick} />
         </Canvas>
 
         {/* Edge fade overlays */}
@@ -302,7 +319,7 @@ const Domains3DSection = () => {
       <div className="container mx-auto px-4 mt-8 text-center scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
         <Button size="lg" className="hover-scale" asChild>
           <Link to="/domains">
-            Explore All Domains <ArrowRight className="ml-2 h-4 w-4" />
+            View All Domains <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </Button>
       </div>
