@@ -802,6 +802,16 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
     let html = htmlContent;
     
+    // Inject a base visible style so content is never invisible against iframe bg
+    const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
+    if (html.includes("</head>")) {
+      html = html.replace("</head>", `${baseStyle}</head>`);
+    } else if (html.includes("<body")) {
+      html = html.replace("<body", `${baseStyle}<body`);
+    } else {
+      html = baseStyle + html;
+    }
+    
     // Find referenced CSS files and inject inline if they exist in the project
     const cssLinkRegex = /<link[^>]+href=["']([^"']+\.css)["'][^>]*>/gi;
     let cssMatch;
@@ -860,6 +870,13 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
         }
       }
 
+      // Inject base visible background so content isn't invisible
+      const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
+      if (html.includes("</head>")) {
+        html = html.replace("</head>", `${baseStyle}</head>`);
+      } else {
+        html = baseStyle + html;
+      }
       // Remove existing script/link refs so we inject fresh
       html = html.replace(/<link[^>]+href=["'][^"']+\.css["'][^>]*>/gi, "");
       html = html.replace(/<script[^>]+src=["'][^"']+\.js["'][^>]*><\/script>/gi, "");
@@ -2220,7 +2237,7 @@ ${jsCode}
                     <iframe
                       ref={iframeRef}
                       srcDoc={previewContent}
-                      className="border-0 bg-background transition-all duration-200"
+                      className="border-0 bg-white transition-all duration-200"
                       style={{
                         width: currentDevice.type === "phone" ? `${currentDevice.w}px` : currentDevice.type === "tablet" ? `${currentDevice.w}px` : "100%",
                         height: "100%",
