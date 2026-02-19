@@ -179,6 +179,11 @@ const Index = () => {
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
         .animate-hero-cta { animation: hero-cta 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.9s both; }
+        @keyframes scroll-dot {
+          0%, 100% { transform: translateY(0); opacity: 0.6; }
+          50% { transform: translateY(8px); opacity: 1; }
+        }
+        .animate-scroll-dot { animation: scroll-dot 2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
       `}</style>
     </div>
   );
