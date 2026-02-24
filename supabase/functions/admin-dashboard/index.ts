@@ -22,23 +22,21 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!
-    );
-
-    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !authUser) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    }
-    const userId = authUser.id;
-
-    // Check admin role
+    // Use service role client for everything - it can verify any token
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Verify the user's token using the admin client
+    const { data: { user: authUser }, error: userError } = await adminClient.auth.getUser(token);
+    if (userError || !authUser) {
+      console.error("Auth error:", userError?.message);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+    const userId = authUser.id;
+
+    // Check admin role
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
