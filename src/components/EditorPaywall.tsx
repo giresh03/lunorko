@@ -1,12 +1,19 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Lock, Crown, Zap, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 
-const EditorPaywall = () => {
+interface EditorPaywallProps {
+  domainId?: string;
+  domainName?: string;
+}
+
+const EditorPaywall = ({ domainId, domainName }: EditorPaywallProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const pricingUrl = domainId ? `/pricing?domain=${domainId}` : "/pricing";
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
@@ -25,15 +32,17 @@ const EditorPaywall = () => {
         Code Editor is a Premium Feature
       </h2>
       <p className="text-muted-foreground max-w-md mb-2">
-        Unlock the full-featured code editor with AI assistant, multi-file projects, live preview, and more.
+        {domainName
+          ? `Subscribe to unlock the code editor for ${domainName}. Each domain requires its own subscription.`
+          : "Unlock the full-featured code editor with AI assistant, multi-file projects, live preview, and more."}
       </p>
       <p className="text-sm text-muted-foreground mb-8">
-        Starting at just <span className="text-primary font-semibold">₹49/month</span>
+        Starting at just <span className="text-primary font-semibold">₹49/month per domain</span>
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3">
         {user ? (
-          <Button size="lg" onClick={() => navigate("/pricing")} className="shadow-lg shadow-primary/20">
+          <Button size="lg" onClick={() => navigate(pricingUrl)} className="shadow-lg shadow-primary/20">
             <Zap className="mr-2 h-4 w-4" /> Upgrade to Pro
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
@@ -42,7 +51,7 @@ const EditorPaywall = () => {
             <Button size="lg" onClick={() => navigate("/auth")} className="shadow-lg shadow-primary/20">
               Sign In to Subscribe
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate("/pricing")}>
+            <Button size="lg" variant="outline" onClick={() => navigate(pricingUrl)}>
               View Plans
             </Button>
           </>

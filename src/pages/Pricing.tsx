@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Check, Crown, Zap, Rocket, Star, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { domains } from "@/lib/domains";
 
 declare global {
   interface Window {
@@ -57,10 +58,14 @@ const plans = [
 
 const Pricing = () => {
   const { user } = useAuth();
-  const { plan: currentPlan } = useSubscription();
+  const { hasEditorAccessForDomain } = useSubscription();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedDomainId = searchParams.get("domain");
+  const selectedDomain = domains.find((d) => d.id === selectedDomainId);
   const { toast } = useToast();
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
+  const [domainId, setDomainId] = useState<string>(selectedDomainId || "");
 
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -74,6 +79,10 @@ const Pricing = () => {
   };
 
   const handleSubscribe = async (planId: string, amount: number) => {
+    if (!domainId) {
+      toast({ title: "Select a domain", description: "Please select a domain to subscribe for.", variant: "destructive" });
+      return;
+    }
     if (!user) {
       navigate("/auth");
       return;
@@ -99,7 +108,7 @@ const Pricing = () => {
           Authorization: `Bearer ${token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ plan_id: planId, amount }),
+        body: JSON.stringify({ plan_id: planId, amount, domain_id: domainId }),
       });
 
       const orderData = await res.json();
@@ -127,6 +136,7 @@ const Pricing = () => {
                 razorpay_signature: response.razorpay_signature,
                 plan_id: planId,
                 amount,
+                domain_id: domainId,
               }),
             });
 
@@ -172,14 +182,33 @@ const Pricing = () => {
             Choose Your Learning Path
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Unlock the full power of Lunor.AI's code editor, AI assistant, and mentorship with a plan that fits your goals.
+            Unlock the code editor & AI assistant for a specific domain. Each subscription unlocks one domain.
           </p>
+
+          {/* Domain Selector */}
+          <div className="mt-8 max-w-md mx-auto">
+            <label className="block text-sm font-medium text-foreground mb-2">
+              {selectedDomain ? `Subscribing for: ${selectedDomain.name}` : "Select a domain to unlock"}
+            </label>
+            <select
+              value={domainId}
+              onChange={(e) => setDomainId(e.target.value)}
+              className="w-full rounded-lg border border-border bg-card px-4 py-3 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
+            >
+              <option value="">-- Choose a domain --</option>
+              {domains.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} {hasEditorAccessForDomain(d.id) ? "✅ (Active)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
           {plans.map((p) => {
             const Icon = p.icon;
-            const isCurrent = currentPlan === p.id;
+            const isCurrent = domainId ? hasEditorAccessForDomain(domainId) && p.id !== "free" : false;
             const isProcessing = processingPlan === p.id;
 
             return (

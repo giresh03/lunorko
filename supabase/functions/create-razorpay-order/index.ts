@@ -29,10 +29,10 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { plan_id, amount } = await req.json();
+    const { plan_id, amount, domain_id } = await req.json();
 
-    if (!plan_id || !amount) {
-      return new Response(JSON.stringify({ error: "Missing plan_id or amount" }), { status: 400, headers: corsHeaders });
+    if (!plan_id || !amount || !domain_id) {
+      return new Response(JSON.stringify({ error: "Missing plan_id, amount, or domain_id" }), { status: 400, headers: corsHeaders });
     }
 
     const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
@@ -52,7 +52,7 @@ serve(async (req) => {
         amount: amount,
         currency: "INR",
         receipt: `s_${userId.slice(0, 8)}_${Date.now()}`,
-        notes: { plan_id, user_id: userId },
+        notes: { plan_id, user_id: userId, domain_id },
       }),
     });
 
