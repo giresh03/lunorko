@@ -12,6 +12,8 @@ import Mentors from "./pages/Mentors";
 import GuidanceRoadmap from "./pages/GuidanceRoadmap";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
+import Pricing from "./pages/Pricing";
+import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,8 @@ const App = () => (
             <Route path="/guidance" element={<GuidanceRoadmap />} />
             <Route path="/about" element={<About />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/admin" element={<AdminPanel />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
