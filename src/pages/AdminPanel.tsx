@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, CreditCard, TrendingUp, UserCheck, Calendar,
   LayoutDashboard, BookOpen, Shield, Loader2, LogOut,
-  Plus, Trash2, Edit, ArrowLeft
+  Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ const AdminPanel = () => {
   const [mentors, setMentors] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   // Mentor form
   const [mentorDialog, setMentorDialog] = useState(false);
@@ -238,34 +239,127 @@ const AdminPanel = () => {
 
           {/* Users */}
           <TabsContent value="users">
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="font-medium">{u.display_name || "Unnamed"}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{new Date(u.created_at).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={u.subscription ? "default" : "outline"} className="text-xs">
-                          {u.subscription ? u.subscription.plan_id : "Free"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs text-green-400 border-green-400/30">Active</Badge>
-                      </TableCell>
+            {selectedUser ? (
+              <div className="space-y-6">
+                <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
+                  <ArrowLeft className="mr-1 h-4 w-4" /> Back to Users
+                </Button>
+                <div className="rounded-xl border border-border bg-card p-6">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground">{selectedUser.display_name || "Unnamed User"}</h2>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> {selectedUser.email || "No email"}</p>
+                    </div>
+                    <div className="ml-auto flex gap-2">
+                      {(selectedUser.roles || ["user"]).map((r: string) => (
+                        <Badge key={r} variant={r === "admin" ? "default" : "outline"} className="text-xs capitalize">{r}</Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-lg border border-border p-4">
+                      <p className="text-xs text-muted-foreground mb-1">User ID</p>
+                      <p className="text-sm font-mono text-foreground truncate">{selectedUser.user_id}</p>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <p className="text-xs text-muted-foreground mb-1">Joined</p>
+                      <p className="text-sm text-foreground">{new Date(selectedUser.auth_created_at || selectedUser.created_at).toLocaleDateString()}</p>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <p className="text-xs text-muted-foreground mb-1">Last Sign In</p>
+                      <p className="text-sm text-foreground">{selectedUser.last_sign_in_at ? new Date(selectedUser.last_sign_in_at).toLocaleString() : "Never"}</p>
+                    </div>
+                    <div className="rounded-lg border border-border p-4">
+                      <p className="text-xs text-muted-foreground mb-1">Current Plan</p>
+                      <Badge variant={selectedUser.active_subscription ? "default" : "outline"} className="text-xs">
+                        {selectedUser.active_subscription ? selectedUser.active_subscription.plan_id : "Free"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subscription History */}
+                <div className="rounded-xl border border-border bg-card p-6">
+                  <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><CreditCard className="h-5 w-5" /> Subscription History</h3>
+                  {(selectedUser.subscriptions || []).length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Plan</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Started</TableHead>
+                          <TableHead>Expires</TableHead>
+                          <TableHead>Payment ID</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedUser.subscriptions.map((s: any) => (
+                          <TableRow key={s.id}>
+                            <TableCell><Badge className="text-xs">{s.plan_id}</Badge></TableCell>
+                            <TableCell className="font-medium">₹{(s.amount / 100).toFixed(0)}</TableCell>
+                            <TableCell>
+                              <Badge variant={s.status === "active" ? "default" : "destructive"} className="text-xs">{s.status}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{new Date(s.started_at).toLocaleDateString()}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{new Date(s.expires_at).toLocaleDateString()}</TableCell>
+                            <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[120px]">{s.razorpay_payment_id || "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No subscription history</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead>Last Sign In</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.display_name || "Unnamed"}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{u.email || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{new Date(u.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={u.active_subscription ? "default" : "outline"} className="text-xs">
+                            {u.active_subscription ? u.active_subscription.plan_id : "Free"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs capitalize">{(u.roles || ["user"])[0]}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedUser(u)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {users.length === 0 && (
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </TabsContent>
 
           {/* Subscriptions */}
