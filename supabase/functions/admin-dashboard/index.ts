@@ -69,13 +69,36 @@ serve(async (req) => {
     if (action === "users") {
       const { data: users } = await adminClient.from("profiles").select("*").order("created_at", { ascending: false }).limit(100);
       // Get subscriptions for each user
-      const { data: subs } = await adminClient.from("subscriptions").select("*").eq("status", "active");
-      const subMap: Record<string, any> = {};
-      (subs || []).forEach((s: any) => { subMap[s.user_id] = s; });
-      
+      const { data: subs } = await adminClient.from("subscriptions").select("*");
+      const subMap: Record<string, any[]> = {};
+      (subs || []).forEach((s: any) => { 
+        if (!subMap[s.user_id]) subMap[s.user_id] = [];
+        subMap[s.user_id].push(s); 
+      });
+
+      // Get emails from auth
+      const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      const emailMap: Record<string, { email: string; last_sign_in_at: string | null; created_at: string }> = {};
+      (authUsers || []).forEach((au: any) => { 
+        emailMap[au.id] = { email: au.email || "", last_sign_in_at: au.last_sign_in_at, created_at: au.created_at }; 
+      });
+
+      // Get user roles
+      const { data: roles } = await adminClient.from("user_roles").select("*");
+      const roleMap: Record<string, string[]> = {};
+      (roles || []).forEach((r: any) => {
+        if (!roleMap[r.user_id]) roleMap[r.user_id] = [];
+        roleMap[r.user_id].push(r.role);
+      });
+
       const enriched = (users || []).map((u: any) => ({
         ...u,
-        subscription: subMap[u.user_id] || null,
+        email: emailMap[u.user_id]?.email || "",
+        last_sign_in_at: emailMap[u.user_id]?.last_sign_in_at || null,
+        auth_created_at: emailMap[u.user_id]?.created_at || u.created_at,
+        subscriptions: subMap[u.user_id] || [],
+        active_subscription: (subMap[u.user_id] || []).find((s: any) => s.status === "active") || null,
+        roles: roleMap[u.user_id] || ["user"],
       }));
 
       return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
