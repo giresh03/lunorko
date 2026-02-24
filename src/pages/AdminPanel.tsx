@@ -55,6 +55,11 @@ const AdminPanel = () => {
   const callAdmin = async (action: string, method = "GET", body?: any) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
+
+    if (!token) {
+      throw new Error("Not authenticated. Please sign in again.");
+    }
+
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-dashboard?action=${action}`,
       {
@@ -67,7 +72,21 @@ const AdminPanel = () => {
         ...(body ? { body: JSON.stringify(body) } : {}),
       }
     );
-    return res.json();
+
+    const raw = await res.text();
+    const parsed = raw ? (() => {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return { error: raw };
+      }
+    })() : null;
+
+    if (!res.ok) {
+      throw new Error(parsed?.error || `Request failed (${res.status})`);
+    }
+
+    return parsed;
   };
 
   useEffect(() => {
@@ -87,14 +106,31 @@ const AdminPanel = () => {
         callAdmin("subscriptions"),
         callAdmin("mentors"),
       ]);
-      setStats(statsData);
+
+      setStats(statsData as AdminStats);
       setUsers(Array.isArray(usersData) ? usersData : []);
       setSubscriptions(Array.isArray(subsData) ? subsData : []);
       setMentors(Array.isArray(mentorsData) ? mentorsData : []);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      toast({
+        title: "Failed to load admin data",
+        description: e?.message || "Unauthorized or network error",
+        variant: "destructive",
+      });
+
+      // Reset to safe state to avoid blank screen
+      setStats(null);
+      setUsers([]);
+      setSubscriptions([]);
+      setMentors([]);
+
+      if ((e?.message || "").toLowerCase().includes("not authenticated")) {
+        navigate("/auth");
+      }
+    } finally {
+      setLoadingData(false);
     }
-    setLoadingData(false);
   };
 
   const handleSaveMentor = async () => {
@@ -176,7 +212,7 @@ const AdminPanel = () => {
             {[
               { label: "Total Users", value: stats.totalUsers, icon: Users, color: "text-blue-400" },
               { label: "Active Subscribers", value: stats.totalSubscribers, icon: UserCheck, color: "text-green-400" },
-              { label: "Revenue (₹)", value: `₹${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
+              { label: "Revenue (₹)", value: `₹${Number(stats.totalRevenue ?? 0).toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
               { label: "Mentors", value: stats.totalMentors, icon: BookOpen, color: "text-purple-400" },
               { label: "Bookings", value: stats.totalBookings, icon: Calendar, color: "text-pink-400" },
             ].map((s, i) => (
