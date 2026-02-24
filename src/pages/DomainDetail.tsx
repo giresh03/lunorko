@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom";
+import EditorPaywall from "@/components/EditorPaywall";
 import { useRef, useState } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
@@ -16,6 +17,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useDashboard } from "@/hooks/useDashboard";
 import { domains, type Resource } from "@/lib/domains";
 
@@ -125,6 +127,7 @@ const DomainDetail = () => {
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { hasEditorAccess } = useSubscription();
   const { progress, bookmarks, activity, bookings, updateProgress, logActivity } = useDashboard();
 
   const handleSendToEditor = (code: string, language: string) => {
@@ -150,7 +153,7 @@ const DomainDetail = () => {
   const videos = domain.resources.filter((r) => r.type === "video" || r.type === "course");
   const articles = domain.resources.filter((r) => r.type === "article");
 
-  if (isFullscreenIDE) {
+  if (isFullscreenIDE && hasEditorAccess) {
     return (
       <div className="fixed inset-0 z-50">
         <CodeEditorComponent
@@ -465,22 +468,28 @@ const DomainDetail = () => {
 
           {/* Code Editor Tab */}
           <TabsContent value="editor">
-            <div className="rounded-xl border border-border bg-card p-12 text-center">
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
-                  <Maximize2 className="h-10 w-10 text-primary" />
+            {hasEditorAccess ? (
+              <div className="rounded-xl border border-border bg-card p-12 text-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
+                    <Maximize2 className="h-10 w-10 text-primary" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-foreground">Lunor.AI Code Editor</h3>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    Full-screen VS Code-style IDE with file explorer, multi-tab editing,
+                    integrated terminal, and AI assistant — all tuned for {domain.name}.
+                  </p>
+                  <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
+                    <Maximize2 className="mr-2 h-4 w-4" />
+                    Launch Full-Screen Editor
+                  </Button>
                 </div>
-                <h3 className="text-2xl font-bold text-foreground">Lunor.AI Code Editor</h3>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Full-screen VS Code-style IDE with file explorer, multi-tab editing,
-                  integrated terminal, and AI assistant — all tuned for {domain.name}.
-                </p>
-                <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
-                  <Maximize2 className="mr-2 h-4 w-4" />
-                  Launch Full-Screen Editor
-                </Button>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-card">
+                <EditorPaywall />
+              </div>
+            )}
           </TabsContent>
 
           {/* Videos Tab */}

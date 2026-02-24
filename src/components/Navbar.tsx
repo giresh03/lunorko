@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { Menu, X, LogOut, User, LayoutDashboard, Sparkles } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Sparkles, Shield } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdmin } from "@/hooks/useAdmin";
 import logo from "@/assets/logo.jpeg";
 
 // Countdown target: 3 days from now (resets on mount)
@@ -98,6 +99,7 @@ const navLinks = [
   { to: "/domains", label: "Domains" },
   { to: "/mentors", label: "Mentors" },
   { to: "/guidance", label: "Guidance" },
+  { to: "/pricing", label: "Pricing" },
   { to: "/about", label: "About" },
 ];
 
@@ -107,6 +109,7 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [logoHovered, setLogoHovered] = useState(false);
   const { user, loading, signOut } = useAuth();
+  const { isAdmin } = useAdmin();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -190,6 +193,13 @@ const Navbar = () => {
                       <LayoutDashboard className="mr-1.5 h-4 w-4" /> Dashboard
                     </Link>
                   </Button>
+                  {isAdmin && (
+                    <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary">
+                      <Link to="/admin">
+                        <Shield className="mr-1.5 h-4 w-4" /> Admin
+                      </Link>
+                    </Button>
+                  )}
                   <div className="h-5 w-px bg-border mx-1" />
                   <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                     <User className="h-3.5 w-3.5" />
