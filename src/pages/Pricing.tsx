@@ -145,15 +145,12 @@ const Pricing = () => {
         modal: { ondismiss: () => setProcessingPlan(null) },
         prefill: { email: user.email },
         theme: { color: "#7c3aed" },
-        config: {
-          display: {
-            blocks: {
-              utib: { name: "Pay using UPI", instruments: [{ method: "upi", flows: ["qr", "collect", "intent"] }] },
-              other: { name: "Other Methods", instruments: [{ method: "card" }, { method: "netbanking" }, { method: "wallet" }] },
-            },
-            sequence: ["block.utib", "block.other"],
-            preferences: { show_default_blocks: false },
-          },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+          qr: true,
         },
       };
 
