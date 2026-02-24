@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -9,23 +9,22 @@ export interface Subscription {
   amount: number;
   started_at: string;
   expires_at: string;
+  domain_id: string | null;
 }
 
 export const useSubscription = () => {
   const { user } = useAuth();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
-  const [plan, setPlan] = useState<string>("free");
 
   useEffect(() => {
     if (!user) {
-      setSubscription(null);
-      setPlan("free");
+      setSubscriptions([]);
       setLoading(false);
       return;
     }
 
-    const fetchSubscription = async () => {
+    const fetchSubscriptions = async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("subscriptions")
@@ -33,24 +32,54 @@ export const useSubscription = () => {
         .eq("user_id", user.id)
         .eq("status", "active")
         .gte("expires_at", new Date().toISOString())
-        .order("expires_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order("expires_at", { ascending: false });
 
       if (data && !error) {
-        setSubscription(data as Subscription);
-        setPlan(data.plan_id);
+        setSubscriptions(data as Subscription[]);
       } else {
-        setSubscription(null);
-        setPlan("free");
+        setSubscriptions([]);
       }
       setLoading(false);
     };
 
-    fetchSubscription();
+    fetchSubscriptions();
   }, [user]);
 
-  const hasEditorAccess = plan !== "free";
+  /** Check if user has editor access for a specific domain */
+  const hasEditorAccessForDomain = useCallback(
+    (domainId: string): boolean => {
+      return subscriptions.some(
+        (sub) => sub.domain_id === domainId || sub.domain_id === null
+      );
+    },
+    [subscriptions]
+  );
 
-  return { subscription, plan, loading, hasEditorAccess };
+  /** Legacy: true if user has any active subscription */
+  const hasEditorAccess = subscriptions.length > 0;
+
+  /** Get the plan for a specific domain */
+  const getPlanForDomain = useCallback(
+    (domainId: string): string => {
+      const sub = subscriptions.find(
+        (s) => s.domain_id === domainId || s.domain_id === null
+      );
+      return sub?.plan_id ?? "free";
+    },
+    [subscriptions]
+  );
+
+  // backward compat
+  const plan = subscriptions[0]?.plan_id ?? "free";
+  const subscription = subscriptions[0] ?? null;
+
+  return {
+    subscription,
+    subscriptions,
+    plan,
+    loading,
+    hasEditorAccess,
+    hasEditorAccessForDomain,
+    getPlanForDomain,
+  };
 };

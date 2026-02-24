@@ -43,7 +43,11 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan_id, amount } = await req.json();
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan_id, amount, domain_id } = await req.json();
+
+    if (!domain_id) {
+      return new Response(JSON.stringify({ error: "Missing domain_id" }), { status: 400, headers: corsHeaders });
+    }
 
     const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
     if (!RAZORPAY_KEY_SECRET) {
@@ -72,6 +76,7 @@ serve(async (req) => {
       razorpay_order_id,
       razorpay_signature,
       amount,
+      domain_id,
       expires_at: expiresAt.toISOString(),
     });
 
@@ -80,7 +85,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to save subscription" }), { status: 500, headers: corsHeaders });
     }
 
-    return new Response(JSON.stringify({ success: true, plan_id }), {
+    return new Response(JSON.stringify({ success: true, plan_id, domain_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

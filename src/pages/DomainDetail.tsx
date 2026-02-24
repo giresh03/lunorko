@@ -127,7 +127,8 @@ const DomainDetail = () => {
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
-  const { hasEditorAccess } = useSubscription();
+  const { hasEditorAccessForDomain } = useSubscription();
+  const hasEditorAccess = domainId ? hasEditorAccessForDomain(domainId) : false;
   const { progress, bookmarks, activity, bookings, updateProgress, logActivity } = useDashboard();
 
   const handleSendToEditor = (code: string, language: string) => {
@@ -487,7 +488,7 @@ const DomainDetail = () => {
               </div>
             ) : (
               <div className="rounded-xl border border-border bg-card">
-                <EditorPaywall />
+                <EditorPaywall domainId={domainId} domainName={domain.name} />
               </div>
             )}
           </TabsContent>

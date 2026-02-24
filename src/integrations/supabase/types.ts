@@ -311,6 +311,7 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          domain_id: string | null
           expires_at: string
           id: string
           plan_id: string
@@ -325,6 +326,7 @@ export type Database = {
         Insert: {
           amount: number
           created_at?: string
+          domain_id?: string | null
           expires_at: string
           id?: string
           plan_id: string
@@ -339,6 +341,7 @@ export type Database = {
         Update: {
           amount?: number
           created_at?: string
+          domain_id?: string | null
           expires_at?: string
           id?: string
           plan_id?: string
