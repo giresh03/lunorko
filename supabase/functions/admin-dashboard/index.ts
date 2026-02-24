@@ -17,13 +17,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (!token || token === "null" || token === "undefined") {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_ANON_KEY")!
     );
 
-    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
+    const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !authUser) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
