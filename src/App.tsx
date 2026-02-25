@@ -19,6 +19,7 @@ import DailyChallenge from "./pages/DailyChallenge";
 import Achievements from "./pages/Achievements";
 import SkillRadar from "./pages/SkillRadar";
 import ResumeBuilder from "./pages/ResumeBuilder";
+import PromoVideo from "./pages/PromoVideo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/achievements" element={<Achievements />} />
             <Route path="/skill-radar" element={<SkillRadar />} />
             <Route path="/resume-builder" element={<ResumeBuilder />} />
+            <Route path="/promo" element={<PromoVideo />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
