@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Menu, X, LogOut, User, LayoutDashboard, Sparkles, Shield } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Sparkles, Shield, Trophy, Zap, Brain, FileText } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -99,6 +99,7 @@ const navLinks = [
   { to: "/domains", label: "Domains" },
   { to: "/mentors", label: "Mentors" },
   { to: "/guidance", label: "Guidance" },
+  { to: "/achievements", label: "Achievements" },
   { to: "/pricing", label: "Pricing" },
   { to: "/about", label: "About" },
 ];

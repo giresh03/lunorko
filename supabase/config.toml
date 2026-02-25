@@ -17,3 +17,15 @@ verify_jwt = false
 
 [functions.admin-dashboard]
 verify_jwt = false
+
+[functions.generate-challenge]
+verify_jwt = false
+
+[functions.evaluate-challenge]
+verify_jwt = false
+
+[functions.generate-resume]
+verify_jwt = false
+
+[functions.assess-skills]
+verify_jwt = false

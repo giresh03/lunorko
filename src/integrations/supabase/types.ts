@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          name: string
+          requirement_type: string
+          requirement_value: number
+          xp_reward: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description: string
+          icon?: string
+          id: string
+          name: string
+          requirement_type: string
+          requirement_value?: number
+          xp_reward?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          name?: string
+          requirement_type?: string
+          requirement_value?: number
+          xp_reward?: number
+        }
+        Relationships: []
+      }
       activity_log: {
         Row: {
           action: string
@@ -119,6 +155,83 @@ export type Database = {
           resource_title?: string
           resource_type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      challenge_submissions: {
+        Row: {
+          challenge_id: string
+          code: string
+          id: string
+          is_correct: boolean | null
+          submitted_at: string
+          time_taken_seconds: number | null
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          code: string
+          id?: string
+          is_correct?: boolean | null
+          submitted_at?: string
+          time_taken_seconds?: number | null
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          code?: string
+          id?: string
+          is_correct?: boolean | null
+          submitted_at?: string
+          time_taken_seconds?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_submissions_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "daily_challenges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_challenges: {
+        Row: {
+          challenge_date: string
+          created_at: string
+          description: string
+          difficulty: string
+          domain_id: string
+          hints: string[] | null
+          id: string
+          solution_code: string | null
+          title: string
+          xp_reward: number
+        }
+        Insert: {
+          challenge_date?: string
+          created_at?: string
+          description: string
+          difficulty?: string
+          domain_id: string
+          hints?: string[] | null
+          id?: string
+          solution_code?: string | null
+          title: string
+          xp_reward?: number
+        }
+        Update: {
+          challenge_date?: string
+          created_at?: string
+          description?: string
+          difficulty?: string
+          domain_id?: string
+          hints?: string[] | null
+          id?: string
+          solution_code?: string | null
+          title?: string
+          xp_reward?: number
         }
         Relationships: []
       }
@@ -274,6 +387,33 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_assessments: {
+        Row: {
+          assessed_at: string
+          domain_id: string
+          id: string
+          score: number
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          assessed_at?: string
+          domain_id: string
+          id?: string
+          score?: number
+          topic: string
+          user_id: string
+        }
+        Update: {
+          assessed_at?: string
+          domain_id?: string
+          id?: string
+          score?: number
+          topic?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscription_plans: {
         Row: {
           created_at: string
@@ -363,6 +503,35 @@ export type Database = {
           },
         ]
       }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -380,6 +549,42 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_xp: {
+        Row: {
+          created_at: string
+          current_streak: number
+          id: string
+          last_activity_date: string | null
+          level: number
+          longest_streak: number
+          total_xp: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_activity_date?: string | null
+          level?: number
+          longest_streak?: number
+          total_xp?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_streak?: number
+          id?: string
+          last_activity_date?: string | null
+          level?: number
+          longest_streak?: number
+          total_xp?: number
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

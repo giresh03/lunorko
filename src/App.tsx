@@ -15,6 +15,10 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Pricing from "./pages/Pricing";
 import AdminPanel from "./pages/AdminPanel";
+import DailyChallenge from "./pages/DailyChallenge";
+import Achievements from "./pages/Achievements";
+import SkillRadar from "./pages/SkillRadar";
+import ResumeBuilder from "./pages/ResumeBuilder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +42,10 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/challenge/:domainId" element={<DailyChallenge />} />
+            <Route path="/achievements" element={<Achievements />} />
+            <Route path="/skill-radar" element={<SkillRadar />} />
+            <Route path="/resume-builder" element={<ResumeBuilder />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
