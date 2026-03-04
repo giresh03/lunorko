@@ -1,7 +1,16 @@
-import { Link } from "react-router-dom";
-import { Menu, X, LogOut, User, LayoutDashboard, Sparkles, Shield, Loader2 } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Menu, X, LogOut, User, LayoutDashboard, Sparkles, Shield, Loader2, Trophy, Radar, FileText, CreditCard } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import logo from "@/assets/logo.jpeg";
@@ -205,21 +214,66 @@ const Navbar = () => {
                       <LayoutDashboard className="mr-1.5 h-4 w-4" /> Dashboard
                     </Link>
                   </Button>
-                  {isAdmin && (
-                    <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary">
-                      <Link to="/admin">
-                        <Shield className="mr-1.5 h-4 w-4" /> Admin
-                      </Link>
-                    </Button>
-                  )}
-                  <div className="h-5 w-px bg-border mx-1" />
-                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <User className="h-3.5 w-3.5" />
-                    {user.user_metadata?.display_name || user.email?.split("@")[0]}
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground hover:text-foreground">
-                    <LogOut className="mr-1.5 h-4 w-4" /> Sign Out
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                        <Avatar className="h-8 w-8 border-2 border-border hover:border-primary transition-colors cursor-pointer">
+                          <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.display_name || "User"} />
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                            {(user.user_metadata?.display_name || user.email || "U").charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel className="font-normal">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">{user.user_metadata?.display_name || "User"}</p>
+                          <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link to="/dashboard" className="cursor-pointer">
+                          <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/achievements" className="cursor-pointer">
+                          <Trophy className="mr-2 h-4 w-4" /> Achievements
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/skill-radar" className="cursor-pointer">
+                          <Radar className="mr-2 h-4 w-4" /> Skill Radar
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/resume-builder" className="cursor-pointer">
+                          <FileText className="mr-2 h-4 w-4" /> Resume Builder
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/pricing" className="cursor-pointer">
+                          <CreditCard className="mr-2 h-4 w-4" /> Subscription
+                        </Link>
+                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild>
+                            <Link to="/admin" className="cursor-pointer text-primary">
+                              <Shield className="mr-2 h-4 w-4" /> Admin Panel
+                            </Link>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive focus:text-destructive">
+                        <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
