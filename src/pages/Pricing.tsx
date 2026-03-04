@@ -1,21 +1,10 @@
-import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, Crown, Zap, Rocket, Star, Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Check, Crown, Zap, Rocket, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@/hooks/useAuth";
-import { useSubscription } from "@/hooks/useSubscription";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { domains } from "@/lib/domains";
-
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
 
 const plans = [
   {
@@ -24,153 +13,42 @@ const plans = [
     price: 0,
     icon: Zap,
     color: "from-muted to-muted/50",
-    features: ["Read-only code preview", "Basic domain access", "Community support", "Limited resources"],
+    features: ["Full code editor access", "All domains unlocked", "AI code assistant", "Community support", "Unlimited projects"],
   },
   {
     id: "pro",
     name: "Pro",
     price: 49,
-    amount: 4900,
     icon: Star,
     color: "from-primary/20 to-primary/5",
     popular: true,
-    features: ["Full code editor access", "All domains unlocked", "AI code assistant", "Priority support", "Unlimited projects"],
+    comingSoon: true,
+    features: ["Everything in Free", "Priority support", "Advanced AI features", "Custom themes"],
   },
   {
     id: "premium",
     name: "Premium",
     price: 99,
-    amount: 9900,
     icon: Crown,
     color: "from-yellow-500/20 to-yellow-500/5",
+    comingSoon: true,
     features: ["Everything in Pro", "1-on-1 mentorship sessions", "Project code reviews", "Career guidance", "Certificate of completion"],
   },
   {
     id: "professional",
     name: "Professional",
     price: 149,
-    amount: 14900,
     icon: Rocket,
     color: "from-purple-500/20 to-purple-500/5",
+    comingSoon: true,
     features: ["Everything in Premium", "Unlimited mentorship", "Resume building & review", "Job referrals", "Custom learning path", "Priority booking"],
   },
 ];
 
 const Pricing = () => {
-  const { user } = useAuth();
-  const { hasEditorAccessForDomain } = useSubscription();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedDomainId = searchParams.get("domain");
   const selectedDomain = domains.find((d) => d.id === selectedDomainId);
-  const { toast } = useToast();
-  const [processingPlan, setProcessingPlan] = useState<string | null>(null);
-  const [domainId, setDomainId] = useState<string>(selectedDomainId || "");
-
-  const loadRazorpayScript = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      if (window.Razorpay) return resolve(true);
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
-
-  const handleSubscribe = async (planId: string, amount: number) => {
-    if (!domainId) {
-      toast({ title: "Select a domain", description: "Please select a domain to subscribe for.", variant: "destructive" });
-      return;
-    }
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
-
-    setProcessingPlan(planId);
-
-    try {
-      const loaded = await loadRazorpayScript();
-      if (!loaded) {
-        toast({ title: "Error", description: "Failed to load payment gateway", variant: "destructive" });
-        setProcessingPlan(null);
-        return;
-      }
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-razorpay-order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ plan_id: planId, amount, domain_id: domainId }),
-      });
-
-      const orderData = await res.json();
-      if (!res.ok) throw new Error(orderData.error || "Failed to create order");
-
-      const options = {
-        key: orderData.key_id,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        name: "Lunor.AI",
-        description: `${planId.charAt(0).toUpperCase() + planId.slice(1)} Plan - Monthly`,
-        order_id: orderData.order_id,
-        handler: async (response: any) => {
-          try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-razorpay-payment`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-                apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                plan_id: planId,
-                amount,
-                domain_id: domainId,
-              }),
-            });
-
-            const result = await verifyRes.json();
-            if (result.success) {
-              toast({ title: "🎉 Subscription Activated!", description: `Welcome to the ${planId} plan!` });
-              setTimeout(() => window.location.reload(), 1500);
-            } else {
-              toast({ title: "Verification Failed", description: result.error, variant: "destructive" });
-            }
-          } catch {
-            toast({ title: "Error", description: "Payment verification failed", variant: "destructive" });
-          }
-          setProcessingPlan(null);
-        },
-        modal: { ondismiss: () => setProcessingPlan(null) },
-        prefill: { email: user.email },
-        theme: { color: "#7c3aed" },
-        method: {
-          upi: true,
-          card: true,
-          netbanking: true,
-          wallet: true,
-          qr: true,
-        },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-      setProcessingPlan(null);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -179,38 +57,17 @@ const Pricing = () => {
         <div className="text-center mb-16">
           <Badge variant="outline" className="mb-4">Pricing</Badge>
           <h1 className="text-4xl md:text-5xl font-bold font-serif text-foreground mb-4">
-            Choose Your Learning Path
+            Everything is Free — For Now!
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Unlock the code editor & AI assistant for a specific domain. Each subscription unlocks one domain.
+            All features are currently unlocked for free. Paid plans coming soon.
+            {selectedDomain && ` You were looking at ${selectedDomain.name}.`}
           </p>
-
-          {/* Domain Selector */}
-          <div className="mt-8 max-w-md mx-auto">
-            <label className="block text-sm font-medium text-foreground mb-2">
-              {selectedDomain ? `Subscribing for: ${selectedDomain.name}` : "Select a domain to unlock"}
-            </label>
-            <select
-              value={domainId}
-              onChange={(e) => setDomainId(e.target.value)}
-              className="w-full rounded-lg border border-border bg-card px-4 py-3 text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
-            >
-              <option value="">-- Choose a domain --</option>
-              {domains.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} {hasEditorAccessForDomain(d.id) ? "✅ (Active)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
           {plans.map((p) => {
             const Icon = p.icon;
-            const isCurrent = domainId ? hasEditorAccessForDomain(domainId) && p.id !== "free" : false;
-            const isProcessing = processingPlan === p.id;
-
             return (
               <div
                 key={p.id}
@@ -230,8 +87,14 @@ const Pricing = () => {
 
                 <h3 className="text-xl font-bold text-foreground">{p.name}</h3>
                 <div className="mt-2 mb-6">
-                  <span className="text-4xl font-bold text-foreground">₹{p.price}</span>
-                  {p.price > 0 && <span className="text-muted-foreground">/month</span>}
+                  {p.id === "free" ? (
+                    <span className="text-4xl font-bold text-foreground">Free</span>
+                  ) : (
+                    <>
+                      <span className="text-4xl font-bold text-foreground line-through opacity-50">₹{p.price}</span>
+                      <span className="ml-2 text-sm text-primary font-semibold">Coming Soon</span>
+                    </>
+                  )}
                 </div>
 
                 <ul className="space-y-3 flex-1 mb-6">
@@ -243,26 +106,13 @@ const Pricing = () => {
                   ))}
                 </ul>
 
-                {isCurrent ? (
+                {p.comingSoon ? (
                   <Button variant="outline" disabled className="w-full">
-                    Current Plan
-                  </Button>
-                ) : p.id === "free" ? (
-                  <Button variant="outline" disabled className="w-full">
-                    Free Forever
+                    Coming Soon
                   </Button>
                 ) : (
-                  <Button
-                    className="w-full"
-                    variant={p.popular ? "default" : "outline"}
-                    onClick={() => handleSubscribe(p.id, p.amount!)}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
-                    ) : (
-                      `Subscribe for ₹${p.price}/mo`
-                    )}
+                  <Button variant="outline" disabled className="w-full">
+                    Current Plan ✓
                   </Button>
                 )}
               </div>
