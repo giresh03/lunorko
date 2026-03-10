@@ -116,7 +116,7 @@ const PromoBanner = ({ onClose }: { onClose: () => void }) => {
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/domains", label: "Domains" },
-  
+  { to: "/community", label: "Community" },
   { to: "/guidance", label: "Guidance" },
   { to: "/achievements", label: "Achievements" },
   { to: "/pricing", label: "Pricing" },
