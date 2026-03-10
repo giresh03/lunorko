@@ -37,7 +37,7 @@ const EditorPaywall = ({ domainId, domainName }: EditorPaywallProps) => {
           : "Unlock the full-featured code editor with AI assistant, multi-file projects, live preview, and more."}
       </p>
       <p className="text-sm text-muted-foreground mb-8">
-        Starting at just <span className="text-primary font-semibold">₹49/month per domain</span>
+        Starting at just <span className="text-primary font-semibold">₹50/month per domain</span>
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3">
