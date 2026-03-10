@@ -8,7 +8,7 @@ import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
 import Dashboard from "./pages/Dashboard";
-
+import Community from "./pages/Community";
 import GuidanceRoadmap from "./pages/GuidanceRoadmap";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
@@ -36,6 +36,7 @@ const App = () => (
             <Route path="/domains" element={<Domains />} />
             <Route path="/domain/:domainId" element={<DomainDetail />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/community" element={<Community />} />
             <Route path="/guidance" element={<GuidanceRoadmap />} />
             <Route path="/about" element={<About />} />
             <Route path="/auth" element={<Auth />} />
