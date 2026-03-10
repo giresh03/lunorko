@@ -49,6 +49,7 @@ const App = () => (
             <Route path="/skill-radar" element={<SkillRadar />} />
             <Route path="/resume-builder" element={<ResumeBuilder />} />
             <Route path="/promo" element={<PromoVideo />} />
+            <Route path="/projects" element={<ProjectBuilder />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -117,6 +117,7 @@ const navLinks = [
   { to: "/", label: "Home" },
   { to: "/domains", label: "Domains" },
   { to: "/community", label: "Community" },
+  { to: "/projects", label: "Projects" },
   { to: "/guidance", label: "Guidance" },
   { to: "/achievements", label: "Achievements" },
   { to: "/pricing", label: "Pricing" },
