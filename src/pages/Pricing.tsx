@@ -24,8 +24,8 @@ const plans = [
   {
     id: "pro",
     name: "Pro",
-    price: 1,
-    amountPaise: 100,
+    price: 50,
+    amountPaise: 5000,
     icon: Star,
     color: "from-primary/20 to-primary/5",
     popular: true,
@@ -34,8 +34,8 @@ const plans = [
   {
     id: "premium",
     name: "Premium",
-    price: 100,
-    amountPaise: 10000,
+    price: 1,
+    amountPaise: 100,
     icon: Crown,
     color: "from-yellow-500/20 to-yellow-500/5",
     features: ["Everything in Pro", "1-on-1 mentorship sessions", "Project code reviews", "Career guidance", "Certificate of completion"],
