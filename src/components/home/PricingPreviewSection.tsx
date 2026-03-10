@@ -14,7 +14,6 @@ const proTier = [
   "Everything in Free, plus:",
   "Unlimited AI Code Assistant",
   "1:1 Mentor booking sessions",
-  "Premium Udemy course recommendations",
   "Priority support & feedback",
   "Certificate of completion",
   "Resume & interview preparation",
