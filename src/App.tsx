@@ -20,6 +20,7 @@ import Achievements from "./pages/Achievements";
 import SkillRadar from "./pages/SkillRadar";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import PromoVideo from "./pages/PromoVideo";
+import ProjectBuilder from "./pages/ProjectBuilder";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
