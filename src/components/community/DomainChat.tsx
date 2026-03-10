@@ -15,6 +15,7 @@ interface ChatMessage {
   message_type: string;
   code_snippet: string | null;
   code_language: string | null;
+  file_url: string | null;
   created_at: string;
   display_name?: string;
 }
