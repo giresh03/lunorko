@@ -46,16 +46,17 @@ export const useSubscription = () => {
   }, [user]);
 
   /** Check if user has editor access for a specific domain */
-  // TEMPORARY: All domains are free while payment is disabled
   const hasEditorAccessForDomain = useCallback(
-    (_domainId: string): boolean => {
-      return true;
+    (domainId: string): boolean => {
+      return subscriptions.some(
+        (s) => s.domain_id === domainId || s.domain_id === null
+      );
     },
-    []
+    [subscriptions]
   );
 
-  /** Legacy: true if user has any active subscription */
-  const hasEditorAccess = true;
+  /** true if user has any active paid subscription */
+  const hasEditorAccess = subscriptions.length > 0;
 
   /** Get the plan for a specific domain */
   const getPlanForDomain = useCallback(
