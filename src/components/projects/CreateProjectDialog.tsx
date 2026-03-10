@@ -57,9 +57,25 @@ const CreateProjectDialog = ({ open, onOpenChange, onCreated }: CreateProjectDia
   };
 
   const handleSubmit = async () => {
-    if (!title.trim() || !description.trim() || !domainId || !user) return;
+    if (!user) {
+      toast.error("Please log in first");
+      return;
+    }
+    if (!title.trim()) {
+      toast.error("Please enter a project title");
+      return;
+    }
+    if (!description.trim()) {
+      toast.error("Please enter a description");
+      return;
+    }
+    if (!domainId) {
+      toast.error("Please select a domain");
+      return;
+    }
     setLoading(true);
     try {
+      console.log("Creating project...", { title, description, domainId, techStack, maxMembers, difficulty });
       const { data: project, error } = await supabase
         .from("team_projects")
         .insert({
@@ -73,20 +89,26 @@ const CreateProjectDialog = ({ open, onOpenChange, onCreated }: CreateProjectDia
         })
         .select()
         .single();
-      if (error) throw error;
+      if (error) {
+        console.error("Insert error:", error);
+        throw error;
+      }
+      console.log("Project created:", project);
 
       // Add owner as team member
-      await supabase.from("team_members").insert({
+      const { error: memberError } = await supabase.from("team_members").insert({
         project_id: project.id,
         user_id: user.id,
         role: "owner",
       });
+      if (memberError) console.error("Member insert error:", memberError);
 
       toast.success("Project created!");
       onOpenChange(false);
       resetForm();
       onCreated();
     } catch (e: any) {
+      console.error("Create project error:", e);
       toast.error(e.message || "Failed to create project");
     }
     setLoading(false);
@@ -204,7 +226,7 @@ const CreateProjectDialog = ({ open, onOpenChange, onCreated }: CreateProjectDia
             </div>
           )}
 
-          <Button className="w-full" onClick={handleSubmit} disabled={loading || !title || !description || !domainId}>
+          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Create Project
           </Button>
