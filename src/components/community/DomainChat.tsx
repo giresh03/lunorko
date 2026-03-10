@@ -205,6 +205,18 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
         })}
       </div>
 
+      {/* Image preview */}
+      {imagePreview && (
+        <div className="border-t border-border p-2">
+          <div className="relative inline-block">
+            <img src={imagePreview} alt="Preview" className="h-20 rounded-md object-cover" />
+            <Button size="icon" variant="destructive" className="absolute -top-1 -right-1 h-5 w-5" onClick={removeImage}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Code input */}
       {showCode && (
         <div className="border-t border-border p-2">
@@ -219,6 +231,15 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
 
       {/* Input bar */}
       <div className="border-t border-border p-3 flex items-center gap-2">
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+        <Button
+          size="icon"
+          variant="outline"
+          className="h-8 w-8 shrink-0"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <ImagePlus className="h-4 w-4" />
+        </Button>
         <Button
           size="icon"
           variant={showCode ? "default" : "outline"}
