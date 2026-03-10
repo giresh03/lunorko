@@ -18,6 +18,7 @@ interface Post {
   code_snippet: string | null;
   code_language: string | null;
   project_link: string | null;
+  image_url: string | null;
   likes_count: number;
   comments_count: number;
   created_at: string;
