@@ -196,6 +196,160 @@ export type Database = {
           },
         ]
       }
+      community_comments: {
+        Row: {
+          code_snippet: string | null
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          code_snippet?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          code_snippet?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_likes: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_messages: {
+        Row: {
+          code_language: string | null
+          code_snippet: string | null
+          content: string
+          created_at: string
+          domain_id: string
+          file_url: string | null
+          id: string
+          message_type: string
+          user_id: string
+        }
+        Insert: {
+          code_language?: string | null
+          code_snippet?: string | null
+          content: string
+          created_at?: string
+          domain_id: string
+          file_url?: string | null
+          id?: string
+          message_type?: string
+          user_id: string
+        }
+        Update: {
+          code_language?: string | null
+          code_snippet?: string | null
+          content?: string
+          created_at?: string
+          domain_id?: string
+          file_url?: string | null
+          id?: string
+          message_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      community_posts: {
+        Row: {
+          code_language: string | null
+          code_snippet: string | null
+          comments_count: number
+          content: string
+          created_at: string
+          domain_id: string
+          id: string
+          image_url: string | null
+          is_pinned: boolean
+          likes_count: number
+          post_type: string
+          project_link: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          code_language?: string | null
+          code_snippet?: string | null
+          comments_count?: number
+          content: string
+          created_at?: string
+          domain_id: string
+          id?: string
+          image_url?: string | null
+          is_pinned?: boolean
+          likes_count?: number
+          post_type?: string
+          project_link?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          code_language?: string | null
+          code_snippet?: string | null
+          comments_count?: number
+          content?: string
+          created_at?: string
+          domain_id?: string
+          id?: string
+          image_url?: string | null
+          is_pinned?: boolean
+          likes_count?: number
+          post_type?: string
+          project_link?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_challenges: {
         Row: {
           challenge_date: string
