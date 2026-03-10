@@ -226,7 +226,7 @@ const CreateProjectDialog = ({ open, onOpenChange, onCreated }: CreateProjectDia
             </div>
           )}
 
-          <Button className="w-full" onClick={handleSubmit} disabled={loading || !title || !description || !domainId}>
+          <Button className="w-full" onClick={handleSubmit} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Create Project
           </Button>
