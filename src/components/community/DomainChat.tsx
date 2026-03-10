@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Code2, Smile } from "lucide-react";
+import { Send, Code2, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,6 +15,7 @@ interface ChatMessage {
   message_type: string;
   code_snippet: string | null;
   code_language: string | null;
+  file_url: string | null;
   created_at: string;
   display_name?: string;
 }
@@ -26,6 +27,9 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
   const [showCode, setShowCode] = useState(false);
   const [codeSnippet, setCodeSnippet] = useState("");
   const [sending, setSending] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
 
@@ -96,23 +100,54 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    if (!file.type.startsWith("image/")) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSend = async () => {
-    if ((!newMessage.trim() && !codeSnippet.trim()) || !user) return;
+    if ((!newMessage.trim() && !codeSnippet.trim() && !imageFile) || !user) return;
     setSending(true);
+
+    let fileUrl: string | null = null;
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop();
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("community-images").upload(path, imageFile);
+      if (!error) {
+        const { data } = supabase.storage.from("community-images").getPublicUrl(path);
+        fileUrl = data.publicUrl;
+      }
+    }
+
     const payload: any = {
       user_id: user.id,
       domain_id: domainId,
-      content: newMessage.trim() || (codeSnippet ? "Shared a code snippet" : ""),
-      message_type: codeSnippet ? "code" : "text",
+      content: newMessage.trim() || (codeSnippet ? "Shared a code snippet" : fileUrl ? "Shared an image" : ""),
+      message_type: fileUrl ? "image" : codeSnippet ? "code" : "text",
     };
     if (codeSnippet) {
       payload.code_snippet = codeSnippet;
       payload.code_language = "javascript";
     }
+    if (fileUrl) payload.file_url = fileUrl;
+
     await supabase.from("community_messages").insert(payload);
     setNewMessage("");
     setCodeSnippet("");
     setShowCode(false);
+    removeImage();
     setSending(false);
   };
 
@@ -156,11 +191,31 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
                     <code>{msg.code_snippet}</code>
                   </pre>
                 )}
+                {msg.file_url && (
+                  <img
+                    src={msg.file_url}
+                    alt="Shared"
+                    className="mt-1 rounded-md max-w-full max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => window.open(msg.file_url!, '_blank')}
+                  />
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Image preview */}
+      {imagePreview && (
+        <div className="border-t border-border p-2">
+          <div className="relative inline-block">
+            <img src={imagePreview} alt="Preview" className="h-20 rounded-md object-cover" />
+            <Button size="icon" variant="destructive" className="absolute -top-1 -right-1 h-5 w-5" onClick={removeImage}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Code input */}
       {showCode && (
@@ -176,6 +231,15 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
 
       {/* Input bar */}
       <div className="border-t border-border p-3 flex items-center gap-2">
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+        <Button
+          size="icon"
+          variant="outline"
+          className="h-8 w-8 shrink-0"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <ImagePlus className="h-4 w-4" />
+        </Button>
         <Button
           size="icon"
           variant={showCode ? "default" : "outline"}
