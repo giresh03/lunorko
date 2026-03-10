@@ -190,6 +190,14 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
                     <code>{msg.code_snippet}</code>
                   </pre>
                 )}
+                {msg.file_url && (
+                  <img
+                    src={msg.file_url}
+                    alt="Shared"
+                    className="mt-1 rounded-md max-w-full max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => window.open(msg.file_url!, '_blank')}
+                  />
+                )}
               </div>
             </div>
           );
