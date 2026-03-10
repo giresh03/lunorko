@@ -26,6 +26,9 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
   const [showCode, setShowCode] = useState(false);
   const [codeSnippet, setCodeSnippet] = useState("");
   const [sending, setSending] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
 
