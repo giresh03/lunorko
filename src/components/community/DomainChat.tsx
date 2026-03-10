@@ -99,23 +99,54 @@ const DomainChat = ({ domainId }: { domainId: string }) => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return;
+    if (!file.type.startsWith("image/")) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSend = async () => {
-    if ((!newMessage.trim() && !codeSnippet.trim()) || !user) return;
+    if ((!newMessage.trim() && !codeSnippet.trim() && !imageFile) || !user) return;
     setSending(true);
+
+    let fileUrl: string | null = null;
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop();
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("community-images").upload(path, imageFile);
+      if (!error) {
+        const { data } = supabase.storage.from("community-images").getPublicUrl(path);
+        fileUrl = data.publicUrl;
+      }
+    }
+
     const payload: any = {
       user_id: user.id,
       domain_id: domainId,
-      content: newMessage.trim() || (codeSnippet ? "Shared a code snippet" : ""),
-      message_type: codeSnippet ? "code" : "text",
+      content: newMessage.trim() || (codeSnippet ? "Shared a code snippet" : fileUrl ? "Shared an image" : ""),
+      message_type: fileUrl ? "image" : codeSnippet ? "code" : "text",
     };
     if (codeSnippet) {
       payload.code_snippet = codeSnippet;
       payload.code_language = "javascript";
     }
+    if (fileUrl) payload.file_url = fileUrl;
+
     await supabase.from("community_messages").insert(payload);
     setNewMessage("");
     setCodeSnippet("");
     setShowCode(false);
+    removeImage();
     setSending(false);
   };
 
