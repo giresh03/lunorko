@@ -8,7 +8,7 @@ import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
 import Dashboard from "./pages/Dashboard";
-import Mentors from "./pages/Mentors";
+
 import GuidanceRoadmap from "./pages/GuidanceRoadmap";
 import About from "./pages/About";
 import Auth from "./pages/Auth";
