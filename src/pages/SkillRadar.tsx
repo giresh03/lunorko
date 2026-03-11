@@ -180,6 +180,7 @@ const SkillRadar = () => {
           </div>
         </div>
       </main>
+      </FeatureGate>
       <Footer />
     </div>
   );
