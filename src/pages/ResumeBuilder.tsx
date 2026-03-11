@@ -57,6 +57,7 @@ const ResumeBuilder = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <FeatureGate feature="resume-builder" featureName="Resume Builder" requiredPlan="professional">
       <main className="container mx-auto px-4 pt-24 pb-20 max-w-4xl">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
