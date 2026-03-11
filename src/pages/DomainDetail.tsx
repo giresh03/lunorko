@@ -157,6 +157,13 @@ const DomainDetail = () => {
   const articles = domain.resources.filter((r) => r.type === "article");
 
   if (isFullscreenIDE && hasEditorAccess) {
+    if (isUIUXDomain) {
+      return (
+        <div className="fixed inset-0 z-50">
+          <DesignEditorMain onExit={() => setIsFullscreenIDE(false)} />
+        </div>
+      );
+    }
     return (
       <div className="fixed inset-0 z-50">
         <CodeEditorComponent
