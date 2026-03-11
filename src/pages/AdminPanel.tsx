@@ -105,12 +105,13 @@ const AdminPanel = () => {
   const fetchAll = async () => {
     setLoadingData(true);
     try {
-      const [statsData, usersData, subsData, mentorsData, prData] = await Promise.all([
+      const [statsData, usersData, subsData, mentorsData, prData, trendsData] = await Promise.all([
         callAdmin("stats"),
         callAdmin("users"),
         callAdmin("subscriptions"),
         callAdmin("mentors"),
         callAdmin("payment-requests"),
+        callAdmin("visitor-trends"),
       ]);
 
       setStats(statsData as AdminStats);
