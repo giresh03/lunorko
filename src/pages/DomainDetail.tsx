@@ -126,6 +126,7 @@ const DomainDetail = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
+  const isUIUXDomain = domainId === 'ui-ux';
   const { toast } = useToast();
   const { user } = useAuth();
   const { hasEditorAccessForDomain } = useSubscription();
