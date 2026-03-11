@@ -24,8 +24,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 
 interface AdminStats {
+  totalVisitors: number;
   totalUsers: number;
-  totalSubscribers: number;
+  totalPaidUsers: number;
   totalRevenue: number;
   totalMentors: number;
   totalBookings: number;
