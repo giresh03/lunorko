@@ -16,61 +16,73 @@ export const useSubscription = () => {
   const { user } = useAuth();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!user) {
       setSubscriptions([]);
+      setIsAdmin(false);
       setLoading(false);
       return;
     }
 
-    const fetchSubscriptions = async () => {
+    const fetchData = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .gte("expires_at", new Date().toISOString())
-        .order("expires_at", { ascending: false });
 
-      if (data && !error) {
-        setSubscriptions(data as Subscription[]);
-      } else {
-        setSubscriptions([]);
-      }
+      // Check admin role and subscriptions in parallel
+      const [{ data: roleData }, { data: subData }] = await Promise.all([
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .maybeSingle(),
+        supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .gte("expires_at", new Date().toISOString())
+          .order("expires_at", { ascending: false }),
+      ]);
+
+      setIsAdmin(!!roleData);
+      setSubscriptions((subData as Subscription[]) || []);
       setLoading(false);
     };
 
-    fetchSubscriptions();
+    fetchData();
   }, [user]);
 
   /** Check if user has editor access for a specific domain */
   const hasEditorAccessForDomain = useCallback(
     (domainId: string): boolean => {
+      // Admins have full access to all domains
+      if (isAdmin) return true;
       return subscriptions.some(
         (s) => s.domain_id === domainId || s.domain_id === null
       );
     },
-    [subscriptions]
+    [subscriptions, isAdmin]
   );
 
   /** true if user has any active paid subscription */
-  const hasEditorAccess = subscriptions.length > 0;
+  const hasEditorAccess = isAdmin || subscriptions.length > 0;
 
   /** Get the plan for a specific domain */
   const getPlanForDomain = useCallback(
     (domainId: string): string => {
+      if (isAdmin) return "premium";
       const sub = subscriptions.find(
         (s) => s.domain_id === domainId || s.domain_id === null
       );
       return sub?.plan_id ?? "free";
     },
-    [subscriptions]
+    [subscriptions, isAdmin]
   );
 
   // backward compat
-  const plan = subscriptions[0]?.plan_id ?? "free";
+  const plan = isAdmin ? "premium" : (subscriptions[0]?.plan_id ?? "free");
   const subscription = subscriptions[0] ?? null;
 
   return {
