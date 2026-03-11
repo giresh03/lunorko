@@ -45,9 +45,6 @@ const Navbar = () => {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50">
-      {/* Promo Banner */}
-      {showBanner && <PromoBanner onClose={() => setShowBanner(false)} />}
-
       {/* Main Navbar */}
       <nav
         className={`border-b transition-all duration-300 ${
