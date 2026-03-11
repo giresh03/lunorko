@@ -106,6 +106,7 @@ const Community = () => {
   return (
     <div className="min-h-screen bg-background" ref={pageRef}>
       <Navbar />
+      <FeatureGate feature="community" featureName="Community Hub" requiredPlan="pro">
       <main className="container mx-auto px-4 pt-24 pb-20">
         {/* Header */}
         <div className="mb-6 scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
