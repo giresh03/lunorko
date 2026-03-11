@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, CreditCard, TrendingUp, UserCheck, Calendar,
   LayoutDashboard, BookOpen, Shield, Loader2, LogOut,
-  Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User
+  Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
+  CheckCircle, XCircle, Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ const AdminPanel = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [mentors, setMentors] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -100,17 +102,19 @@ const AdminPanel = () => {
   const fetchAll = async () => {
     setLoadingData(true);
     try {
-      const [statsData, usersData, subsData, mentorsData] = await Promise.all([
+      const [statsData, usersData, subsData, mentorsData, prData] = await Promise.all([
         callAdmin("stats"),
         callAdmin("users"),
         callAdmin("subscriptions"),
         callAdmin("mentors"),
+        callAdmin("payment-requests"),
       ]);
 
       setStats(statsData as AdminStats);
       setUsers(Array.isArray(usersData) ? usersData : []);
       setSubscriptions(Array.isArray(subsData) ? subsData : []);
       setMentors(Array.isArray(mentorsData) ? mentorsData : []);
+      setPaymentRequests(Array.isArray(prData) ? prData : []);
     } catch (e: any) {
       console.error(e);
       toast({
@@ -234,6 +238,7 @@ const AdminPanel = () => {
             <TabsTrigger value="overview"><LayoutDashboard className="mr-2 h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" /> Users</TabsTrigger>
             <TabsTrigger value="subscriptions"><CreditCard className="mr-2 h-4 w-4" /> Subscriptions</TabsTrigger>
+            <TabsTrigger value="payment-requests"><Receipt className="mr-2 h-4 w-4" /> Payment Requests{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
             <TabsTrigger value="mentors"><BookOpen className="mr-2 h-4 w-4" /> Mentors</TabsTrigger>
           </TabsList>
 
@@ -425,6 +430,85 @@ const AdminPanel = () => {
                   ))}
                   {subscriptions.length === 0 && (
                     <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No subscriptions yet</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Payment Requests */}
+          <TabsContent value="payment-requests">
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User Email</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>UTR Number</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paymentRequests.map((pr) => (
+                    <TableRow key={pr.id}>
+                      <TableCell className="text-sm">{pr.email || pr.user_id?.slice(0, 8)}</TableCell>
+                      <TableCell><Badge className="text-xs">{pr.plan_id}</Badge></TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{pr.domain_id}</Badge></TableCell>
+                      <TableCell className="font-medium">₹{(pr.amount / 100).toFixed(0)}</TableCell>
+                      <TableCell className="font-mono text-sm">{pr.utr_number}</TableCell>
+                      <TableCell>
+                        <Badge variant={pr.status === "approved" ? "default" : pr.status === "rejected" ? "destructive" : "outline"} className="text-xs capitalize">
+                          {pr.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{new Date(pr.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {pr.status === "pending" && (
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-green-500 hover:text-green-600"
+                              onClick={async () => {
+                                try {
+                                  await callAdmin("approve-payment", "POST", { id: pr.id });
+                                  toast({ title: "Payment approved & subscription activated" });
+                                  fetchAll();
+                                } catch (e: any) {
+                                  toast({ title: "Error", description: e.message, variant: "destructive" });
+                                }
+                              }}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={async () => {
+                                try {
+                                  await callAdmin("reject-payment", "POST", { id: pr.id, admin_notes: "Payment not verified" });
+                                  toast({ title: "Payment request rejected" });
+                                  fetchAll();
+                                } catch (e: any) {
+                                  toast({ title: "Error", description: e.message, variant: "destructive" });
+                                }
+                              }}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                        {pr.status !== "pending" && <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {paymentRequests.length === 0 && (
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No payment requests yet</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

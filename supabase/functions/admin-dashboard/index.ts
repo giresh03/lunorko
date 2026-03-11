@@ -116,9 +116,56 @@ serve(async (req) => {
       return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "payment-requests") {
+      const { data } = await adminClient.from("payment_requests").select("*").order("created_at", { ascending: false }).limit(200);
+      // Enrich with user emails
+      const userIds = [...new Set((data || []).map((r: any) => r.user_id))];
+      const emailMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+        (authUsers || []).forEach((au: any) => { emailMap[au.id] = au.email || ""; });
+      }
+      const enriched = (data || []).map((r: any) => ({ ...r, email: emailMap[r.user_id] || "" }));
+      return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // POST actions for managing data
     if (req.method === "POST") {
       const body = await req.json();
+
+      if (action === "approve-payment") {
+        const { id } = body;
+        // Get the payment request
+        const { data: pr, error: prErr } = await adminClient.from("payment_requests").select("*").eq("id", id).single();
+        if (prErr || !pr) {
+          return new Response(JSON.stringify({ error: "Payment request not found" }), { status: 404, headers: corsHeaders });
+        }
+
+        // Create subscription
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+        const { error: subErr } = await adminClient.from("subscriptions").insert({
+          user_id: pr.user_id,
+          plan_id: pr.plan_id,
+          status: "active",
+          amount: pr.amount,
+          domain_id: pr.domain_id,
+          expires_at: expiresAt.toISOString(),
+        });
+        if (subErr) {
+          return new Response(JSON.stringify({ error: subErr.message }), { status: 400, headers: corsHeaders });
+        }
+
+        // Mark payment request as approved
+        await adminClient.from("payment_requests").update({ status: "approved", reviewed_at: new Date().toISOString() }).eq("id", id);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "reject-payment") {
+        const { id, admin_notes } = body;
+        await adminClient.from("payment_requests").update({ status: "rejected", admin_notes: admin_notes || null, reviewed_at: new Date().toISOString() }).eq("id", id);
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       if (action === "add-mentor") {
         const { error } = await adminClient.from("mentors").insert(body);

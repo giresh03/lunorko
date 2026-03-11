@@ -514,6 +514,45 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_requests: {
+        Row: {
+          admin_notes: string | null
+          amount: number
+          created_at: string
+          domain_id: string
+          id: string
+          plan_id: string
+          reviewed_at: string | null
+          status: string
+          user_id: string
+          utr_number: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          amount: number
+          created_at?: string
+          domain_id: string
+          id?: string
+          plan_id: string
+          reviewed_at?: string | null
+          status?: string
+          user_id: string
+          utr_number: string
+        }
+        Update: {
+          admin_notes?: string | null
+          amount?: number
+          created_at?: string
+          domain_id?: string
+          id?: string
+          plan_id?: string
+          reviewed_at?: string | null
+          status?: string
+          user_id?: string
+          utr_number?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
