@@ -61,7 +61,7 @@ const Toolbar = ({
       </div>
 
       {/* Alignment tools - show when elements selected */}
-      {selectedIds.length > 0 && (
+      {selectedIds && selectedIds.length > 0 && (
         <>
           <div className="h-6 w-px bg-border" />
           <div className="flex items-center gap-0.5">
