@@ -31,7 +31,6 @@ const navLinks = [
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
-  const [showBanner, setShowBanner] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const [logoHovered, setLogoHovered] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
