@@ -238,6 +238,7 @@ const AdminPanel = () => {
             <TabsTrigger value="overview"><LayoutDashboard className="mr-2 h-4 w-4" /> Overview</TabsTrigger>
             <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" /> Users</TabsTrigger>
             <TabsTrigger value="subscriptions"><CreditCard className="mr-2 h-4 w-4" /> Subscriptions</TabsTrigger>
+            <TabsTrigger value="payment-requests"><Receipt className="mr-2 h-4 w-4" /> Payment Requests{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
             <TabsTrigger value="mentors"><BookOpen className="mr-2 h-4 w-4" /> Mentors</TabsTrigger>
           </TabsList>
 
