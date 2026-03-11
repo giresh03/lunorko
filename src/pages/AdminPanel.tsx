@@ -39,6 +39,7 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [visitorTrends, setVisitorTrends] = useState<{ visit_date: string; visitor_count: number }[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
