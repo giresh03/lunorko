@@ -210,6 +210,7 @@ const Community = () => {
           </TabsContent>
         </Tabs>
       </main>
+      </FeatureGate>
       <Footer />
 
       <CreatePostDialog

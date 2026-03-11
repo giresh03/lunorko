@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import FeatureGate from "@/components/FeatureGate";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectDetailView from "@/components/projects/ProjectDetailView";
 import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
