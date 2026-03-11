@@ -484,14 +484,18 @@ const DomainDetail = () => {
                   <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
                     <Maximize2 className="h-10 w-10 text-primary" />
                   </div>
-                  <h3 className="text-2xl font-bold text-foreground">Lunor.AI Code Editor</h3>
+                  <h3 className="text-2xl font-bold text-foreground">
+                    {isUIUXDomain ? 'Lunor.AI Design Studio' : 'Lunor.AI Code Editor'}
+                  </h3>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Full-screen VS Code-style IDE with file explorer, multi-tab editing,
-                    integrated terminal, and AI assistant — all tuned for {domain.name}.
+                    {isUIUXDomain
+                      ? 'Figma-like visual design editor with drag & drop widgets, properties panel, layer management, and export to React + Tailwind CSS.'
+                      : `Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant — all tuned for ${domain.name}.`
+                    }
                   </p>
                   <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
                     <Maximize2 className="mr-2 h-4 w-4" />
-                    Launch Full-Screen Editor
+                    {isUIUXDomain ? 'Launch Design Studio' : 'Launch Full-Screen Editor'}
                   </Button>
                 </div>
               </div>
