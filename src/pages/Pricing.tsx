@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Check, Crown, Zap, Rocket, Star, Loader2 } from "lucide-react";
+import { Check, X, Crown, Zap, Rocket, Star, Loader2, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,20 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+const allFeatures = [
+  "Credits / month",
+  "Domain Access",
+  "Videos",
+  "Code Editor",
+  "Notes",
+  "Community",
+  "Projects",
+  "Skill Radar",
+  "Resume Builder",
+  "Interview Prep",
+  "Hackathons",
+];
+
 const plans = [
   {
     id: "free",
@@ -22,8 +36,21 @@ const plans = [
     price: 0,
     amountPaise: 0,
     icon: Zap,
+    credits: 4,
     color: "from-muted to-muted/50",
-    features: ["Full code editor access", "All domains unlocked", "AI code assistant", "Community support", "Unlimited projects"],
+    access: {
+      "Credits / month": "4",
+      "Domain Access": false,
+      "Videos": false,
+      "Code Editor": false,
+      "Notes": false,
+      "Community": false,
+      "Projects": false,
+      "Skill Radar": false,
+      "Resume Builder": false,
+      "Interview Prep": false,
+      "Hackathons": false,
+    } as Record<string, string | boolean>,
   },
   {
     id: "pro",
@@ -31,9 +58,22 @@ const plans = [
     price: 50,
     amountPaise: 5000,
     icon: Star,
+    credits: 60,
     color: "from-primary/20 to-primary/5",
     popular: true,
-    features: ["Everything in Free", "Priority support", "Advanced AI features", "Custom themes"],
+    access: {
+      "Credits / month": "60",
+      "Domain Access": true,
+      "Videos": true,
+      "Code Editor": true,
+      "Notes": true,
+      "Community": true,
+      "Projects": false,
+      "Skill Radar": false,
+      "Resume Builder": false,
+      "Interview Prep": false,
+      "Hackathons": false,
+    } as Record<string, string | boolean>,
   },
   {
     id: "premium",
@@ -41,8 +81,21 @@ const plans = [
     price: 100,
     amountPaise: 10000,
     icon: Crown,
+    credits: 100,
     color: "from-yellow-500/20 to-yellow-500/5",
-    features: ["Everything in Pro", "1-on-1 mentorship sessions", "Project code reviews", "Career guidance", "Certificate of completion"],
+    access: {
+      "Credits / month": "100",
+      "Domain Access": true,
+      "Videos": true,
+      "Code Editor": true,
+      "Notes": true,
+      "Community": true,
+      "Projects": true,
+      "Skill Radar": true,
+      "Resume Builder": false,
+      "Interview Prep": false,
+      "Hackathons": false,
+    } as Record<string, string | boolean>,
   },
   {
     id: "professional",
@@ -50,8 +103,21 @@ const plans = [
     price: 150,
     amountPaise: 15000,
     icon: Rocket,
+    credits: 150,
     color: "from-purple-500/20 to-purple-500/5",
-    features: ["Everything in Premium", "Unlimited mentorship", "Resume building & review", "Job referrals", "Custom learning path", "Priority booking"],
+    access: {
+      "Credits / month": "150",
+      "Domain Access": true,
+      "Videos": true,
+      "Code Editor": true,
+      "Notes": true,
+      "Community": true,
+      "Projects": true,
+      "Skill Radar": true,
+      "Resume Builder": true,
+      "Interview Prep": true,
+      "Hackathons": true,
+    } as Record<string, string | boolean>,
   },
 ];
 
@@ -94,7 +160,6 @@ const Pricing = () => {
       } as any);
 
       if (error) throw error;
-
       toast.success("Payment request submitted! You'll get access once the admin verifies your payment.");
       setPayDialog(null);
       setUtrNumber("");
@@ -123,7 +188,8 @@ const Pricing = () => {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
+        {/* Plan cards */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto mb-16">
           {plans.map((p) => {
             const Icon = p.icon;
             const isCurrentPlan = currentPlan === p.id;
@@ -148,7 +214,7 @@ const Pricing = () => {
                 </div>
 
                 <h3 className="text-xl font-bold text-foreground">{p.name}</h3>
-                <div className="mt-2 mb-6">
+                <div className="mt-2 mb-3">
                   {p.id === "free" ? (
                     <span className="text-4xl font-bold text-foreground">Free</span>
                   ) : (
@@ -159,11 +225,22 @@ const Pricing = () => {
                   )}
                 </div>
 
-                <ul className="space-y-3 flex-1 mb-6">
-                  {p.features.map((f, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                      {f}
+                {/* Credits highlight */}
+                <div className="flex items-center gap-2 mb-5 px-3 py-2 rounded-lg bg-accent/50">
+                  <Coins className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">{p.credits} credits/month</span>
+                </div>
+
+                {/* Key features */}
+                <ul className="space-y-2 flex-1 mb-6">
+                  {Object.entries(p.access).filter(([k]) => k !== "Credits / month").map(([feature, has]) => (
+                    <li key={feature} className={`flex items-center gap-2 text-sm ${has ? "text-foreground" : "text-muted-foreground/50 line-through"}`}>
+                      {has ? (
+                        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                      ) : (
+                        <X className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0" />
+                      )}
+                      {feature}
                     </li>
                   ))}
                 </ul>
@@ -189,6 +266,44 @@ const Pricing = () => {
               </div>
             );
           })}
+        </div>
+
+        {/* Comparison table */}
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-2xl font-bold text-foreground text-center mb-8">Feature Comparison</h2>
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-left p-4 font-semibold text-foreground">Feature</th>
+                  {plans.map((p) => (
+                    <th key={p.id} className="p-4 text-center font-semibold text-foreground">{p.name}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allFeatures.map((feature, i) => (
+                  <tr key={feature} className={i % 2 === 0 ? "bg-card" : "bg-muted/10"}>
+                    <td className="p-4 font-medium text-foreground">{feature}</td>
+                    {plans.map((p) => {
+                      const val = p.access[feature];
+                      return (
+                        <td key={p.id} className="p-4 text-center">
+                          {typeof val === "string" ? (
+                            <span className="font-semibold text-primary">{val}</span>
+                          ) : val ? (
+                            <Check className="h-4 w-4 text-primary mx-auto" />
+                          ) : (
+                            <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
 
