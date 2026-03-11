@@ -89,6 +89,7 @@ const ProjectBuilder = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <FeatureGate feature="projects" featureName="Project Builder" requiredPlan="premium">
       <main className="container mx-auto px-4 pt-24 pb-20">
         <div className="flex items-center justify-between mb-6">
           <div>
