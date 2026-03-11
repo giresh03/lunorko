@@ -1,6 +1,5 @@
 import { Link, Navigate } from "react-router-dom";
 import { BookOpen, Clock, Trophy, TrendingUp, Bookmark, Trash2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
