@@ -470,7 +470,7 @@ const DomainDetail = () => {
                   onClick={() => setIsFullscreenIDE(true)}
                 >
                   <Maximize2 className="mr-2 h-4 w-4" />
-                  Open Code Editor
+                  {isUIUXDomain ? 'Open Design Editor' : 'Open Code Editor'}
                 </Button>
               </div>
             </div>
