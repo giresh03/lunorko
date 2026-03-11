@@ -119,6 +119,7 @@ const AdminPanel = () => {
       setSubscriptions(Array.isArray(subsData) ? subsData : []);
       setMentors(Array.isArray(mentorsData) ? mentorsData : []);
       setPaymentRequests(Array.isArray(prData) ? prData : []);
+      setVisitorTrends(Array.isArray(trendsData) ? trendsData : []);
     } catch (e: any) {
       console.error(e);
       toast({
