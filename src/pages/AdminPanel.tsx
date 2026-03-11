@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, CreditCard, TrendingUp, UserCheck, Calendar,
   LayoutDashboard, BookOpen, Shield, Loader2, LogOut,
-  Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User
+  Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
+  CheckCircle, XCircle, Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
