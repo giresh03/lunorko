@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import EditorPaywall from "@/components/EditorPaywall";
+import DesignEditorMain from "@/components/design-editor/DesignEditorMain";
 import { useRef, useState } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
@@ -125,6 +126,7 @@ const DomainDetail = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
+  const isUIUXDomain = domainId === 'ui-ux';
   const { toast } = useToast();
   const { user } = useAuth();
   const { hasEditorAccessForDomain } = useSubscription();
@@ -155,6 +157,13 @@ const DomainDetail = () => {
   const articles = domain.resources.filter((r) => r.type === "article");
 
   if (isFullscreenIDE && hasEditorAccess) {
+    if (isUIUXDomain) {
+      return (
+        <div className="fixed inset-0 z-50">
+          <DesignEditorMain onExit={() => setIsFullscreenIDE(false)} />
+        </div>
+      );
+    }
     return (
       <div className="fixed inset-0 z-50">
         <CodeEditorComponent
@@ -461,7 +470,7 @@ const DomainDetail = () => {
                   onClick={() => setIsFullscreenIDE(true)}
                 >
                   <Maximize2 className="mr-2 h-4 w-4" />
-                  Open Code Editor
+                  {isUIUXDomain ? 'Open Design Editor' : 'Open Code Editor'}
                 </Button>
               </div>
             </div>
@@ -475,14 +484,18 @@ const DomainDetail = () => {
                   <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
                     <Maximize2 className="h-10 w-10 text-primary" />
                   </div>
-                  <h3 className="text-2xl font-bold text-foreground">Lunor.AI Code Editor</h3>
+                  <h3 className="text-2xl font-bold text-foreground">
+                    {isUIUXDomain ? 'Lunor.AI Design Studio' : 'Lunor.AI Code Editor'}
+                  </h3>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Full-screen VS Code-style IDE with file explorer, multi-tab editing,
-                    integrated terminal, and AI assistant — all tuned for {domain.name}.
+                    {isUIUXDomain
+                      ? 'Figma-like visual design editor with drag & drop widgets, properties panel, layer management, and export to React + Tailwind CSS.'
+                      : `Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant — all tuned for ${domain.name}.`
+                    }
                   </p>
                   <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
                     <Maximize2 className="mr-2 h-4 w-4" />
-                    Launch Full-Screen Editor
+                    {isUIUXDomain ? 'Launch Design Studio' : 'Launch Full-Screen Editor'}
                   </Button>
                 </div>
               </div>

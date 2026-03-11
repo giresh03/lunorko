@@ -389,6 +389,36 @@ export type Database = {
         }
         Relationships: []
       }
+      design_projects: {
+        Row: {
+          canvas_data: Json
+          created_at: string
+          id: string
+          name: string
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          canvas_data?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          canvas_data?: Json
+          created_at?: string
+          id?: string
+          name?: string
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       domain_progress: {
         Row: {
           completed_topics: string[]
