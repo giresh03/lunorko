@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import FeatureGate from "@/components/FeatureGate";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +82,7 @@ const SkillRadar = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <FeatureGate feature="skill-radar" featureName="Skill Radar" requiredPlan="premium">
       <main className="container mx-auto px-4 pt-24 pb-20 max-w-5xl">
         <div className="flex items-center gap-3 mb-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -178,6 +180,7 @@ const SkillRadar = () => {
           </div>
         </div>
       </main>
+      </FeatureGate>
       <Footer />
     </div>
   );

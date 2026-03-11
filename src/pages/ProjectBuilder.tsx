@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import FeatureGate from "@/components/FeatureGate";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectDetailView from "@/components/projects/ProjectDetailView";
 import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
@@ -88,6 +89,7 @@ const ProjectBuilder = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <FeatureGate feature="projects" featureName="Project Builder" requiredPlan="premium">
       <main className="container mx-auto px-4 pt-24 pb-20">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -150,6 +152,7 @@ const ProjectBuilder = () => {
           </div>
         )}
       </main>
+      </FeatureGate>
       <Footer />
       <CreateProjectDialog open={showCreate} onOpenChange={setShowCreate} onCreated={fetchProjects} />
     </div>
