@@ -118,6 +118,7 @@ const ResumeBuilder = () => {
           </div>
         )}
       </main>
+      </FeatureGate>
       <Footer />
     </div>
   );
