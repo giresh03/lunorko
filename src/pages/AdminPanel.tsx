@@ -213,10 +213,11 @@ const AdminPanel = () => {
       <main className="container mx-auto px-4 py-8">
         {/* Stats Cards */}
         {stats && (
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-8">
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-6 mb-8">
             {[
-              { label: "Total Users", value: stats.totalUsers, icon: Users, color: "text-blue-400" },
-              { label: "Active Subscribers", value: stats.totalSubscribers, icon: UserCheck, color: "text-green-400" },
+              { label: "Site Visitors", value: stats.totalVisitors, icon: Eye, color: "text-cyan-400" },
+              { label: "Registered Users", value: stats.totalUsers, icon: Users, color: "text-blue-400" },
+              { label: "Paid Users", value: stats.totalPaidUsers, icon: UserCheck, color: "text-green-400" },
               { label: "Revenue (₹)", value: `₹${Number(stats.totalRevenue ?? 0).toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
               { label: "Mentors", value: stats.totalMentors, icon: BookOpen, color: "text-purple-400" },
               { label: "Bookings", value: stats.totalBookings, icon: Calendar, color: "text-pink-400" },
