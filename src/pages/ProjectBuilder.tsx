@@ -152,6 +152,7 @@ const ProjectBuilder = () => {
           </div>
         )}
       </main>
+      </FeatureGate>
       <Footer />
       <CreateProjectDialog open={showCreate} onOpenChange={setShowCreate} onCreated={fetchProjects} />
     </div>
