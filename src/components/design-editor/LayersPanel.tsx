@@ -11,11 +11,17 @@ interface LayersPanelProps {
 const ELEMENT_ICONS: Record<string, string> = {
   rectangle: '◻', text: 'T', button: '▣', image: '🖼', card: '▢',
   navbar: '≡', input: '▭', container: '⬚', icon: '★', divider: '—',
-  avatar: '●', badge: '⬮',
+  avatar: '●', badge: '⬮', hero: '🏠', footer: '⊥', testimonial: '💬',
+  'pricing-card': '💰', 'progress-bar': '█░', toggle: '⊙', checkbox: '☑',
+  textarea: '📝', dropdown: '⌄', video: '▶', map: '🗺',
+  'social-icons': '🔗', stats: '📊', sidebar: '⊞', tabs: '⊟',
+  accordion: '▸', 'gradient-box': '🌈', 'glass-card': '🪟',
+  'feature-card': '✨', 'cta-banner': '📢', 'logo-cloud': '🏢',
+  'avatar-group': '●●', breadcrumb: '›', skeleton: '░░',
+  'tooltip-demo': '💬', 'code-block': '<>', table: '⊞',
 };
 
 const LayersPanel = ({ elements, selectedIds, onSelect, onUpdate }: LayersPanelProps) => {
-  // Reverse to show top-most layers first
   const reversed = [...elements].reverse();
 
   return (

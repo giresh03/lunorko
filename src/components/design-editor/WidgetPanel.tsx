@@ -8,10 +8,12 @@ interface WidgetPanelProps {
 }
 
 const categories = [
-  { id: 'basic', label: 'Basic' },
-  { id: 'form', label: 'Form' },
-  { id: 'layout', label: 'Layout' },
-  { id: 'display', label: 'Display' },
+  { id: 'basic', label: 'Basic', icon: '◻' },
+  { id: 'form', label: 'Form', icon: '▣' },
+  { id: 'layout', label: 'Layout', icon: '⬚' },
+  { id: 'display', label: 'Show', icon: '★' },
+  { id: 'sections', label: 'Sections', icon: '🏠' },
+  { id: 'data', label: 'Data', icon: '📊' },
 ];
 
 const WidgetPanel = ({ onAddElement }: WidgetPanelProps) => {
@@ -19,9 +21,10 @@ const WidgetPanel = ({ onAddElement }: WidgetPanelProps) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filtered = WIDGET_DEFINITIONS.filter(w => {
-    const matchesCategory = w.category === activeCategory;
-    const matchesSearch = !searchQuery || w.label.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    if (searchQuery) {
+      return w.label.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return w.category === activeCategory;
   });
 
   const handleDragStart = (e: React.DragEvent, widget: typeof WIDGET_DEFINITIONS[0]) => {
@@ -55,25 +58,26 @@ const WidgetPanel = ({ onAddElement }: WidgetPanelProps) => {
         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Widgets</h3>
         <input
           type="text"
-          placeholder="Search widgets..."
+          placeholder="Search all widgets..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full h-8 rounded-md border border-border bg-background px-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
         />
       </div>
 
-      {/* Category tabs */}
-      <div className="flex border-b border-border">
+      {/* Category tabs - 2 rows for 6 categories */}
+      <div className="grid grid-cols-3 border-b border-border">
         {categories.map(cat => (
           <button
             key={cat.id}
-            onClick={() => setActiveCategory(cat.id)}
-            className={`flex-1 py-2 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
-              activeCategory === cat.id
-                ? 'text-primary border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground'
+            onClick={() => { setActiveCategory(cat.id); setSearchQuery(''); }}
+            className={`py-2 text-[9px] font-semibold uppercase tracking-wider transition-colors flex flex-col items-center gap-0.5 ${
+              activeCategory === cat.id && !searchQuery
+                ? 'text-primary bg-primary/5 border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/20'
             }`}
           >
+            <span className="text-sm">{cat.icon}</span>
             {cat.label}
           </button>
         ))}
@@ -81,6 +85,11 @@ const WidgetPanel = ({ onAddElement }: WidgetPanelProps) => {
 
       {/* Widget grid */}
       <div className="flex-1 overflow-y-auto p-2">
+        {searchQuery && (
+          <p className="text-[10px] text-muted-foreground mb-2 px-1">
+            {filtered.length} result{filtered.length !== 1 ? 's' : ''} for "{searchQuery}"
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-1.5">
           {filtered.map(widget => (
             <div
@@ -88,10 +97,10 @@ const WidgetPanel = ({ onAddElement }: WidgetPanelProps) => {
               draggable
               onDragStart={(e) => handleDragStart(e, widget)}
               onClick={() => handleClick(widget)}
-              className="flex flex-col items-center gap-1.5 p-3 rounded-lg border border-border bg-background cursor-grab hover:border-primary/50 hover:bg-primary/5 transition-all active:cursor-grabbing group"
+              className="flex flex-col items-center gap-1 p-2.5 rounded-lg border border-border bg-background cursor-grab hover:border-primary/50 hover:bg-primary/5 transition-all active:cursor-grabbing group"
             >
-              <span className="text-xl group-hover:scale-110 transition-transform">{widget.icon}</span>
-              <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground">{widget.label}</span>
+              <span className="text-lg group-hover:scale-110 transition-transform leading-none">{widget.icon}</span>
+              <span className="text-[9px] font-medium text-muted-foreground group-hover:text-foreground leading-tight text-center">{widget.label}</span>
             </div>
           ))}
         </div>

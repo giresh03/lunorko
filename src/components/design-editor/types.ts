@@ -1,6 +1,6 @@
 export interface DesignElement {
   id: string;
-  type: 'rectangle' | 'text' | 'button' | 'image' | 'card' | 'navbar' | 'input' | 'container' | 'icon' | 'divider' | 'avatar' | 'badge';
+  type: DesignElementType;
   x: number;
   y: number;
   width: number;
@@ -12,9 +12,20 @@ export interface DesignElement {
   name: string;
   styles: ElementStyles;
   content?: string;
-  children?: string[]; // IDs of child elements
+  children?: string[];
   parentId?: string;
 }
+
+export type DesignElementType =
+  | 'rectangle' | 'text' | 'button' | 'image' | 'card' | 'navbar' | 'input'
+  | 'container' | 'icon' | 'divider' | 'avatar' | 'badge'
+  // New advanced types
+  | 'hero' | 'footer' | 'testimonial' | 'pricing-card' | 'progress-bar'
+  | 'toggle' | 'checkbox' | 'textarea' | 'dropdown' | 'video'
+  | 'map' | 'social-icons' | 'stats' | 'sidebar' | 'tabs'
+  | 'accordion' | 'gradient-box' | 'glass-card' | 'feature-card'
+  | 'cta-banner' | 'logo-cloud' | 'avatar-group' | 'breadcrumb'
+  | 'skeleton' | 'tooltip-demo' | 'code-block' | 'table';
 
 export interface ElementStyles {
   backgroundColor?: string;
@@ -28,11 +39,26 @@ export interface ElementStyles {
   fontFamily?: string;
   textAlign?: 'left' | 'center' | 'right';
   padding?: number;
+  paddingX?: number;
+  paddingY?: number;
   gap?: number;
   boxShadow?: string;
   backgroundGradient?: string;
   letterSpacing?: number;
   lineHeight?: number;
+  backdropBlur?: number;
+  filter?: string;
+  mixBlendMode?: string;
+  flexDirection?: 'row' | 'column';
+  justifyContent?: string;
+  alignItems?: string;
+  overflow?: string;
+  textDecoration?: string;
+  textTransform?: string;
+  borderTopLeftRadius?: number;
+  borderTopRightRadius?: number;
+  borderBottomLeftRadius?: number;
+  borderBottomRightRadius?: number;
 }
 
 export interface CanvasViewport {
@@ -54,11 +80,25 @@ export interface DesignProject {
 }
 
 export interface WidgetDefinition {
-  type: DesignElement['type'];
+  type: DesignElementType;
   label: string;
   icon: string;
-  category: 'basic' | 'form' | 'layout' | 'display';
+  category: 'basic' | 'form' | 'layout' | 'display' | 'sections' | 'data';
   defaultProps: Partial<DesignElement>;
 }
 
 export type Tool = 'select' | 'hand' | 'rectangle' | 'text';
+
+export interface AlignAction {
+  type: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom' | 'distribute-h' | 'distribute-v';
+  label: string;
+  icon: string;
+}
+
+export interface DesignTemplate {
+  id: string;
+  name: string;
+  thumbnail: string;
+  category: string;
+  elements: DesignElement[];
+}
