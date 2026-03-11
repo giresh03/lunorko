@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { useVisitorTracking } from "@/hooks/useVisitorTracking";
 import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
@@ -25,34 +26,42 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const AppContent = () => {
+  useVisitorTracking();
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/domains" element={<Domains />} />
+        <Route path="/domain/:domainId" element={<DomainDetail />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/community" element={<Community />} />
+        
+        <Route path="/about" element={<About />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/challenge/:domainId" element={<DailyChallenge />} />
+        <Route path="/achievements" element={<Achievements />} />
+        <Route path="/skill-radar" element={<SkillRadar />} />
+        <Route path="/resume-builder" element={<ResumeBuilder />} />
+        <Route path="/promo" element={<PromoVideo />} />
+        <Route path="/projects" element={<ProjectBuilder />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/domains" element={<Domains />} />
-            <Route path="/domain/:domainId" element={<DomainDetail />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/community" element={<Community />} />
-            
-            <Route path="/about" element={<About />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/admin" element={<AdminPanel />} />
-            <Route path="/challenge/:domainId" element={<DailyChallenge />} />
-            <Route path="/achievements" element={<Achievements />} />
-            <Route path="/skill-radar" element={<SkillRadar />} />
-            <Route path="/resume-builder" element={<ResumeBuilder />} />
-            <Route path="/promo" element={<PromoVideo />} />
-            <Route path="/projects" element={<ProjectBuilder />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <AppContent />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
