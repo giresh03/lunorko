@@ -1,5 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import EditorPaywall from "@/components/EditorPaywall";
+import DesignEditorMain from "@/components/design-editor/DesignEditorMain";
 import { useRef, useState } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
