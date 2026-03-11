@@ -52,16 +52,38 @@ serve(async (req) => {
     const action = url.searchParams.get("action");
 
     if (action === "stats") {
+      // Count unique site visitors (by visitor_id)
+      const { data: visitorData } = await adminClient.rpc("count_unique_visitors") as any;
+      let totalVisitors = 0;
+      if (typeof visitorData === "number") {
+        totalVisitors = visitorData;
+      } else {
+        // fallback: count all rows
+        const { count } = await adminClient.from("site_visits").select("*", { count: "exact", head: true });
+        totalVisitors = count || 0;
+      }
+
+      // Registered / logged-in users
       const { count: totalUsers } = await adminClient.from("profiles").select("*", { count: "exact", head: true });
-      const { count: totalSubscribers } = await adminClient.from("subscriptions").select("*", { count: "exact", head: true }).eq("status", "active");
+
+      // Paid users: users with active non-free subscriptions
+      const { data: paidData } = await adminClient
+        .from("subscriptions")
+        .select("user_id")
+        .eq("status", "active")
+        .neq("plan_id", "free");
+      const paidUserIds = new Set((paidData || []).map((s: any) => s.user_id));
+      const totalPaidUsers = paidUserIds.size;
+
       const { data: revenueData } = await adminClient.from("subscriptions").select("amount").eq("status", "active");
       const totalRevenue = (revenueData || []).reduce((sum: number, s: any) => sum + (s.amount || 0), 0);
       const { count: totalMentors } = await adminClient.from("mentors").select("*", { count: "exact", head: true });
       const { count: totalBookings } = await adminClient.from("bookings").select("*", { count: "exact", head: true });
 
       return new Response(JSON.stringify({
+        totalVisitors: totalVisitors,
         totalUsers: totalUsers || 0,
-        totalSubscribers: totalSubscribers || 0,
+        totalPaidUsers: totalPaidUsers,
         totalRevenue: totalRevenue / 100,
         totalMentors: totalMentors || 0,
         totalBookings: totalBookings || 0,
