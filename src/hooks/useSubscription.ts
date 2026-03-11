@@ -57,10 +57,11 @@ export const useSubscription = () => {
     return () => { cancelled = true; };
   }, [user]);
 
+  const { subscriptions, isAdmin, loading } = state;
+
   /** Check if user has editor access for a specific domain */
   const hasEditorAccessForDomain = useCallback(
     (domainId: string): boolean => {
-      // Admins have full access to all domains
       if (isAdmin) return true;
       return subscriptions.some(
         (s) => s.domain_id === domainId || s.domain_id === null
@@ -69,10 +70,8 @@ export const useSubscription = () => {
     [subscriptions, isAdmin]
   );
 
-  /** true if user has any active paid subscription */
   const hasEditorAccess = isAdmin || subscriptions.length > 0;
 
-  /** Get the plan for a specific domain */
   const getPlanForDomain = useCallback(
     (domainId: string): string => {
       if (isAdmin) return "premium";
@@ -84,7 +83,6 @@ export const useSubscription = () => {
     [subscriptions, isAdmin]
   );
 
-  // backward compat
   const plan = isAdmin ? "premium" : (subscriptions[0]?.plan_id ?? "free");
   const subscription = subscriptions[0] ?? null;
 
