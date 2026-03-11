@@ -102,17 +102,19 @@ const AdminPanel = () => {
   const fetchAll = async () => {
     setLoadingData(true);
     try {
-      const [statsData, usersData, subsData, mentorsData] = await Promise.all([
+      const [statsData, usersData, subsData, mentorsData, prData] = await Promise.all([
         callAdmin("stats"),
         callAdmin("users"),
         callAdmin("subscriptions"),
         callAdmin("mentors"),
+        callAdmin("payment-requests"),
       ]);
 
       setStats(statsData as AdminStats);
       setUsers(Array.isArray(usersData) ? usersData : []);
       setSubscriptions(Array.isArray(subsData) ? subsData : []);
       setMentors(Array.isArray(mentorsData) ? mentorsData : []);
+      setPaymentRequests(Array.isArray(prData) ? prData : []);
     } catch (e: any) {
       console.error(e);
       toast({
