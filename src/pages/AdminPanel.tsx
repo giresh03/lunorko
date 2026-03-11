@@ -6,6 +6,7 @@ import {
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
   CheckCircle, XCircle, Receipt
 } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";

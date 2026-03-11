@@ -1004,6 +1004,13 @@ export type Database = {
     Functions: {
       count_unique_visitors: { Args: never; Returns: number }
       get_user_plan: { Args: { _user_id: string }; Returns: string }
+      get_visitor_trends: {
+        Args: never
+        Returns: {
+          visit_date: string
+          visitor_count: number
+        }[]
+      }
       has_active_subscription: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
