@@ -250,6 +250,53 @@ const AdminPanel = () => {
 
           {/* Overview */}
           <TabsContent value="overview">
+            {/* Visitor Trends Chart */}
+            <div className="rounded-xl border border-border bg-card p-6 mb-6">
+              <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-cyan-400" /> Visitor Trends (Last 30 Days)
+              </h3>
+              {visitorTrends.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={visitorTrends} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="visitorGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="visit_date"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                        color: "hsl(var(--foreground))",
+                        fontSize: "12px",
+                      }}
+                      labelFormatter={(v) => new Date(v).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      formatter={(value: number) => [value, "Visitors"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="visitor_count"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      fill="url(#visitorGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-muted-foreground">No visitor data yet</p>
+              )}
+            </div>
+
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="rounded-xl border border-border bg-card p-6">
                 <h3 className="text-lg font-bold text-foreground mb-4">Recent Users</h3>
