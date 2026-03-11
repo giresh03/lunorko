@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, User, LayoutDashboard, Sparkles, Shield, Loader2, Trophy, Radar, FileText, CreditCard } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Shield, Loader2, Trophy, Radar, FileText, CreditCard } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,94 +25,6 @@ const GoogleIcon = () => (
   </svg>
 );
 
-// Countdown target: 3 days from now (resets on mount)
-const getTargetDate = () => {
-  const stored = sessionStorage.getItem("lunor_promo_end");
-  if (stored) return parseInt(stored, 10);
-  const target = Date.now() + 3 * 24 * 60 * 60 * 1000;
-  sessionStorage.setItem("lunor_promo_end", target.toString());
-  return target;
-};
-
-const useCountdown = () => {
-  const [target] = useState(getTargetDate);
-  const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0, s: 0 });
-
-  useEffect(() => {
-    const tick = () => {
-      const diff = Math.max(0, target - Date.now());
-      setTimeLeft({
-        d: Math.floor(diff / 86400000),
-        h: Math.floor((diff % 86400000) / 3600000),
-        m: Math.floor((diff % 3600000) / 60000),
-        s: Math.floor((diff % 60000) / 1000),
-      });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [target]);
-
-  return timeLeft;
-};
-
-const TimerUnit = ({ value, label }: { value: number; label: string }) => (
-  <span className="inline-flex items-center font-mono text-xs font-bold">
-    <span className="bg-foreground/15 rounded px-1.5 py-0.5 min-w-[1.5rem] text-center tabular-nums">
-      {String(value).padStart(2, "0")}
-    </span>
-    <span className="text-[10px] text-foreground/60 ml-0.5">{label}</span>
-  </span>
-);
-
-const PromoBanner = ({ onClose }: { onClose: () => void }) => {
-  const { d, h, m, s } = useCountdown();
-
-  return (
-    <div className="relative w-full bg-gradient-to-r from-primary via-primary/90 to-[hsl(192,91%,45%)] text-primary-foreground overflow-hidden">
-      {/* Animated shimmer */}
-      <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,rgba(255,255,255,0.1)_50%,transparent_75%)] bg-[length:200%_100%] animate-[shimmer_3s_ease-in-out_infinite]" />
-
-      <div className="container mx-auto flex items-center justify-center gap-3 px-4 py-2 text-sm relative">
-        <Sparkles className="h-3.5 w-3.5 animate-pulse shrink-0" />
-        <span className="font-medium hidden sm:inline">
-          🎉 30% off on All-Access Pro Plan.
-        </span>
-        <span className="font-medium sm:hidden text-xs">
-          🎉 30% off Pro Plan
-        </span>
-        <span className="hidden sm:inline text-primary-foreground/80">
-          Use code
-        </span>
-        <span className="font-bold bg-foreground/15 rounded px-2 py-0.5 text-xs tracking-wider">
-          LUNOR30
-        </span>
-        <span className="hidden md:inline text-primary-foreground/70 text-xs">
-          Valid till
-        </span>
-        <div className="flex items-center gap-1.5">
-          <TimerUnit value={d} label="d" />
-          <span className="text-foreground/40">:</span>
-          <TimerUnit value={h} label="h" />
-          <span className="text-foreground/40">:</span>
-          <TimerUnit value={m} label="m" />
-          <span className="text-foreground/40 hidden sm:inline">:</span>
-          <span className="hidden sm:inline">
-            <TimerUnit value={s} label="s" />
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-foreground/60 hover:text-primary-foreground transition-colors"
-          aria-label="Dismiss"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/domains", label: "Domains" },
@@ -126,7 +38,6 @@ const navLinks = [
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
-  const [showBanner, setShowBanner] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const [logoHovered, setLogoHovered] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -141,9 +52,6 @@ const Navbar = () => {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-50">
-      {/* Promo Banner */}
-      {showBanner && <PromoBanner onClose={() => setShowBanner(false)} />}
-
       {/* Main Navbar */}
       <nav
         className={`border-b transition-all duration-300 ${
