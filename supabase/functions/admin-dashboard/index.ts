@@ -90,6 +90,15 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "visitor-trends") {
+      // Get daily visitor counts for the last 30 days
+      const { data, error } = await adminClient.rpc("get_visitor_trends") as any;
+      if (error) {
+        return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
+      }
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "users") {
       const { data: users } = await adminClient.from("profiles").select("*").order("created_at", { ascending: false }).limit(100);
       // Get subscriptions for each user
