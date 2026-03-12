@@ -332,17 +332,12 @@ const Auth = () => {
                 onClick={async () => {
                   setLoading(true);
                   clearMessages();
-                  const { data, error } = await supabase.auth.signInWithOAuth({
-                    provider: "google",
-                    options: { redirectTo: getAuthRedirectUrl() },
+                  const result = await lovable.auth.signInWithOAuth("google", {
+                    redirect_uri: getAuthRedirectUrl(),
                   });
-                  if (error) {
-                    if (import.meta.env.DEV) console.error("[Auth] Google OAuth error:", error.message, error);
-                    setFormError(friendlyError(error.message));
-                    setLoading(false);
-                  } else if (data?.url) {
-                    window.location.href = data.url;
-                  } else {
+                  if (result.error) {
+                    if (import.meta.env.DEV) console.error("[Auth] Google OAuth error:", result.error);
+                    setFormError(friendlyError(result.error instanceof Error ? result.error.message : String(result.error)));
                     setLoading(false);
                   }
                 }}

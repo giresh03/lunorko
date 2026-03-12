@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import logo from "@/assets/logo.jpeg";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { getAuthRedirectUrl } from "@/lib/auth";
 
 const GoogleIcon = () => (
