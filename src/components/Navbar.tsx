@@ -249,11 +249,9 @@ const Navbar = () => {
                       disabled={googleLoading}
                       onClick={async () => {
                         setGoogleLoading(true);
-                        const { data, error } = await supabase.auth.signInWithOAuth({
-                          provider: "google",
-                          options: { redirectTo: getAuthRedirectUrl() },
+                        await lovable.auth.signInWithOAuth("google", {
+                          redirect_uri: getAuthRedirectUrl(),
                         });
-                        if (!error && data?.url) window.location.href = data.url;
                         setGoogleLoading(false);
                         setOpen(false);
                       }}
