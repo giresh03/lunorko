@@ -39,14 +39,17 @@ RULES:
 // Languages that can be natively executed in Deno
 const NATIVE_LANGUAGES = new Set(["javascript", "typescript"]);
 
-function normalizeGroqModel(requested?: string, fallback = "llama-3.3-70b-versatile"): string {
+const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const DEFAULT_MODEL = "google/gemini-3-flash-preview";
+
+function normalizeLovableModel(requested?: string): string {
   const m = (requested || "").toLowerCase();
-  if (!m) return fallback;
-  if (m.includes("llama-3.3") || m.includes("70b")) return "llama-3.3-70b-versatile";
-  if (m.includes("llama-3.1") || m.includes("8b")) return "llama-3.1-8b-instant";
-  if (m.includes("mixtral")) return "mixtral-8x7b-32768";
-  if (m.includes("deepseek")) return "deepseek-r1-distill-llama-70b";
-  return fallback;
+  if (!m) return DEFAULT_MODEL;
+  if (m.includes("gemini-3-pro")) return "google/gemini-3-pro-preview";
+  if (m.includes("gemini-2.5-pro")) return "google/gemini-2.5-pro";
+  if (m.includes("gemini-2.5-flash-lite")) return "google/gemini-2.5-flash-lite";
+  if (m.includes("gemini-2.5-flash")) return "google/gemini-2.5-flash";
+  return DEFAULT_MODEL;
 }
 
 /**
@@ -133,7 +136,7 @@ function extractExports(code: string): string[] {
 }
 
 /**
- * Use AI to simulate execution for non-native languages (Python, SQL, etc.)
+ * Use Lovable AI to simulate execution for non-native languages (Python, SQL, etc.)
  */
 async function simulateWithAI(
   code: string,
@@ -158,14 +161,14 @@ ${code}
 \`\`\``;
 
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const response = await fetch(LOVABLE_AI_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: normalizeGroqModel("llama-3.3-70b-versatile"),
+        model: DEFAULT_MODEL,
         messages: [
           { role: "system", content: `You are a precise ${language} code execution simulator for the ${domain} domain. Output ONLY what the code would print — nothing else.` },
           { role: "user", content: simulationPrompt },
@@ -198,12 +201,12 @@ serve(async (req) => {
     const body = await req.json();
     const { action, domain } = body;
 
-    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
-    if (!GROQ_API_KEY) {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
       return new Response(
         JSON.stringify({
-          error: "GROQ_API_KEY is not configured",
-          hint: "Set the Edge Function secret: npx supabase secrets set GROQ_API_KEY=gsk_... --project-ref byveaoqwuwyhaykgjufj",
+          error: "LOVABLE_API_KEY is not configured",
+          hint: "Set the Edge Function secret: npx supabase secrets set LOVABLE_API_KEY=... --project-ref byveaoqwuwyhaykgjufj",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -212,7 +215,7 @@ serve(async (req) => {
     // ============= ACTION: generate (AI code generation with streaming) =============
     if (action === "generate") {
       const { messages, model } = body;
-      const selectedModel = normalizeGroqModel(model, "llama-3.3-70b-versatile");
+      const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
@@ -240,10 +243,10 @@ Rules:
 - Ensure imports/paths are consistent and runnable
 ${stackDirective}`;
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -307,7 +310,7 @@ ${stackDirective}`;
         output = executeNatively(code);
       } else {
         // AI-simulated execution for Python, SQL, Solidity, C++, etc.
-        output = await simulateWithAI(code, language, domain || "general", GROQ_API_KEY);
+        output = await simulateWithAI(code, language, domain || "general", LOVABLE_API_KEY);
       }
 
       return new Response(
@@ -351,7 +354,7 @@ ${stackDirective}`;
     // ============= ACTION: generate-tests =============
     if (action === "generate-tests") {
       const { code, language, filename, model } = body;
-      const selectedModel = normalizeGroqModel(model, "llama-3.3-70b-versatile");
+      const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate-tests lang=${language}, file=${filename}`);
 
       const testPrompt = `Generate comprehensive unit tests for the following ${language} code. Use appropriate testing frameworks (Jest for JS/TS, pytest for Python, etc.). Include edge cases, error cases, and happy paths. Return ONLY the test code in a single code block.
@@ -361,9 +364,9 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
@@ -387,7 +390,7 @@ ${code}
     // ============= ACTION: generate-docs =============
     if (action === "generate-docs") {
       const { code, language, filename, model } = body;
-      const selectedModel = normalizeGroqModel(model, "llama-3.3-70b-versatile");
+      const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate-docs lang=${language}, file=${filename}`);
 
       const docsPrompt = `Generate comprehensive documentation for the following ${language} code. Include:
@@ -403,9 +406,9 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
@@ -429,16 +432,16 @@ ${code}
     // ============= ACTION: autocomplete (ghost text) =============
     if (action === "autocomplete") {
       const { code, language, cursorLine, cursorColumn, model } = body;
-      const selectedModel = normalizeGroqModel(model, "llama-3.1-8b-instant");
+      const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
 
       const lines = code.split("\n");
       const contextBefore = lines.slice(Math.max(0, cursorLine - 20), cursorLine + 1).join("\n");
       const contextAfter = lines.slice(cursorLine + 1, cursorLine + 5).join("\n");
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: selectedModel,
           messages: [

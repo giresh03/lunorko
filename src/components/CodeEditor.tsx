@@ -1646,8 +1646,8 @@ ${stripModuleSyntax(jsCode)}
           const msg = String(err?.error || "Request failed");
           upsert(`❌ ${msg}`);
           pushTimeline({ phase: "status", title: "AI request failed", detail: msg, status: "error" });
-          if (msg.includes("GROQ_API_KEY")) {
-            upsert("\n\n💡 Groq API key is missing in Supabase Edge Function secrets.\nRun:\n`npx supabase secrets set GROQ_API_KEY=gsk_your_key --project-ref byveaoqwuwyhaykgjufj`\nThen redeploy:\n`npx supabase functions deploy code-engine --project-ref byveaoqwuwyhaykgjufj`");
+          if (msg.includes("LOVABLE_API_KEY") || msg.includes("GROQ_API_KEY")) {
+            upsert("\n\n💡 Lovable API key is missing in Supabase Edge Function secrets.\nRun:\n`npx supabase secrets set LOVABLE_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj`\nThen redeploy:\n`npx supabase functions deploy code-engine --project-ref byveaoqwuwyhaykgjufj`");
           }
           setChatLoading(false);
           return;
