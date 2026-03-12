@@ -63,7 +63,7 @@ serve(async (req) => {
         totalVisitors = count || 0;
       }
 
-      // Registered / logged-in users
+      // Registered users (profiles created by trigger on sign-up; includes email + Google)
       const { count: totalUsers } = await adminClient.from("profiles").select("*", { count: "exact", head: true });
 
       // Paid users: users with active non-free subscriptions
@@ -100,23 +100,24 @@ serve(async (req) => {
     }
 
     if (action === "users") {
-      const { data: users } = await adminClient.from("profiles").select("*").order("created_at", { ascending: false }).limit(100);
-      // Get subscriptions for each user
+      // Primary source: ALL auth users (email + Google sign-in)
+      const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      const authList = authUsers || [];
+
+      // Profiles (display_name, avatar_url)
+      const { data: profiles } = await adminClient.from("profiles").select("user_id, display_name, avatar_url, created_at");
+      const profileMap: Record<string, any> = {};
+      (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p; });
+
+      // Subscriptions
       const { data: subs } = await adminClient.from("subscriptions").select("*");
       const subMap: Record<string, any[]> = {};
-      (subs || []).forEach((s: any) => { 
+      (subs || []).forEach((s: any) => {
         if (!subMap[s.user_id]) subMap[s.user_id] = [];
-        subMap[s.user_id].push(s); 
+        subMap[s.user_id].push(s);
       });
 
-      // Get emails from auth
-      const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
-      const emailMap: Record<string, { email: string; last_sign_in_at: string | null; created_at: string }> = {};
-      (authUsers || []).forEach((au: any) => { 
-        emailMap[au.id] = { email: au.email || "", last_sign_in_at: au.last_sign_in_at, created_at: au.created_at }; 
-      });
-
-      // Get user roles
+      // User roles
       const { data: roles } = await adminClient.from("user_roles").select("*");
       const roleMap: Record<string, string[]> = {};
       (roles || []).forEach((r: any) => {
@@ -124,17 +125,29 @@ serve(async (req) => {
         roleMap[r.user_id].push(r.role);
       });
 
-      const enriched = (users || []).map((u: any) => ({
-        ...u,
-        email: emailMap[u.user_id]?.email || "",
-        last_sign_in_at: emailMap[u.user_id]?.last_sign_in_at || null,
-        auth_created_at: emailMap[u.user_id]?.created_at || u.created_at,
-        subscriptions: subMap[u.user_id] || [],
-        active_subscription: (subMap[u.user_id] || []).find((s: any) => s.status === "active") || null,
-        roles: roleMap[u.user_id] || ["user"],
-      }));
+      const enriched = authList.map((au: any) => {
+        const profile = profileMap[au.id];
+        const provider = au.app_metadata?.provider || au.identities?.[0]?.provider || "email";
+        return {
+          id: profile?.id || au.id,
+          user_id: au.id,
+          display_name: profile?.display_name || au.user_metadata?.full_name || au.user_metadata?.name || au.user_metadata?.display_name || au.email?.split("@")[0] || "Unnamed",
+          avatar_url: profile?.avatar_url || au.user_metadata?.picture || au.user_metadata?.avatar_url,
+          email: au.email || au.user_metadata?.email || "",
+          last_sign_in_at: au.last_sign_in_at || null,
+          auth_created_at: au.created_at,
+          created_at: profile?.created_at || au.created_at,
+          provider,
+          subscriptions: subMap[au.id] || [],
+          active_subscription: (subMap[au.id] || []).find((s: any) => s.status === "active") || null,
+          roles: roleMap[au.id] || ["user"],
+        };
+      });
 
-      return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Sort by created_at descending
+      enriched.sort((a: any, b: any) => new Date(b.auth_created_at).getTime() - new Date(a.auth_created_at).getTime());
+
+      return new Response(JSON.stringify(enriched.slice(0, 100)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (action === "subscriptions") {

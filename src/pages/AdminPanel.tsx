@@ -302,13 +302,25 @@ const AdminPanel = () => {
                 <h3 className="text-lg font-bold text-foreground mb-4">Recent Users</h3>
                 {users.slice(0, 5).map((u) => (
                   <div key={u.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{u.display_name || "Unnamed"}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+                        {u.avatar_url ? (
+                          <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <User className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{u.display_name || "Unnamed"}</p>
+                        <p className="text-xs text-muted-foreground">{u.email || "—"} · {new Date(u.created_at).toLocaleDateString()}</p>
+                      </div>
                     </div>
-                    <Badge variant={u.subscription ? "default" : "outline"} className="text-xs">
-                      {u.subscription ? u.subscription.plan_id : "Free"}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs capitalize">{u.provider === "google" ? "Google" : "Email"}</Badge>
+                      <Badge variant={u.active_subscription ? "default" : "outline"} className="text-xs">
+                        {u.active_subscription ? u.active_subscription.plan_id : "Free"}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -340,12 +352,19 @@ const AdminPanel = () => {
                 </Button>
                 <div className="rounded-xl border border-border bg-card p-6">
                   <div className="flex items-center gap-4 mb-6">
-                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-8 w-8 text-primary" />
+                    <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
+                      {selectedUser.avatar_url ? (
+                        <img src={selectedUser.avatar_url} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <User className="h-8 w-8 text-primary" />
+                      )}
                     </div>
                     <div>
                       <h2 className="text-xl font-bold text-foreground">{selectedUser.display_name || "Unnamed User"}</h2>
                       <p className="text-sm text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> {selectedUser.email || "No email"}</p>
+                      <Badge variant="outline" className="mt-1 text-xs capitalize">
+                        {selectedUser.provider === "google" ? "Google" : selectedUser.provider === "email" ? "Email" : selectedUser.provider || "Email"}
+                      </Badge>
                     </div>
                     <div className="ml-auto flex gap-2">
                       {(selectedUser.roles || ["user"]).map((r: string) => (
@@ -418,6 +437,7 @@ const AdminPanel = () => {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Provider</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead>Last Sign In</TableHead>
                       <TableHead>Plan</TableHead>
@@ -430,6 +450,9 @@ const AdminPanel = () => {
                       <TableRow key={u.id}>
                         <TableCell className="font-medium">{u.display_name || "Unnamed"}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">{u.email || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs capitalize">{u.provider === "google" ? "Google" : u.provider || "Email"}</Badge>
+                        </TableCell>
                         <TableCell className="text-muted-foreground text-sm">{new Date(u.created_at).toLocaleDateString()}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "—"}</TableCell>
                         <TableCell>
@@ -448,7 +471,7 @@ const AdminPanel = () => {
                       </TableRow>
                     ))}
                     {users.length === 0 && (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No users found</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>

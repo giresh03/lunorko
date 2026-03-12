@@ -14,7 +14,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import logo from "@/assets/logo.jpeg";
-import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
+import { getAuthRedirectUrl } from "@/lib/auth";
 
 const GoogleIcon = () => (
   <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -185,7 +186,11 @@ const Navbar = () => {
                     disabled={googleLoading}
                     onClick={async () => {
                       setGoogleLoading(true);
-                      await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+                      const { data, error } = await supabase.auth.signInWithOAuth({
+                        provider: "google",
+                        options: { redirectTo: getAuthRedirectUrl() },
+                      });
+                      if (!error && data?.url) window.location.href = data.url;
                       setGoogleLoading(false);
                     }}
                   >
@@ -246,7 +251,11 @@ const Navbar = () => {
                       disabled={googleLoading}
                       onClick={async () => {
                         setGoogleLoading(true);
-                        await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+                        const { data, error } = await supabase.auth.signInWithOAuth({
+                          provider: "google",
+                          options: { redirectTo: getAuthRedirectUrl() },
+                        });
+                        if (!error && data?.url) window.location.href = data.url;
                         setGoogleLoading(false);
                         setOpen(false);
                       }}

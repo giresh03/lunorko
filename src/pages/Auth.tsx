@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { getAuthRedirectUrl, getSiteUrl } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import logo from "@/assets/logo.jpeg";
 import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
-import { lovable } from "@/integrations/lovable/index";
 
 const signUpSchema = z.object({
   displayName: z.string().trim().min(2, "Name must be at least 2 characters").max(50, "Name must be under 50 characters"),
@@ -37,11 +38,19 @@ const friendlyError = (msg: string): string => {
   if (msg.includes("Email not confirmed")) return "Please check your inbox and confirm your email before signing in.";
   if (msg.includes("User already registered")) return "An account with this email already exists. Try signing in instead.";
   if (msg.includes("rate limit") || msg.includes("too many")) return "Too many attempts. Please wait a moment and try again.";
-  if (msg.includes("Email signups are disabled") || msg.includes("Email logins are disabled")) return "Email authentication is currently being configured. Please try again in a moment.";
+  if (
+    msg.includes("Email signups are disabled") ||
+    msg.includes("Email logins are disabled") ||
+    msg.includes("Signups not allowed") ||
+    (msg.toLowerCase().includes("signup") && msg.toLowerCase().includes("disabled"))
+  ) {
+    return "Email auth is disabled in Supabase. Enable it: Project Settings → Authentication → turn ON 'Allow new users to sign up'. Also check Auth → Providers → Email is enabled.";
+  }
   return msg;
 };
 
 const Auth = () => {
+  const { user } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -55,6 +64,37 @@ const Auth = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Handle OAuth callback: check for errors in URL, clear hash to prevent 404s and clean URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    const error = params.get("error") || hashParams.get("error");
+    const errorDesc = params.get("error_description") || hashParams.get("error_description");
+
+    if (error) {
+      setFormError(friendlyError(errorDesc || error));
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+
+    // Clear OAuth hash after Supabase processes it (prevents 404s from hash-based requests)
+    const hash = window.location.hash;
+    if (hash && (hash.includes("access_token") || hash.includes("refresh_token"))) {
+      // Delay so Supabase client can read the hash first
+      const id = setTimeout(() => {
+        window.history.replaceState(null, "", window.location.pathname);
+      }, 100);
+      return () => clearTimeout(id);
+    }
+  }, []);
+
+  // Redirect to domains when user is already logged in (e.g. after OAuth callback)
+  useEffect(() => {
+    if (user) {
+      navigate("/domains", { replace: true });
+    }
+  }, [user, navigate]);
 
   const clearMessages = () => {
     setFieldErrors({});
@@ -76,9 +116,10 @@ const Auth = () => {
 
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${getSiteUrl()}/reset-password`,
     });
     if (error) {
+      console.error("[Auth] Reset password error:", error.message, error);
       setFormError(friendlyError(error.message));
     } else {
       setFormSuccess("Check your email — we've sent you a password reset link.");
@@ -108,11 +149,12 @@ const Auth = () => {
         email,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${getSiteUrl()}/auth`,
           data: { display_name: displayName },
         },
       });
       if (error) {
+        console.error("[Auth] Sign up error:", error.message, error);
         setFormError(friendlyError(error.message));
       } else {
         setFormSuccess("Account created! Check your email for a confirmation link to get started.");
@@ -120,6 +162,7 @@ const Auth = () => {
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
+        console.error("[Auth] Sign in error:", error.message, error);
         setFormError(friendlyError(error.message));
       } else {
         navigate("/domains");
@@ -284,13 +327,19 @@ const Auth = () => {
                 onClick={async () => {
                   setLoading(true);
                   clearMessages();
-                  const { error } = await lovable.auth.signInWithOAuth("google", {
-                    redirect_uri: window.location.origin,
+                  const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: "google",
+                    options: { redirectTo: getAuthRedirectUrl() },
                   });
                   if (error) {
+                    console.error("[Auth] Google OAuth error:", error.message, error);
                     setFormError(friendlyError(error.message));
+                    setLoading(false);
+                  } else if (data?.url) {
+                    window.location.href = data.url;
+                  } else {
+                    setLoading(false);
                   }
-                  setLoading(false);
                 }}
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">

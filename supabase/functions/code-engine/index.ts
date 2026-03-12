@@ -9,44 +9,21 @@ const corsHeaders = {
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development tutor specializing in HTML, CSS, JavaScript, TypeScript, React, Next.js, Node.js, and modern full-stack patterns. Write clean, accessible, responsive code with imports, type annotations, and accessibility attributes. Explain "why" behind patterns like SSR vs CSR, hydration, and component composition.`,
-  "app-development": `You are Lunor.AI's expert Mobile App Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE code that renders perfectly in a browser-based React preview.
+  "app-development": `You are Lunor.AI's expert Mobile App Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE code using ONLY vanilla HTML, CSS, and JavaScript.
 
-CRITICAL RULES FOR CODE GENERATION:
-1. **Always use React with hooks** — the preview environment provides React 18 via UMD (React, ReactDOM, Babel standalone). Do NOT use import/export statements — they will be stripped automatically.
-2. **Available hooks are pre-destructured**: useState, useEffect, useRef, useCallback, useMemo, useReducer, useContext, createContext — use them directly.
-3. **NO external libraries** — do NOT use react-native, expo, @react-navigation, styled-components, or ANY npm packages. The preview only has React and ReactDOM.
-4. **Use plain HTML elements** — instead of React Native components:
-   - View → <div>, Text → <span>/<p>, TouchableOpacity → <button>, Image → <img>, ScrollView → <div style={{overflowY:'auto'}}>
-   - TextInput → <input>, FlatList → .map() with <div>, Switch → <input type="checkbox">
-   - SafeAreaView → <div style={{padding:'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'}}>
-5. **Style with inline styles or CSS classes** — use objects like style={{display:'flex', gap:'8px'}} or className. The preview has a dark theme base (bg: #0f0f23, text: #e0e0e0).
-6. **Every response MUST have a single root component** named clearly (e.g., App, LoginScreen, TodoApp). This component gets rendered via ReactDOM.createRoot.
-7. **No TypeScript** — use plain JavaScript/JSX only. No type annotations, interfaces, or generics.
-8. **Error handling** — wrap async calls in try/catch. Use optional chaining (?.) for potentially null values.
-9. **Always produce working UI** — even for conceptual questions, include a visual demo component.
-10. **Use mobile-first design** — design for 393px width (iPhone 15 Pro). Use column layouts, touch-friendly targets (min 44px), readable font sizes (14px+).
+CRITICAL: NEVER use React, JSX, TSX, Vue, TypeScript, or any framework. Use ONLY:
+- index.html
+- styles.css
+- script.js
 
-COMPONENT PATTERNS THAT WORK:
-\`\`\`jsx
-function App() {
-  const [items, setItems] = useState([]);
-  return (
-    <div style={{padding: '16px', minHeight: '100vh', background: '#0f0f23', color: '#e0e0e0'}}>
-      <h1 style={{fontSize: '24px', marginBottom: '12px'}}>My App</h1>
-      {items.map((item, i) => <div key={i}>{item}</div>)}
-    </div>
-  );
-}
-\`\`\`
-
-PATTERNS THAT WILL BREAK (NEVER DO THESE):
-- import React from 'react' → BREAKS (already available globally)
-- import { View } from 'react-native' → BREAKS (not available)
-- export default App → BREAKS (auto-stripped but unreliable)
-- const App: React.FC<Props> = () => → BREAKS (TypeScript)
-- require('axios') → BREAKS (no CommonJS modules)
-
-When asked about React Native or Flutter concepts, ALWAYS translate to web-compatible React code that demonstrates the same UI/UX pattern.`,
+RULES:
+1. **HTML only** — semantic HTML5, no JSX or React.
+2. **CSS only** — styles.css with modern animations (transitions, keyframes, hover effects).
+3. **Vanilla JS only** — plain JavaScript, no import/export, no modules.
+4. **Include images** — use <img src="https://image.pollinations.ai/prompt/DESCRIPTION"> with URL-encoded descriptions (e.g. "modern%20hero%20illustration").
+5. **Mobile-first** — design for 393px width, touch-friendly targets (min 44px), readable fonts (14px+).
+6. **Visually rich** — gradients, cards, shadows, smooth transitions. Add 2-3 relevant images via pollinations.ai URLs.
+7. **Always produce working UI** — the preview runs directly in HTML; no build step.`,
   "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
   "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
   "cloud-computing": `You are Lunor.AI's expert Cloud Computing tutor covering AWS, Azure, GCP, Docker, Kubernetes, Terraform, serverless, and CI/CD. Explain cloud services with architecture diagrams in text, write IaC templates. Emphasize cost optimization, security, and scalability.`,
@@ -61,6 +38,16 @@ When asked about React Native or Flutter concepts, ALWAYS translate to web-compa
 
 // Languages that can be natively executed in Deno
 const NATIVE_LANGUAGES = new Set(["javascript", "typescript"]);
+
+function normalizeGroqModel(requested?: string, fallback = "llama-3.3-70b-versatile"): string {
+  const m = (requested || "").toLowerCase();
+  if (!m) return fallback;
+  if (m.includes("llama-3.3") || m.includes("70b")) return "llama-3.3-70b-versatile";
+  if (m.includes("llama-3.1") || m.includes("8b")) return "llama-3.1-8b-instant";
+  if (m.includes("mixtral")) return "mixtral-8x7b-32768";
+  if (m.includes("deepseek")) return "deepseek-r1-distill-llama-70b";
+  return fallback;
+}
 
 /**
  * Execute JavaScript/TypeScript code natively in a sandboxed Function scope.
@@ -171,14 +158,14 @@ ${code}
 \`\`\``;
 
   try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: normalizeGroqModel("llama-3.3-70b-versatile"),
         messages: [
           { role: "system", content: `You are a precise ${language} code execution simulator for the ${domain} domain. Output ONLY what the code would print — nothing else.` },
           { role: "user", content: simulationPrompt },
@@ -211,16 +198,32 @@ serve(async (req) => {
     const body = await req.json();
     const { action, domain } = body;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY");
+    if (!GROQ_API_KEY) {
+      return new Response(
+        JSON.stringify({
+          error: "GROQ_API_KEY is not configured",
+          hint: "Set the Edge Function secret: npx supabase secrets set GROQ_API_KEY=gsk_... --project-ref byveaoqwuwyhaykgjufj",
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ============= ACTION: generate (AI code generation with streaming) =============
     if (action === "generate") {
       const { messages, model } = body;
-      const selectedModel = model || "google/gemini-3-flash-preview";
+      const selectedModel = normalizeGroqModel(model, "llama-3.3-70b-versatile");
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
+      const stackDirective = domain === "app-development"
+        ? `
+- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
+- Return exactly 3 files: index.html, styles.css, script.js
+- index.html: <link href="styles.css"> and <script src="script.js"></script>
+- Add modern CSS animations (transitions, keyframes, hover effects)
+- Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+        : "";
       const systemPrompt = `${basePrompt}
 
 Rules:
@@ -229,12 +232,18 @@ Rules:
 - When generating code, include comments explaining key parts
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity
-- When generating full files, specify the filename in a comment at the top`;
+- When generating full files, specify the filename in a comment at the top
+- Prefer modern production stack patterns (component architecture, clean state management, reusable UI)
+- Add subtle motion/micro-interactions using CSS transitions/animations when relevant
+- Favor visually polished output (spacing, typography hierarchy, color harmony, responsive layout)
+- Prefer file paths in fenced blocks (e.g., "index.html" before the code block)
+- Ensure imports/paths are consistent and runnable
+${stackDirective}`;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${GROQ_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -298,7 +307,7 @@ Rules:
         output = executeNatively(code);
       } else {
         // AI-simulated execution for Python, SQL, Solidity, C++, etc.
-        output = await simulateWithAI(code, language, domain || "general", LOVABLE_API_KEY);
+        output = await simulateWithAI(code, language, domain || "general", GROQ_API_KEY);
       }
 
       return new Response(
@@ -342,7 +351,7 @@ Rules:
     // ============= ACTION: generate-tests =============
     if (action === "generate-tests") {
       const { code, language, filename, model } = body;
-      const selectedModel = model || "google/gemini-3-flash-preview";
+      const selectedModel = normalizeGroqModel(model, "llama-3.3-70b-versatile");
       console.log(`[code-engine] generate-tests lang=${language}, file=${filename}`);
 
       const testPrompt = `Generate comprehensive unit tests for the following ${language} code. Use appropriate testing frameworks (Jest for JS/TS, pytest for Python, etc.). Include edge cases, error cases, and happy paths. Return ONLY the test code in a single code block.
@@ -352,9 +361,9 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
@@ -378,7 +387,7 @@ ${code}
     // ============= ACTION: generate-docs =============
     if (action === "generate-docs") {
       const { code, language, filename, model } = body;
-      const selectedModel = model || "google/gemini-3-flash-preview";
+      const selectedModel = normalizeGroqModel(model, "llama-3.3-70b-versatile");
       console.log(`[code-engine] generate-docs lang=${language}, file=${filename}`);
 
       const docsPrompt = `Generate comprehensive documentation for the following ${language} code. Include:
@@ -394,9 +403,9 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
@@ -420,16 +429,16 @@ ${code}
     // ============= ACTION: autocomplete (ghost text) =============
     if (action === "autocomplete") {
       const { code, language, cursorLine, cursorColumn, model } = body;
-      const selectedModel = model || "google/gemini-2.5-flash-lite";
+      const selectedModel = normalizeGroqModel(model, "llama-3.1-8b-instant");
       console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
 
       const lines = code.split("\n");
       const contextBefore = lines.slice(Math.max(0, cursorLine - 20), cursorLine + 1).join("\n");
       const contextAfter = lines.slice(cursorLine + 1, cursorLine + 5).join("\n");
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: selectedModel,
           messages: [
@@ -455,6 +464,43 @@ ${code}
       return new Response(JSON.stringify({ suggestion: cleaned }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // ============= ACTION: visual-assets (generated image URLs from prompt) =============
+    if (action === "visual-assets") {
+      const { prompt, domain: visualDomain, count } = body;
+      const total = Math.max(1, Math.min(Number(count) || 3, 4));
+      if (!prompt || typeof prompt !== "string") {
+        return new Response(
+          JSON.stringify({ error: "Prompt is required for visual-assets" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const styleHints = [
+        "modern UI mockup, glassmorphism, vibrant gradients, clean typography, subtle depth, no watermark",
+        "futuristic dashboard interface, animated feel, neon accents, premium product design, no watermark",
+        "product hero visual, cinematic lighting, smooth motion aesthetics, high detail, no watermark",
+        "app screen concept, minimal and elegant, delightful micro-interactions style, no watermark",
+      ];
+
+      const seedBase = Date.now();
+      const images = Array.from({ length: total }).map((_, i) => {
+        const style = styleHints[i % styleHints.length];
+        const finalPrompt = `${prompt}, domain: ${visualDomain || "general"}, ${style}`;
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(finalPrompt)}?width=1280&height=720&seed=${seedBase + i}&nologo=true`;
+        return {
+          id: `img-${seedBase + i}`,
+          caption: `Generated visual ${i + 1}`,
+          prompt: finalPrompt,
+          url,
+        };
+      });
+
+      return new Response(
+        JSON.stringify({ images }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
