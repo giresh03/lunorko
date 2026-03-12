@@ -146,11 +146,6 @@ const Navbar = () => {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link to="/achievements" className="cursor-pointer">
-                          <Trophy className="mr-2 h-4 w-4" /> Achievements
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
                         <Link to="/skill-radar" className="cursor-pointer">
                           <Radar className="mr-2 h-4 w-4" /> Skill Radar
                         </Link>
