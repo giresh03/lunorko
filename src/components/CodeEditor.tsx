@@ -6,7 +6,7 @@ import {
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
-  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler, Minus,
+  Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
   Maximize2, ExternalLink, TestTube2, BookOpen, Wand2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -117,23 +117,6 @@ interface Message {
   content: string;
 }
 
-interface TimelineItem {
-  id: string;
-  phase: "plan" | "apply" | "status";
-  title: string;
-  detail?: string;
-  status: "pending" | "done" | "error";
-  timestamp: number;
-}
-
-interface PendingPatch {
-  id: string;
-  filename: string;
-  language: string;
-  code: string;
-  status: "pending" | "applied" | "skipped";
-}
-
 // -- Language helpers --
 const LANG_MAP: Record<string, string> = {
   js: "javascript", ts: "typescript", py: "python", html: "html",
@@ -181,32 +164,23 @@ const createDefaultProject = (domainName: string): FileNode[] => {
     });
   }
 
-  const rootNodes: FileNode[] = [
+  return [
     {
       id: "src", name: "src", type: "folder", isOpen: true,
       children: templateChildren,
     },
-  ];
-
-  // App-development uses vanilla HTML/CSS/JS in src/ — no React public/index.html
-  if (domainId !== "app-development") {
-    rootNodes.push({
+    {
       id: "public", name: "public", type: "folder", isOpen: false,
       children: [
         { id: "public/index.html", name: "index.html", type: "file", language: "html",
           content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <title>${domainName} - Lunor.AI</title>\n</head>\n<body>\n  <div id="root"></div>\n</body>\n</html>` },
       ],
-    });
-  }
-
-  rootNodes.push(
+    },
     { id: "package.json", name: "package.json", type: "file", language: "json",
       content: `{\n  "name": "${domainName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "description": "${domainName} project on Lunor.AI",\n  "main": "src/${env.defaultFileName}"\n}\n` },
     { id: "README.md", name: "README.md", type: "file", language: "markdown",
-      content: `# ${domainName}\n\nWelcome to your ${domainName} workspace on **Lunor.AI**.\n\n## Environment\n- **Primary Language:** ${env.primaryLanguage}\n- **Supported:** ${env.supportedLanguages.join(", ")}\n- **Runtime:** ${env.runtime === "native" ? "⚡ Native execution" : "🤖 AI-simulated execution"}\n\n## Getting Started\n\n1. Edit files in the explorer\n2. Run code with the play button (supports ${env.supportedLanguages.join(", ")})\n3. Ask the AI assistant for help\n` }
-  );
-
-  return rootNodes;
+      content: `# ${domainName}\n\nWelcome to your ${domainName} workspace on **Lunor.AI**.\n\n## Environment\n- **Primary Language:** ${env.primaryLanguage}\n- **Supported:** ${env.supportedLanguages.join(", ")}\n- **Runtime:** ${env.runtime === "native" ? "⚡ Native execution" : "🤖 AI-simulated execution"}\n\n## Getting Started\n\n1. Edit files in the explorer\n2. Run code with the play button (supports ${env.supportedLanguages.join(", ")})\n3. Ask the AI assistant for help\n` },
+  ];
 };
 
 // -- Extract code blocks from markdown with filename detection --
@@ -404,10 +378,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets">("files");
   const [showAIPanel, setShowAIPanel] = useState(true);
-  const [aiPanelTab, setAiPanelTab] = useState<"chat" | "diff">("chat");
   const [online, setOnline] = useState(isOnline());
-  const editorRootRef = useRef<HTMLDivElement>(null);
-  const [immersiveFullscreen, setImmersiveFullscreen] = useState(false);
 
   // Sync offline cache on mount
   useEffect(() => {
@@ -475,27 +446,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     setShowThemeMenu(false);
   }, []);
 
-  const toggleImmersiveFullscreen = useCallback(async () => {
-    try {
-      if (!document.fullscreenElement) {
-        if (editorRootRef.current?.requestFullscreen) {
-          await editorRootRef.current.requestFullscreen();
-        }
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch {
-      setOutput((prev) => [...prev, "⚠️ Fullscreen request blocked by browser. Use the browser fullscreen shortcut."]);
-      setShowTerminal(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    const onFsChange = () => setImmersiveFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
-  }, []);
-
   // Project management
   const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj-${Date.now()}`);
   const [currentProjectName, setCurrentProjectName] = useState<string>(`${domainName} Workspace`);
@@ -507,22 +457,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [recentProjects, setRecentProjects] = useState<SavedProject[]>(() => getSavedProjects());
 
   // AI Chat
-  const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "llama-3.3-70b-versatile");
+  const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant.\n\nUse **Agent mode** to build features across files, or **Edit mode** to rewrite your active file with diff review before applying.` },
+    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant!\n\nYour workspace starts **empty** — just tell me what to build and I'll:\n\n1. 📁 **Create files** with proper names\n2. ✍️ **Write the code** automatically\n3. ▶️ **Run the preview** instantly\n\nNo manual approval needed — just describe what you want! 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const [aiMode, setAiMode] = useState<"agent" | "edit">("agent");
-  const autoApplyCode = true;
-  const [conversationTitle, setConversationTitle] = useState("New Conversation");
-  const [conversationTitles, setConversationTitles] = useState<string[]>([]);
-  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
-  const [pendingPatches, setPendingPatches] = useState<PendingPatch[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
-  const [editorFontSize, setEditorFontSize] = useState<number>(() => Number(localStorage.getItem("lunor-editor-font-size") || "13"));
-  const [pendingAutoRunFileId, setPendingAutoRunFileId] = useState<string | null>(null);
 
   // Diff preview state
   const [diffPreview, setDiffPreview] = useState<{
@@ -549,34 +490,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  const pushTimeline = useCallback((item: Omit<TimelineItem, "id" | "timestamp">) => {
-    setTimeline((prev) => [
-      { ...item, id: `tl-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, timestamp: Date.now() },
-      ...prev,
-    ].slice(0, 50));
-  }, []);
-
-  const startNewConversation = useCallback(() => {
-    const hasConversation = messages.some((m) => m.role === "user");
-    if (hasConversation) {
-      setConversationTitles((prev) => [conversationTitle, ...prev.filter((t) => t !== conversationTitle)].slice(0, 10));
-    }
-    setConversationTitle("New Conversation");
-    setTimeline([]);
-    setPendingPatches([]);
-    setMessages([{ role: "assistant", content: `👋 New chat ready. Describe what to build.` }]);
-    setAiPanelTab("chat");
-  }, [messages, conversationTitle]);
-
-  const adjustEditorFontSize = useCallback((delta: number) => {
-    setEditorFontSize((prev) => {
-      const next = Math.max(11, Math.min(28, prev + delta));
-      localStorage.setItem("lunor-editor-font-size", String(next));
-      if (monacoEditorRef.current) monacoEditorRef.current.updateOptions({ fontSize: next });
-      return next;
-    });
-  }, []);
 
   useImperativeHandle(ref, () => ({
     setExternalCode: (code: string, lang: string) => {
@@ -672,23 +585,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     const walk = (ns: FileNode[]) => {
       for (const n of ns) {
         if (n.type === "file" && n.content) {
-          const fullPath = n.id.replace(/^\/+/, "");
-          const normalized = fullPath.replace(/^(src|public)\//, "");
-          const base = n.name;
-          const aliases = new Set([
-            fullPath,
-            normalized,
-            base,
-            `./${normalized}`,
-            `/${normalized}`,
-            `./${base}`,
-            `/${base}`,
-            `/${fullPath}`,
-            `./${fullPath}`,
-          ]);
-          aliases.forEach((key) => {
-            if (key && !files[key]) files[key] = n.content!;
-          });
+          // Store by full path id
+          files[n.id] = n.content;
+          // Store by name — prefer src/ files (first occurrence wins since src is walked first)
+          if (!files[n.name]) files[n.name] = n.content;
         }
         if (n.children) walk(n.children);
       }
@@ -697,41 +597,16 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     return files;
   }, []);
 
-  const stripModuleSyntax = useCallback((source: string) => {
-    const normalized = source.replace(/\r\n/g, "\n");
-    return normalized
-      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?\s*$/gm, "")
-      .replace(/^\s*import\s+['"][^'"]+['"]\s*;?\s*$/gm, "")
-      .replace(/^\s*export\s+default\s+/gm, "")
-      .replace(/^\s*export\s+\{[^}]*\}\s*;?\s*$/gm, "")
-      .replace(/^\s*export\s+/gm, "");
-  }, []);
-
   // Build an app preview HTML for JS/JSX/React code (app-development domain)
   const buildAppPreviewHtml = useCallback((code: string, language: string, allFiles: Record<string, string>) => {
     const allCss = Object.entries(allFiles)
       .filter(([name]) => name.endsWith(".css"))
       .map(([name, content]) => `/* ${name} */\n${content}`)
       .join("\n");
-    const strippedCode = stripModuleSyntax(code);
-    const canonicalEntries = Object.entries(allFiles).filter(([name]) => !name.startsWith("./") && !name.startsWith("/"));
-    const jsEntries = canonicalEntries.filter(([name]) => /\.(js|jsx|ts|tsx)$/.test(name) && !name.endsWith(".html"));
-    const preferredPathEntries = jsEntries.filter(([name]) => name.includes("/"));
-    const fallbackEntries = jsEntries.filter(([name]) => !name.includes("/"))
-      .filter(([name]) => !preferredPathEntries.some(([pathName]) => pathName.endsWith(`/${name}`)));
-    const moduleEntries = [...preferredPathEntries, ...fallbackEntries].sort(([a], [b]) => {
-      const score = (name: string) => {
-        if (/\/(main|index)\.(jsx|tsx|js|ts)$/.test(name) || /^(main|index)\.(jsx|tsx|js|ts)$/.test(name)) return 20;
-        if (/\/App\.(jsx|tsx|js|ts)$/.test(name) || /^App\.(jsx|tsx|js|ts)$/.test(name)) return 10;
-        return 0;
-      };
-      return score(a) - score(b);
-    });
-    const moduleBundle = moduleEntries
-      .map(([name, content]) => ({ name, content: stripModuleSyntax(content) }))
-      .filter(({ content }) => content.trim().length > 0)
-      .map(({ name, content }) => `/* ${name} */\n${content}`)
-      .join("\n\n");
+    const strippedCode = code
+      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
+      .replace(/^\s*import\s+['"][^'"]+['"];?\s*$/gm, "")
+      .replace(/^\s*export\s+(default\s+)?/gm, "");
     const hasJSX = /<\w+[\s/>]/.test(code);
     // Find the main component: prefer PascalCase function/const (not ALL_CAPS constants)
     const componentMatches = strippedCode.match(/(?:function|const)\s+([A-Z][a-z]\w*)/g);
@@ -856,11 +731,8 @@ window._iconProxy = new Proxy({}, { get: (_, name) => {
   return (props) => React.createElement('span', {style:{display:'inline-flex',alignItems:'center',justifyContent:'center',width:(props?.size||16)+'px',height:(props?.size||16)+'px',fontSize:'10px',border:'1px dashed #555',borderRadius:'2px',color:'#888'}}, '⬡');
 }});
 <\/script>
-<script type="text/babel" data-presets="react,typescript">
+<script type="text/babel" data-type="module">
 const { useState, useEffect, useRef, useCallback, useMemo, useReducer, useContext, createContext, Fragment } = React;
-const { StrictMode } = React;
-const createRoot = ReactDOM.createRoot ? ReactDOM.createRoot.bind(ReactDOM) : null;
-const ReactDOMClient = ReactDOM;
 
 // Error Boundary
 class ErrorBoundary extends React.Component {
@@ -878,7 +750,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-${moduleBundle}
+${strippedCode}
 
 try {
   const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -912,7 +784,7 @@ console.log = (...args) => { addLine(args.map(a => typeof a === 'object' ? JSON.
 console.error = (...args) => { addLine('ERROR ' + args.map(String).join(' '), 'error'); };
 console.warn = (...args) => { addLine('WARN ' + args.map(String).join(' '), 'warn'); };
 try {
-${moduleBundle}
+${strippedCode}
 } catch(e) { addLine('ERROR ' + e.message, 'error'); }
 if(!output.children.length) addLine('Code executed successfully (no output)');
 <\/script>
@@ -922,7 +794,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   // Build a full HTML document for preview by injecting sibling CSS/JS
   const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
     let html = htmlContent;
-
+    
     // Inject a base visible style so content is never invisible against iframe bg
     const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
     if (html.includes("</head>")) {
@@ -940,68 +812,32 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     const cssLinkRegex = /<link[^>]+href=["']([^"']+\.css)["'][^>]*>/gi;
     let cssMatch;
     while ((cssMatch = cssLinkRegex.exec(htmlContent)) !== null) {
-      const rawHref = cssMatch[1];
-      const href = rawHref.replace(/^\.?\//, "");
-      const cssFileName = href.split("/").pop() || "";
-      const cssContent =
-        allFiles[rawHref] ||
-        allFiles[href] ||
-        allFiles[`./${href}`] ||
-        allFiles[`/${href}`] ||
-        allFiles[cssFileName];
-      if (cssContent) {
-        html = html.replace(cssMatch[0], `<style>/* ${href} */\n${cssContent}</style>`);
-        injectedFiles.add(rawHref);
-        injectedFiles.add(href);
+      const cssFileName = cssMatch[1].split("/").pop() || "";
+      if (allFiles[cssFileName]) {
+        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${allFiles[cssFileName]}</style>`);
         injectedFiles.add(cssFileName);
       }
     }
     
-    // Find referenced JS files and inject inline if they exist in the project.
-    // NEVER leave script src — causes 404 and "import outside module" errors.
-    // ALWAYS strip import/export — plain <script> cannot run ES modules.
-    const findJsContent = (rawSrc: string): string | undefined => {
-      const src = rawSrc.replace(/^\.?\//, "");
-      const base = src.split("/").pop() || "";
-      const keys = [rawSrc, src, `./${src}`, `/${src}`, base, `src/${base}`, `./${base}`];
-      for (const k of keys) {
-        if (allFiles[k]) return allFiles[k];
-      }
-      return Object.entries(allFiles).find(([name]) => name.endsWith("/" + base) || name === base)?.[1];
-    };
-
-    const jsScriptRegex = /<script[^>]+src=["']([^"']+\.(js|jsx|ts|tsx))["'][^>]*><\/script>/gi;
+    // Find referenced JS files and inject inline if they exist in the project
+    const jsScriptRegex = /<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/gi;
     let jsMatch;
     while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
-      const rawSrc = jsMatch[1];
-      const jsContent = findJsContent(rawSrc);
-      if (jsContent) {
-        const stripped = stripModuleSyntax(jsContent);
-        html = html.replace(jsMatch[0], `<script>/* ${rawSrc} */\n${stripped}<\/script>`);
-        injectedFiles.add(rawSrc);
-        injectedFiles.add(rawSrc.replace(/^\.?\//, ""));
-        injectedFiles.add(rawSrc.split("/").pop() || "");
-      } else {
-        html = html.replace(jsMatch[0], "<!-- script removed: file not found -->");
+      const jsFileName = jsMatch[1].split("/").pop() || "";
+      if (allFiles[jsFileName]) {
+        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
+        injectedFiles.add(jsFileName);
       }
     }
 
-    // Remove ANY remaining script with src to local path (prevents 404)
-    html = html.replace(/<script[^>]+src=["']([^"']+)["'][^>]*><\/script>/gi, (match, src) => {
-      const s = (src || "").trim();
-      if (s.startsWith("http://") || s.startsWith("https://")) return match;
-      return "<!-- local script removed -->";
-    });
-
     // Also inject any remaining CSS/JS files that weren't explicitly referenced
-    const canonicalEntries = Object.entries(allFiles).filter(([name]) => !name.startsWith("./") && !name.startsWith("/"));
-    const remainingCss = canonicalEntries
-      .filter(([name]) => name.endsWith(".css") && !injectedFiles.has(name))
+    const remainingCss = Object.entries(allFiles)
+      .filter(([name]) => name.endsWith(".css") && !injectedFiles.has(name) && !name.includes("/"))
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
-    const remainingJs = canonicalEntries
-      .filter(([name]) => /\.(js|jsx|ts|tsx)$/.test(name) && !injectedFiles.has(name) && !name.endsWith(".html"))
-      .map(([name, content]) => `<script>/* ${name} */\n${stripModuleSyntax(content)}<\/script>`)
+    const remainingJs = Object.entries(allFiles)
+      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
     if (remainingCss) {
@@ -1020,38 +856,9 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
         html += remainingJs;
       }
     }
-
-    // Surface runtime errors inside iframe instead of blank screen.
-    const runtimeGuard = `<script>
-window.addEventListener('error', function (e) {
-  var root = document.getElementById('__preview-runtime-error');
-  if (!root) {
-    root = document.createElement('div');
-    root.id = '__preview-runtime-error';
-    root.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#2b0000;color:#ffd7d7;border:1px solid #ff4d4f;border-radius:8px;padding:10px;font:12px/1.4 ui-monospace,Menlo,Monaco,monospace;white-space:pre-wrap;max-height:45vh;overflow:auto;';
-    document.body.appendChild(root);
-  }
-  root.textContent = 'Runtime Error: ' + (e.message || 'Unknown error');
-});
-window.addEventListener('unhandledrejection', function (e) {
-  var root = document.getElementById('__preview-runtime-error');
-  if (!root) {
-    root = document.createElement('div');
-    root.id = '__preview-runtime-error';
-    root.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#2b0000;color:#ffd7d7;border:1px solid #ff4d4f;border-radius:8px;padding:10px;font:12px/1.4 ui-monospace,Menlo,Monaco,monospace;white-space:pre-wrap;max-height:45vh;overflow:auto;';
-    document.body.appendChild(root);
-  }
-  root.textContent = 'Promise Rejection: ' + (e.reason?.message || String(e.reason || 'Unknown error'));
-});
-</script>`;
-    if (html.includes("</body>")) {
-      html = html.replace("</body>", `${runtimeGuard}\n</body>`);
-    } else {
-      html += runtimeGuard;
-    }
     
     return html;
-  }, [stripModuleSyntax]);
+  }, []);
 
   const isAppDomain = domainId === "app-development";
 
@@ -1097,7 +904,7 @@ window.addEventListener('unhandledrejection', function (e) {
       }
       // Remove existing script/link refs so we inject fresh
       html = html.replace(/<link[^>]+href=["'][^"']+\.css["'][^>]*>/gi, "");
-      html = html.replace(/<script[^>]+src=["'][^"']+\.(js|jsx|ts|tsx)["'][^>]*><\/script>/gi, "");
+      html = html.replace(/<script[^>]+src=["'][^"']+\.js["'][^>]*><\/script>/gi, "");
       // Inject CSS before </head> or at start
       const cssTag = `<style>${allCss}</style>`;
       if (html.includes("</head>")) {
@@ -1107,10 +914,10 @@ window.addEventListener('unhandledrejection', function (e) {
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|jsx|ts|tsx)$/.test(name) && name !== activeTab?.name)
-        .map(([name, content]) => `/* ${name} */\n${stripModuleSyntax(content)}`)
+        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
-      const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${stripModuleSyntax(jsCode)}<\/script>`;
+      const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
       if (html.includes("</body>")) {
         html = html.replace("</body>", `${jsTag}</body>`);
       } else {
@@ -1142,13 +949,13 @@ ${elementDivs}
 <div id="output"></div>
 <script>
 try {
-${stripModuleSyntax(jsCode)}
+${jsCode}
 } catch(e) {
   document.body.innerHTML += '<div style="padding:16px;background:#1a0000;border:1px solid #ff4444;border-radius:8px;margin:16px;"><h3 style="color:#ff6b6b">⚠️ Runtime Error</h3><pre style="color:#ff9999;font-size:12px;white-space:pre-wrap">' + e.message + '</pre></div>';
 }
 <\/script>
 </body></html>`;
-  }, [activeTab?.name, stripModuleSyntax]);
+  }, [activeTab?.name]);
 
   const updatePreview = useCallback(() => {
     if (!activeTab || !showPreview) return;
@@ -1156,34 +963,14 @@ ${stripModuleSyntax(jsCode)}
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
     const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
-    const isJsxFile = /\.(jsx|tsx)$/.test(activeTab.name);
-    const hasReactImportInTab = /\bfrom\s+['"]react(?:-dom)?(?:\/client)?['"]/.test(activeTab.content);
     const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
     if (isHtml) {
-      const hasJsxFiles = Object.keys(allFiles).some((k) => /\.(jsx|tsx)$/.test(k));
-      const hasReactImports = Object.entries(allFiles).some(
-        ([name, content]) => /\.(js|jsx|ts|tsx)$/.test(name) && /\bfrom\s+['"]react(?:-dom)?(?:\/client)?['"]/.test(content)
-      );
-      const reactEntryCandidates = ["src/main.tsx", "src/main.jsx", "main.tsx", "main.jsx", "src/index.tsx", "src/index.jsx", "index.tsx", "index.jsx"];
-      let reactEntry = reactEntryCandidates.find((f) => Boolean(allFiles[f]));
-      if (!reactEntry) {
-        reactEntry = Object.keys(allFiles).find((k) => /\/(main|index)\.(jsx|tsx|js|ts)$/.test(k) || /^(main|index)\.(jsx|tsx|js|ts)$/.test(k));
-      }
-      const htmlHasModuleScript = /<script[^>]+type=["']module["']/i.test(activeTab.content);
-      const shouldUseReactPreview = Boolean(reactEntry) && (hasJsxFiles || hasReactImports || htmlHasModuleScript);
-      if (shouldUseReactPreview && reactEntry) {
-        const entryCode = allFiles[reactEntry] || "";
-        const entryLang = /\.(tsx|ts)$/.test(reactEntry) ? "typescript" : "javascript";
-        setPreviewContent(buildAppPreviewHtml(entryCode, entryLang, allFiles));
-      } else {
-        setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
-      }
-    } else if (isJsLike && (isJsxFile || hasJSX || hasReactImportInTab)) {
+      setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+    } else if (isJsLike && hasJSX) {
       setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
-      // App-development uses vanilla HTML/CSS/JS only — use vanilla preview
-      setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isJsLike && usesDOM) {
       // Vanilla JS with DOM usage — render in an HTML shell with DOM available
       setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
@@ -1294,25 +1081,12 @@ ${stripModuleSyntax(jsCode)}
       // Force immediate preview update after state settles
       setTimeout(() => updatePreview(), 50);
     }
-    setPendingPatches((prev) =>
-      prev.map((p) =>
-        p.status === "pending" &&
-        p.filename === diffPreview.filename &&
-        p.language === diffPreview.language
-          ? { ...p, status: "applied" }
-          : p
-      )
-    );
-    pushTimeline({ phase: "apply", title: "Patch applied", detail: diffPreview.filename, status: "done" });
     setDiffPreview(null);
-  }, [diffPreview, updateNode, addChild, updatePreview, pushTimeline]);
+  }, [diffPreview, updateNode, addChild, updatePreview]);
 
   const handleDiffReject = useCallback(() => {
-    if (diffPreview) {
-      pushTimeline({ phase: "apply", title: "Patch rejected", detail: diffPreview.filename, status: "error" });
-    }
     setDiffPreview(null);
-  }, [diffPreview, pushTimeline]);
+  }, []);
 
   // Model change handler
   const handleModelChange = useCallback((modelId: string) => {
@@ -1420,7 +1194,7 @@ ${stripModuleSyntax(jsCode)}
         const blocks = extractCodeBlocks(assistantSoFar);
         if (blocks.length > 0) {
           const testFilename = activeTab.name.replace(/\.(\w+)$/, ".test.$1");
-          applyCodeToEditor(blocks[0].code, blocks[0].language, testFilename, true);
+          applyCodeToEditor(blocks[0].code, blocks[0].language, testFilename);
         }
       }
     } catch { upsert("❌ Connection error."); }
@@ -1473,7 +1247,7 @@ ${stripModuleSyntax(jsCode)}
         const blocks = extractCodeBlocks(assistantSoFar);
         if (blocks.length > 0) {
           const docFilename = activeTab.name.replace(/\.\w+$/, ".docs.md");
-          applyCodeToEditor(blocks[0].code, blocks[0].language, docFilename, true);
+          applyCodeToEditor(blocks[0].code, blocks[0].language, docFilename);
         }
       }
     } catch { upsert("❌ Connection error."); }
@@ -1496,32 +1270,13 @@ ${stripModuleSyntax(jsCode)}
       // Trigger preview update immediately
       const allFiles = collectFiles(fileTree);
       const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
-      const isJsxFile = /\.(jsx|tsx)$/.test(activeTab.name);
-      const hasReactImportInTab = /\bfrom\s+['"]react(?:-dom)?(?:\/client)?['"]/.test(activeTab.content);
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
       if (isHtml) {
-        const hasJsxFiles = Object.keys(allFiles).some((k) => /\.(jsx|tsx)$/.test(k));
-        const hasReactImports = Object.entries(allFiles).some(
-          ([name, content]) => /\.(js|jsx|ts|tsx)$/.test(name) && /\bfrom\s+['"]react(?:-dom)?(?:\/client)?['"]/.test(content)
-        );
-        const reactEntryCandidates = ["src/main.tsx", "src/main.jsx", "main.tsx", "main.jsx", "src/index.tsx", "src/index.jsx", "index.tsx", "index.jsx"];
-        let reactEntry = reactEntryCandidates.find((f) => Boolean(allFiles[f]));
-        if (!reactEntry) {
-          reactEntry = Object.keys(allFiles).find((k) => /\/(main|index)\.(jsx|tsx|js|ts)$/.test(k) || /^(main|index)\.(jsx|tsx|js|ts)$/.test(k));
-        }
-        const htmlHasModuleScript = /<script[^>]+type=["']module["']/i.test(activeTab.content);
-        const shouldUseReactPreview = Boolean(reactEntry) && (hasJsxFiles || hasReactImports || htmlHasModuleScript);
-        if (shouldUseReactPreview && reactEntry) {
-          const entryCode = allFiles[reactEntry] || "";
-          const entryLang = /\.(tsx|ts)$/.test(reactEntry) ? "typescript" : "javascript";
-          setPreviewContent(buildAppPreviewHtml(entryCode, entryLang, allFiles));
-        } else {
-          setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
-        }
-      } else if (isJsLike && (isJsxFile || hasJSX || hasReactImportInTab)) {
+        setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+      } else if (isJsLike && hasJSX) {
         setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
-      } else if ((isAppDomain && isJsLike) || (isJsLike && usesDOM)) {
+      } else if (isJsLike && usesDOM) {
         setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
       } else {
         setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
@@ -1558,15 +1313,6 @@ ${stripModuleSyntax(jsCode)}
     setIsRunning(false);
   }, [activeTab, domainName, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview]);
 
-  useEffect(() => {
-    if (!pendingAutoRunFileId || activeTabId !== pendingAutoRunFileId || !activeTab) return;
-    const id = setTimeout(() => {
-      handleRun();
-      setPendingAutoRunFileId(null);
-    }, 120);
-    return () => clearTimeout(id);
-  }, [pendingAutoRunFileId, activeTabId, activeTab, handleRun]);
-
   const handleCopy = () => {
     if (activeTab) navigator.clipboard.writeText(activeTab.content);
     setCopied(true);
@@ -1579,32 +1325,16 @@ ${stripModuleSyntax(jsCode)}
     if (original?.content) handleCodeChange(original.content);
   };
 
-  // -- AI Chat with VS Code-style modes --
+  // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
-    if (aiMode === "edit" && !activeTab) {
-      setOutput((prev) => [...prev, "⚠️ Open a file first to use Edit mode."]);
-      setShowTerminal(true);
-      return;
-    }
-    const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 4000)}\n\`\`\`` : "";
-    const stackInstruction = isAppDomain
-      ? `\n\n[STACK: VANILLA WEB ONLY]\nUse only HTML, CSS, and JavaScript files. Do not generate React/Vite/TypeScript code. Return files as:\n- index.html\n- styles.css\n- script.js\nInclude modern animations and rich visuals (gradients, cards, motion), and add image URLs that render directly in preview.`
-      : "";
-    const modeInstruction =
-      aiMode === "edit"
-        ? `\n\n[MODE: EDIT]\nRewrite the current file only. Return exactly one fenced code block in the same language. Do not add explanations outside the code block.`
-        : `\n\n[MODE: AGENT]\nGenerate production-ready code and include filenames with fenced code blocks when creating multiple files.`;
+    // Add file context to the user message
+    const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
     const updated = [...messages, userMsg];
-    if (conversationTitle === "New Conversation") {
-      const title = chatInput.trim().slice(0, 48) || "New Conversation";
-      setConversationTitle(title);
-    }
     setMessages(updated);
     setChatInput("");
     setChatLoading(true);
-    pushTimeline({ phase: "plan", title: "Prompt received", detail: chatInput.trim(), status: "done" });
     let assistantSoFar = "";
 
     const upsert = (chunk: string) => {
@@ -1627,12 +1357,10 @@ ${stripModuleSyntax(jsCode)}
       }
     } else {
       try {
-        pushTimeline({ phase: "plan", title: "Planning with AI model", detail: selectedModel, status: "pending" });
-        // Append mode + file context to last user message
+        // Append file context to the last user message for AI awareness
         const messagesWithContext = updated.map((m, i) => {
           if (i === updated.length - 1 && m.role === "user") {
-            const scopedContext = aiMode === "edit" ? fileContext : (activeTab ? fileContext : "");
-            return { role: m.role, content: m.content + modeInstruction + stackInstruction + scopedContext };
+            return { role: m.role, content: m.content + fileContext };
           }
           return { role: m.role, content: m.content };
         });
@@ -1641,19 +1369,8 @@ ${stripModuleSyntax(jsCode)}
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
           body: JSON.stringify({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel }),
         });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({ error: "Request failed" }));
-          const msg = String(err?.error || "Request failed");
-          upsert(`❌ ${msg}`);
-          pushTimeline({ phase: "status", title: "AI request failed", detail: msg, status: "error" });
-          if (msg.includes("LOVABLE_API_KEY") || msg.includes("GROQ_API_KEY")) {
-            upsert("\n\n💡 Lovable API key is missing in Supabase Edge Function secrets.\nRun:\n`npx supabase secrets set LOVABLE_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj`\nThen redeploy:\n`npx supabase functions deploy code-engine --project-ref byveaoqwuwyhaykgjufj`");
-          }
-          setChatLoading(false);
-          return;
-        }
+        if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
         if (!resp.body) throw new Error("No body");
-        pushTimeline({ phase: "plan", title: "Streaming response", status: "done" });
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buf = "";
@@ -1674,101 +1391,98 @@ ${stripModuleSyntax(jsCode)}
         }
         // Cache the response for offline use
         if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
-
-        // Auto-attach generated visuals for richer responses
-        try {
-          const visualResp = await fetch(CODE_ENGINE_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-            body: JSON.stringify({ action: "visual-assets", prompt: chatInput, domain: domainName, count: 3 }),
-          });
-          if (visualResp.ok) {
-            const visualData = await visualResp.json();
-            const visuals = Array.isArray(visualData?.images) ? visualData.images : [];
-            if (visuals.length > 0) {
-              const visualMarkdown = "\n\n### Generated Visuals\n\n" + visuals.map((v: any) => `![${v.caption || "Generated visual"}](${v.url})`).join("\n\n");
-              assistantSoFar += visualMarkdown;
-              setMessages((prev) =>
-                prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: assistantSoFar } : m))
-              );
-            }
-          }
-        } catch {
-          // Non-blocking: text/code response still succeeds even if visual generation fails
-        }
-        pushTimeline({ phase: "plan", title: "Response completed", status: "done" });
       } catch { upsert("❌ Connection error. Switching to offline mode."); }
     }
 
-    // Auto-apply generated code directly to workspace
+    // Auto-apply: extract code blocks, batch all file operations, then trigger preview
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
-      if (aiMode === "edit" && activeTab) {
-        const first = codeBlocks[0];
-        applyCodeToEditor(first.code, first.language || activeTab.language, undefined, true);
-        setPendingAutoRunFileId(activeTab.id);
-        setShowTerminal(true);
-        setOutput((prev) => [...prev, `✨ Updated ${activeTab.name} automatically.`]);
-      } else {
-        const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
-        codeBlocks.forEach((block) => {
-          const normalizedLang = LANG_MAP[block.language] || block.language;
-          const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-          const rawName = (block.filename || `untitled.${ext}`).replace(/^\/+/, "").replace(/^\.\/+/, "");
-          const cleanedName = rawName.replace(/^src\/src\//, "src/");
-          const inferredId = cleanedName.includes("/")
-            ? cleanedName
-            : `src/${cleanedName}`;
-          const displayName = inferredId.split("/").pop() || cleanedName;
-          newFiles.push({ id: inferredId, name: displayName, lang: normalizedLang || getLang(cleanedName), code: block.code });
-        });
+      // Prepare all new files/updates in one pass
+      const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
+      codeBlocks.forEach((block) => {
+        const normalizedLang = LANG_MAP[block.language] || block.language;
+        const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
+        const fname = block.filename || `untitled.${ext}`;
+        const newId = `src/${fname}`;
+        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+      });
 
-        setFileTree(prev => {
-          let tree = [...prev];
-          let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-          if (!srcFolder) {
-            srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-            tree = [srcFolder, ...tree];
-          }
-          const needsPublicFolder = newFiles.some((f) => f.id.startsWith("public/"));
-          const publicFolder = tree.find(n => n.id === "public" && n.type === "folder");
-          if (needsPublicFolder && !publicFolder) {
-            tree = [{ id: "public", name: "public", type: "folder", isOpen: true, children: [] }, ...tree];
-          }
-          newFiles.forEach(({ id, name, lang, code }) => {
-            const existingInTree = findFile(tree, id);
-            if (existingInTree) tree = updateNode(tree, id, n => ({ ...n, content: code }));
-            else {
-              const parentId = id.startsWith("public/") ? "public" : "src";
-              tree = addChild(tree, parentId, { id, name, type: "file", language: lang, content: code });
-            }
-          });
-          return tree;
-        });
-
-        setOpenTabs(prev => {
-          let tabs = [...prev];
-          newFiles.forEach(({ id, name, lang, code }) => {
-            const existingTab = tabs.find(t => t.id === id);
-            if (existingTab) tabs = tabs.map(t => t.id === id ? { ...t, content: code, isModified: true } : t);
-            else tabs = [...tabs, { id, name, language: lang, content: code, isModified: true }];
-          });
-          return tabs;
-        });
-
-        const preferredEntry = newFiles.find(f => /^src\/main\.(jsx|tsx|js|ts)$/.test(f.id) || /^main\.(jsx|tsx|js|ts)$/.test(f.id));
-        const htmlFile = newFiles.find(f => f.lang === "html" || f.name.endsWith(".html") || f.id.endsWith(".html"));
-        const appFile = newFiles.find(f => /^src\/App\.(jsx|tsx|js|ts)$/.test(f.id));
-        const indexHtml = newFiles.find(f => f.name === "index.html" || f.id.endsWith("/index.html"));
-        const jsFile = newFiles.find(f => ["javascript", "typescript"].includes(f.lang) || /\.(js|jsx|ts|tsx)$/.test(f.name));
-        const bestFile = (isAppDomain ? indexHtml : null) || preferredEntry || htmlFile || appFile || jsFile || newFiles[0];
-        if (bestFile) {
-          setActiveTabId(bestFile.id);
-          setPendingAutoRunFileId(bestFile.id);
+      // Batch update file tree in a single setState
+      setFileTree(prev => {
+        let tree = [...prev];
+        // Ensure src folder exists
+        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
+        if (!srcFolder) {
+          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
+          tree = [srcFolder, ...tree];
         }
-        setShowTerminal(true);
-        setOutput((prev) => [...prev, `✨ Generated ${newFiles.length} file(s) and applied to workspace automatically.`]);
+
+        newFiles.forEach(({ id, name, lang, code }) => {
+          const existingInTree = findFile(tree, id);
+          if (existingInTree) {
+            tree = updateNode(tree, id, n => ({ ...n, content: code }));
+          } else {
+            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
+            tree = addChild(tree, "src", newNode);
+          }
+        });
+        return tree;
+      });
+
+      // Batch update tabs in a single setState
+      setOpenTabs(prev => {
+        let tabs = [...prev];
+        newFiles.forEach(({ id, name, lang, code }) => {
+          const existingTab = tabs.find(t => t.id === id);
+          if (existingTab) {
+            tabs = tabs.map(t => t.id === id ? { ...t, content: code, isModified: true } : t);
+          } else {
+            tabs = [...tabs, { id, name, language: lang, content: code, isModified: true }];
+          }
+        });
+        return tabs;
+      });
+
+      // Auto-select the best file for preview (prefer HTML, then first JS)
+      const htmlFile = newFiles.find(f => f.lang === "html" || f.name.endsWith(".html"));
+      const jsFile = newFiles.find(f => ["javascript", "typescript"].includes(f.lang) || /\.(js|jsx|ts|tsx)$/.test(f.name));
+      const bestFile = htmlFile || jsFile || newFiles[0];
+      if (bestFile) setActiveTabId(bestFile.id);
+
+      // Auto-open preview and build it directly from the code blocks (don't rely on stale state)
+      const hasWebCode = newFiles.some(f => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(f.lang));
+      if (hasWebCode) {
+        setShowPreview(true);
+
+        // Build a complete file map from existing tree + new files for immediate preview
+        setTimeout(() => {
+          // Collect files from current (updated) tree via a fresh read
+          setFileTree(currentTree => {
+            const allFiles = collectFiles(currentTree);
+
+            // Determine which file to preview
+            const previewFile = htmlFile || jsFile || newFiles[0];
+            if (previewFile) {
+              const isHtml = previewFile.lang === "html" || previewFile.name.endsWith(".html");
+              const isJsLike = ["javascript", "typescript"].includes(previewFile.lang) || /\.(js|jsx|ts|tsx)$/.test(previewFile.name);
+              const hasJSX = /<\w+[\s/>]/.test(previewFile.code) && /\breturn\s*[\s(]/.test(previewFile.code);
+              const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(previewFile.code);
+
+              if (isHtml) {
+                setPreviewContent(buildPreviewHtml(previewFile.code, allFiles));
+              } else if (isJsLike && hasJSX) {
+                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+              } else if (isJsLike && usesDOM) {
+                setPreviewContent(buildVanillaJsPreview(previewFile.code, allFiles));
+              } else if (isJsLike) {
+                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+              }
+            }
+
+            return currentTree; // Don't modify tree, just reading
+          });
+        }, 200);
       }
     }
 
@@ -1783,14 +1497,14 @@ ${stripModuleSyntax(jsCode)}
         if (/layout|overflow|scroll|flex|position|align|margin|padding|safe.?area/.test(lowerInput + " " + lowerResponse)) {
           hints.push("🔧 **Layout Tip:** Use the **Grid Debug Overlay** (⊞ icon in preview) to visualize safe areas, padding guides, and column grids across devices.");
         }
-        if (/render|re-render|performance|slow|lag/.test(lowerInput + " " + lowerResponse)) {
-          hints.push("⚡ **Performance Tip:** Use `requestAnimationFrame` for smooth animations and debounce event handlers for frequent updates.");
+        if (/render|re-render|performance|slow|lag|memo|usememo|usecallback/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("⚡ **Performance Tip:** Wrap expensive components in `React.memo()` and use `useMemo`/`useCallback` for derived values and handlers passed as props.");
         }
-        if (/state|variable|stale|closure/.test(lowerInput + " " + lowerResponse)) {
-          hints.push("🔄 **State Tip:** Use `let` or `const` for state, and update the DOM explicitly after changes with `element.textContent` or `element.innerHTML`.");
+        if (/state|usestate|setstate|stale|closure/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("🔄 **State Tip:** Use the functional updater `setState(prev => ...)` to avoid stale closure bugs — especially in event handlers and async callbacks.");
         }
-        if (/navigation|link|route|tab/.test(lowerInput + " " + lowerResponse)) {
-          hints.push("🗺️ **Navigation Tip:** Use `<a href>` for links or `location.hash` for single-page navigation without full reloads.");
+        if (/navigation|screen|route|stack|tab|navigate/.test(lowerInput + " " + lowerResponse)) {
+          hints.push("🗺️ **Navigation Tip:** Ensure all screens are registered before navigating. Use `navigation.canGoBack()` before calling `goBack()` to prevent crashes.");
         }
         if (/api|fetch|network|timeout|cors|401|403|500/.test(lowerInput + " " + lowerResponse)) {
           hints.push("🌐 **Network Tip:** Always wrap API calls in try/catch, check `response.ok`, and handle offline gracefully with cached data or retry logic.");
@@ -1811,10 +1525,10 @@ ${stripModuleSyntax(jsCode)}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, aiMode, pushTimeline]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId]);
 
   const handleClearChat = () => {
-    startNewConversation();
+    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
   };
 
   // -- Project management --
@@ -1877,51 +1591,19 @@ ${stripModuleSyntax(jsCode)}
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "F11") {
-        e.preventDefault();
-        toggleImmersiveFullscreen();
-        return;
-      }
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
-      if (e.shiftKey && e.key === "Enter") {
-        e.preventDefault();
-        toggleImmersiveFullscreen();
-        return;
-      }
-      if (e.key === "=" || e.key === "+") {
-        e.preventDefault();
-        adjustEditorFontSize(1);
-        return;
-      }
-      if (e.key === "-") {
-        e.preventDefault();
-        adjustEditorFontSize(-1);
-        return;
-      }
-      if (e.key === "0") {
-        e.preventDefault();
-        setEditorFontSize(13);
-        localStorage.setItem("lunor-editor-font-size", "13");
-        if (monacoEditorRef.current) monacoEditorRef.current.updateOptions({ fontSize: 13 });
-        return;
-      }
       switch (e.key.toLowerCase()) {
         case "s": e.preventDefault(); handleSaveProject(); break;
         case "n": e.preventDefault(); setShowNewProject(true); break;
         case "o": e.preventDefault(); setShowWelcome(true); break;
         case "b": e.preventDefault(); setShowSidebar(prev => !prev); break;
         case "j": e.preventDefault(); setShowTerminal(prev => !prev); break;
-        case "i":
-          e.preventDefault();
-          setShowAIPanel(true);
-          setTimeout(() => chatInputRef.current?.focus(), 0);
-          break;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [handleSaveProject, toggleImmersiveFullscreen, adjustEditorFontSize]);
+  }, [handleSaveProject]);
 
   const firstFolderId = useMemo(() => {
     const find = (nodes: FileNode[]): string | null => {
@@ -2078,7 +1760,7 @@ ${stripModuleSyntax(jsCode)}
   );
 
   return (
-    <div ref={editorRootRef} className="flex flex-col h-screen w-full overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.text }}>
+    <div className="flex flex-col h-screen w-full overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.text }}>
       {newProjectDialog}
       {/* Diff Preview Modal */}
       {diffPreview && (
@@ -2185,15 +1867,6 @@ ${stripModuleSyntax(jsCode)}
           </Button>
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowSidebar(!showSidebar)}>
             <Settings className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-1.5 text-[10px]"
-            onClick={toggleImmersiveFullscreen}
-            title="Immersive Fullscreen (F11 / Cmd+Shift+Enter)"
-          >
-            {immersiveFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </Button>
           {onExit && (
             <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={onExit}>
@@ -2330,13 +2003,6 @@ ${stripModuleSyntax(jsCode)}
             ))}
             <div className="flex-1" />
             <div className="flex items-center gap-1 px-2 shrink-0">
-              <button onClick={() => adjustEditorFontSize(-1)} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Decrease Font (Ctrl/Cmd -)">
-                <Minus className="h-3.5 w-3.5" />
-              </button>
-              <span className="text-[10px] text-muted-foreground w-8 text-center">{editorFontSize}px</span>
-              <button onClick={() => adjustEditorFontSize(1)} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Increase Font (Ctrl/Cmd +)">
-                <Plus className="h-3.5 w-3.5" />
-              </button>
               <button onClick={handleCopy} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Copy">
                 {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
@@ -2385,7 +2051,7 @@ ${stripModuleSyntax(jsCode)}
                     (window as any).monaco = monaco;
                   }}
                   options={{
-                    fontSize: editorFontSize,
+                    fontSize: 13,
                     fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
                     minimap: { enabled: !showPreview, scale: 1, maxColumn: 80 },
                     scrollBeyondLastLine: false,
@@ -2579,7 +2245,7 @@ ${stripModuleSyntax(jsCode)}
                           srcDoc={previewContent}
                           className="border-0 w-full"
                           style={{ height: "calc(100% - 48px)" }}
-                          sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"
+                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
                         {/* Debug overlay - phone */}
@@ -2638,7 +2304,7 @@ ${stripModuleSyntax(jsCode)}
                           srcDoc={previewContent}
                           className="border-0 w-full"
                           style={{ height: "calc(100% - 32px)" }}
-                          sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"
+                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
                         {/* Debug overlay - tablet */}
@@ -2680,7 +2346,7 @@ ${stripModuleSyntax(jsCode)}
                         height: "100%",
                         maxWidth: "100%",
                       }}
-                      sandbox="allow-scripts allow-same-origin allow-modals allow-forms allow-popups"
+                      sandbox="allow-scripts allow-modals allow-forms allow-popups"
                       title="Web Preview"
                     />
                   )}
@@ -2712,94 +2378,56 @@ ${stripModuleSyntax(jsCode)}
         {showAIPanel && (
           <div className="flex flex-col w-80 lg:w-96 border-l shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             {/* AI Header */}
-            <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: currentTheme.uiColors.border }}>
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4" style={{ color: currentTheme.uiColors.accent }} />
-                <span className="text-xs font-semibold" style={{ color: currentTheme.uiColors.text }}>AI Assistant</span>
-                <div className="flex-1" />
-                <button onClick={handleClearChat} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="Clear chat">
-                  <Trash2 className="h-3 w-3" />
-                </button>
-                <button onClick={() => setShowAIPanel(false)} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }}>
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-              <div className="mt-2 flex items-center gap-1">
-                <button
-                  onClick={() => setAiPanelTab("chat")}
-                  className="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
-                  style={{
-                    color: aiPanelTab === "chat" ? currentTheme.uiColors.accent : currentTheme.uiColors.muted,
-                    backgroundColor: aiPanelTab === "chat" ? currentTheme.uiColors.accent + "15" : "transparent",
-                  }}
-                >
-                  Chat
-                </button>
-              </div>
-              <div className="mt-2 rounded border px-2 py-1.5" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Conversation</span>
-                  <div className="flex-1" />
-                  <button
-                    onClick={startNewConversation}
-                    className="rounded px-1.5 py-0.5 text-[9px] font-medium"
-                    style={{ color: currentTheme.uiColors.accent, backgroundColor: currentTheme.uiColors.accent + "15" }}
-                  >
-                    New
-                  </button>
-                </div>
-                <p className="mt-1 text-[10px] font-medium truncate" style={{ color: currentTheme.uiColors.text }}>{conversationTitle}</p>
-                {conversationTitles.length > 0 && (
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {conversationTitles.slice(0, 3).map((title, idx) => (
-                      <span
-                        key={`${title}-${idx}`}
-                        className="rounded px-1.5 py-0.5 text-[9px] truncate max-w-[120px]"
-                        style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}`, color: currentTheme.uiColors.muted }}
-                        title={title}
-                      >
-                        {title}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0" style={{ borderColor: currentTheme.uiColors.border }}>
+              <Sparkles className="h-4 w-4" style={{ color: currentTheme.uiColors.accent }} />
+              <span className="text-xs font-semibold" style={{ color: currentTheme.uiColors.text }}>AI Assistant</span>
+              <span className="rounded-sm px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>Diff Review</span>
+              <div className="flex-1" />
+              <button onClick={handleClearChat} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="Clear chat">
+                <Trash2 className="h-3 w-3" />
+              </button>
+              <button onClick={() => setShowAIPanel(false)} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }}>
+                <X className="h-3 w-3" />
+              </button>
             </div>
 
-            {/* Chat / Diff content */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-2.5" style={{ backgroundColor: currentTheme.uiColors.bg }}>
-              <>
-                  {messages.map((msg, i) => (
-                    <div key={i} className="rounded-lg border p-2.5" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
-                      <div className="mb-1.5 flex items-center gap-1.5">
-                        <div className="flex h-5 w-5 items-center justify-center rounded" style={{ backgroundColor: msg.role === "user" ? currentTheme.uiColors.border : currentTheme.uiColors.accent + "20" }}>
-                          {msg.role === "user" ? <span className="text-[9px] font-medium" style={{ color: currentTheme.uiColors.text }}>U</span> : <Bot className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />}
-                        </div>
-                        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
-                          {msg.role === "user" ? "You" : "Assistant"}
-                        </span>
-                      </div>
-                      <div
-                        className="prose prose-sm max-w-none break-words overflow-hidden text-xs [&_pre]:p-2.5 [&_pre]:rounded-md [&_pre]:text-[10px] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:px-1 [&_code]:rounded-sm [&_code]:break-all [&_pre]:relative [&_pre_code]:break-normal [&_pre_code]:whitespace-pre"
-                        style={{
-                          ["--tw-prose-body" as string]: currentTheme.uiColors.text,
-                          ["--tw-prose-headings" as string]: currentTheme.uiColors.text,
-                          ["--tw-prose-code" as string]: currentTheme.uiColors.accent,
-                        }}
-                      >
-                        <ReactMarkdown
-                          components={{
-                            pre({ children, ...props }) {
-                              const codeEl = (children as any)?.props;
-                              const codeText = codeEl?.children || "";
-                              const className = codeEl?.className || "";
-                              const lang = className.replace("language-", "") || "javascript";
-                              return (
-                                <div className="relative group">
-                                  <div className="flex items-center justify-between rounded-t-md px-2 py-1" style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, borderBottom: "none" }}>
-                                    <span className="text-[9px] font-mono" style={{ color: currentTheme.uiColors.muted }}>{lang}</span>
+            {/* Chat messages */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-3" style={{ backgroundColor: currentTheme.uiColors.bg }}>
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: msg.role === "user" ? currentTheme.uiColors.border : currentTheme.uiColors.accent + "20" }}>
+                    {msg.role === "user" ? <span className="text-[9px] font-medium" style={{ color: currentTheme.uiColors.text }}>U</span> : <Bot className="h-3.5 w-3.5" style={{ color: currentTheme.uiColors.accent }} />}
+                  </div>
+                  <div
+                    className="max-w-[88%] rounded-lg px-3 py-2 text-xs"
+                    style={{
+                      backgroundColor: msg.role === "user" ? currentTheme.uiColors.accent : currentTheme.uiColors.card,
+                      color: msg.role === "user" ? "#ffffff" : currentTheme.uiColors.text,
+                      border: msg.role === "user" ? "none" : `1px solid ${currentTheme.uiColors.border}`,
+                    }}
+                  >
+                    <div className="prose prose-sm max-w-none break-words overflow-hidden [&_pre]:p-2.5 [&_pre]:rounded-md [&_pre]:text-[10px] [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:px-1 [&_code]:rounded-sm [&_code]:break-all [&_pre]:relative [&_pre_code]:break-normal [&_pre_code]:whitespace-pre"
+                      style={{
+                        // Override prose colors to match theme
+                        ["--tw-prose-body" as string]: msg.role === "user" ? "#ffffff" : currentTheme.uiColors.text,
+                        ["--tw-prose-headings" as string]: msg.role === "user" ? "#ffffff" : currentTheme.uiColors.text,
+                        ["--tw-prose-code" as string]: currentTheme.uiColors.accent,
+                      }}
+                    >
+                      <ReactMarkdown
+                        components={{
+                          pre({ children, ...props }) {
+                            const codeEl = (children as any)?.props;
+                            const codeText = codeEl?.children || "";
+                            const className = codeEl?.className || "";
+                            const lang = className.replace("language-", "") || "javascript";
+                            return (
+                              <div className="relative group">
+                                <div className="flex items-center justify-between rounded-t-md px-2 py-1" style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, borderBottom: "none" }}>
+                                  <span className="text-[9px] font-mono" style={{ color: currentTheme.uiColors.muted }}>{lang}</span>
+                                  <div className="flex gap-1">
                                     <button
-                                      onClick={() => applyCodeToEditor(String(codeText).trim(), lang, undefined, true)}
+                                      onClick={() => applyCodeToEditor(String(codeText).trim(), lang)}
                                       className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-medium transition-colors"
                                       style={{ backgroundColor: currentTheme.uiColors.accent + "25", color: currentTheme.uiColors.accent }}
                                       title="Apply to Editor"
@@ -2808,32 +2436,38 @@ ${stripModuleSyntax(jsCode)}
                                       Apply
                                     </button>
                                   </div>
-                                  <pre {...props} className="!rounded-t-none !mt-0" style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, color: currentTheme.uiColors.text }}>{children}</pre>
                                 </div>
-                              );
-                            },
-                            code({ children, className, ...props }) {
-                              const isInline = !className;
-                              if (isInline) return <code style={{ color: currentTheme.uiColors.accent, backgroundColor: currentTheme.uiColors.bg + "80" }} {...props}>{children}</code>;
-                              return <code style={{ color: currentTheme.uiColors.text }} {...props}>{children}</code>;
-                            },
-                            strong({ children }) {
-                              return <strong style={{ color: currentTheme.uiColors.accent }}>{children}</strong>;
-                            },
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
+                                <pre {...props} className="!rounded-t-none !mt-0" style={{ backgroundColor: currentTheme.uiColors.bg, border: `1px solid ${currentTheme.uiColors.border}`, color: currentTheme.uiColors.text }}>{children}</pre>
+                              </div>
+                            );
+                          },
+                          code({ children, className, ...props }) {
+                            const isInline = !className;
+                            if (isInline) {
+                              return <code style={{ color: currentTheme.uiColors.accent, backgroundColor: currentTheme.uiColors.bg + "80" }} {...props}>{children}</code>;
+                            }
+                            return <code style={{ color: currentTheme.uiColors.text }} {...props}>{children}</code>;
+                          },
+                          strong({ children }) {
+                            return <strong style={{ color: currentTheme.uiColors.accent }}>{children}</strong>;
+                          },
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
                     </div>
-                  ))}
-                  {chatLoading && messages[messages.length - 1]?.role !== "assistant" && (
-                    <div className="flex items-center gap-2 rounded-lg border px-3 py-2" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: currentTheme.uiColors.accent }} />
-                      <span className="text-xs" style={{ color: currentTheme.uiColors.muted }}>Thinking...</span>
-                    </div>
-                  )}
-              </>
+                  </div>
+                </div>
+              ))}
+              {chatLoading && messages[messages.length - 1]?.role !== "assistant" && (
+                <div className="flex gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-md" style={{ backgroundColor: currentTheme.uiColors.accent + "20" }}><Bot className="h-3.5 w-3.5" style={{ color: currentTheme.uiColors.accent }} /></div>
+                  <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: currentTheme.uiColors.accent }} />
+                    <span className="text-xs" style={{ color: currentTheme.uiColors.muted }}>Thinking...</span>
+                  </div>
+                </div>
+              )}
               <div ref={chatEndRef} />
             </div>
 
@@ -2901,29 +2535,6 @@ ${stripModuleSyntax(jsCode)}
               <div className="flex items-center justify-between mb-1">
                 <ModelSelector selectedModel={selectedModel} onSelect={handleModelChange} themeColors={currentTheme.uiColors} />
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setAiMode("agent")}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
-                    style={{ color: aiMode === "agent" ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: aiMode === "agent" ? currentTheme.uiColors.accent + "15" : "transparent" }}
-                    title="Agent mode: create/update multiple files"
-                  >
-                    <Bot className="h-3 w-3" />
-                    Agent
-                  </button>
-                  <button
-                    onClick={() => setAiMode("edit")}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
-                    style={{ color: aiMode === "edit" ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: aiMode === "edit" ? currentTheme.uiColors.accent + "15" : "transparent" }}
-                    title="Edit mode: rewrite active file"
-                  >
-                    <Wand2 className="h-3 w-3" />
-                    Edit
-                  </button>
-                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
-                    style={{ color: currentTheme.uiColors.accent, backgroundColor: currentTheme.uiColors.accent + "15" }}>
-                    <ArrowRightToLine className="h-3 w-3" />
-                    Auto Apply
-                  </span>
                   {isAppDomain && (
                     <button
                       onClick={() => setShowChecklist(!showChecklist)}
@@ -2938,11 +2549,10 @@ ${stripModuleSyntax(jsCode)}
               </div>
               <div className="flex gap-1.5">
                 <input
-                  ref={chatInputRef}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
-                  placeholder={aiMode === "edit" ? `Edit ${activeTab?.name || "current file"}...` : `Build with AI in ${domainName.toLowerCase()}...`}
+                  placeholder={`Ask about ${domainName.toLowerCase()}...`}
                   className="flex-1 rounded-md px-2.5 py-1.5 text-xs outline-none"
                   style={{
                     backgroundColor: currentTheme.uiColors.bg,
@@ -2960,31 +2570,8 @@ ${stripModuleSyntax(jsCode)}
                   <Send className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                <button
-                  onClick={() => { setAiMode("agent"); setChatInput("Build a complete feature with clean file structure, reusable components, and working preview."); }}
-                  className="px-1.5 py-0.5 rounded text-[9px] transition-colors"
-                  style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.muted, border: `1px solid ${currentTheme.uiColors.border}` }}
-                >
-                  Build Feature
-                </button>
-                <button
-                  onClick={() => { setAiMode("edit"); setChatInput(`Refactor ${activeTab?.name || "this file"} for readability and performance without changing behavior.`); }}
-                  className="px-1.5 py-0.5 rounded text-[9px] transition-colors"
-                  style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.muted, border: `1px solid ${currentTheme.uiColors.border}` }}
-                >
-                  Refactor Active File
-                </button>
-                <button
-                  onClick={() => { setAiMode("edit"); setChatInput(`Fix bugs in ${activeTab?.name || "this file"} and return corrected code only.`); }}
-                  className="px-1.5 py-0.5 rounded text-[9px] transition-colors"
-                  style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.muted, border: `1px solid ${currentTheme.uiColors.border}` }}
-                >
-                  Fix Active File
-                </button>
-              </div>
               <p className="mt-1.5 text-[9px] text-center" style={{ color: currentTheme.uiColors.muted }}>
-                {aiMode === "edit" ? "Edit mode updates the active file automatically." : "Agent mode generates files and applies them automatically."}
+                Code changes shown in <span className="font-medium" style={{ color: currentTheme.uiColors.accent }}>diff review</span> before applying
               </p>
             </div>
           </div>
