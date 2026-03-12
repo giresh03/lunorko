@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import logo from "@/assets/logo.jpeg";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { getAuthRedirectUrl } from "@/lib/auth";
 
 const GoogleIcon = () => (
@@ -186,11 +186,9 @@ const Navbar = () => {
                     disabled={googleLoading}
                     onClick={async () => {
                       setGoogleLoading(true);
-                      const { data, error } = await supabase.auth.signInWithOAuth({
-                        provider: "google",
-                        options: { redirectTo: getAuthRedirectUrl() },
+                      await lovable.auth.signInWithOAuth("google", {
+                        redirect_uri: getAuthRedirectUrl(),
                       });
-                      if (!error && data?.url) window.location.href = data.url;
                       setGoogleLoading(false);
                     }}
                   >
@@ -251,11 +249,9 @@ const Navbar = () => {
                       disabled={googleLoading}
                       onClick={async () => {
                         setGoogleLoading(true);
-                        const { data, error } = await supabase.auth.signInWithOAuth({
-                          provider: "google",
-                          options: { redirectTo: getAuthRedirectUrl() },
+                        await lovable.auth.signInWithOAuth("google", {
+                          redirect_uri: getAuthRedirectUrl(),
                         });
-                        if (!error && data?.url) window.location.href = data.url;
                         setGoogleLoading(false);
                         setOpen(false);
                       }}
