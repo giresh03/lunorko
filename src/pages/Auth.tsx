@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { getAuthRedirectUrl, getSiteUrl } from "@/lib/auth";
+import { lovable } from "@/integrations/lovable";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import logo from "@/assets/logo.jpeg";
