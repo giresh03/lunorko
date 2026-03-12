@@ -30,8 +30,6 @@ const navLinks = [
   { to: "/domains", label: "Domains" },
   { to: "/community", label: "Community" },
   { to: "/projects", label: "Projects" },
-  
-  { to: "/achievements", label: "Achievements" },
   { to: "/pricing", label: "Pricing" },
   { to: "/about", label: "About" },
 ];
@@ -145,11 +143,6 @@ const Navbar = () => {
                       <DropdownMenuItem asChild>
                         <Link to="/dashboard" className="cursor-pointer">
                           <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/achievements" className="cursor-pointer">
-                          <Trophy className="mr-2 h-4 w-4" /> Achievements
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
