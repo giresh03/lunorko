@@ -83,11 +83,6 @@ const Index = () => {
         <Domains3DSection />
       </ParallaxLayer>
 
-      {/* Video Demo */}
-      <ParallaxLayer speed={0.03}>
-        <VideoSection />
-      </ParallaxLayer>
-
       {/* Why Lunor */}
       <ParallaxLayer speed={0.05}>
         <WhyLunorSection />
