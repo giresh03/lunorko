@@ -9,13 +9,11 @@ import { ParallaxLayer } from "@/hooks/useParallax";
 import DomainParallaxSection from "@/components/home/DomainParallaxSection";
 import WhyLunorSection from "@/components/home/WhyLunorSection";
 import Domains3DSection from "@/components/home/Domains3DSection";
-import HowItWorksSection from "@/components/home/HowItWorksSection";
 import StatsSection from "@/components/home/StatsSection";
 import TestimonialsSection from "@/components/home/TestimonialsSection";
 import AIPowerSection from "@/components/home/AIPowerSection";
 import PricingPreviewSection from "@/components/home/PricingPreviewSection";
 import ComparisonSection from "@/components/home/ComparisonSection";
-import VideoSection from "@/components/home/VideoSection";
 import FAQSection from "@/components/home/FAQSection";
 import HeroSection from "@/components/home/HeroSection";
 import FeaturesSection from "@/components/home/FeaturesSection";
@@ -83,19 +81,9 @@ const Index = () => {
         <Domains3DSection />
       </ParallaxLayer>
 
-      {/* Video Demo */}
-      <ParallaxLayer speed={0.03}>
-        <VideoSection />
-      </ParallaxLayer>
-
       {/* Why Lunor */}
       <ParallaxLayer speed={0.05}>
         <WhyLunorSection />
-      </ParallaxLayer>
-
-      {/* How It Works */}
-      <ParallaxLayer speed={0.04}>
-        <HowItWorksSection />
       </ParallaxLayer>
 
       {/* Features Section */}
