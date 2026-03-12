@@ -105,7 +105,7 @@ Keep responses concise and actionable. Format as JSON with keys: roles (array of
     });
   } catch (e) {
     console.error("match-team error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
