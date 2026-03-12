@@ -88,11 +88,6 @@ const Index = () => {
         <WhyLunorSection />
       </ParallaxLayer>
 
-      {/* How It Works */}
-      <ParallaxLayer speed={0.04}>
-        <HowItWorksSection />
-      </ParallaxLayer>
-
       {/* Features Section */}
       <ParallaxLayer speed={0.03}>
         <FeaturesSection />
