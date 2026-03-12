@@ -119,7 +119,7 @@ const Auth = () => {
       redirectTo: `${getSiteUrl()}/reset-password`,
     });
     if (error) {
-      console.error("[Auth] Reset password error:", error.message, error);
+      if (import.meta.env.DEV) console.error("[Auth] Reset password error:", error.message, error);
       setFormError(friendlyError(error.message));
     } else {
       setFormSuccess("Check your email — we've sent you a password reset link.");
@@ -143,33 +143,37 @@ const Auth = () => {
     }
 
     setLoading(true);
-
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${getSiteUrl()}/auth`,
-          data: { display_name: displayName },
-        },
-      });
-      if (error) {
-        console.error("[Auth] Sign up error:", error.message, error);
-        setFormError(friendlyError(error.message));
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${getSiteUrl()}/auth`,
+            data: { display_name: displayName },
+          },
+        });
+        if (error) {
+          if (import.meta.env.DEV) console.error("[Auth] Sign up error:", error.message, error);
+          setFormError(friendlyError(error.message));
+        } else {
+          setFormSuccess("Account created! Check your email for a confirmation link to get started.");
+        }
       } else {
-        setFormSuccess("Account created! Check your email for a confirmation link to get started.");
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          if (import.meta.env.DEV) console.error("[Auth] Sign in error:", error.message, error);
+          setFormError(friendlyError(error.message));
+        } else {
+          navigate("/domains");
+        }
       }
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        console.error("[Auth] Sign in error:", error.message, error);
-        setFormError(friendlyError(error.message));
-      } else {
-        navigate("/domains");
-      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setFormError(friendlyError(msg));
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const switchMode = () => {
@@ -332,7 +336,7 @@ const Auth = () => {
                     options: { redirectTo: getAuthRedirectUrl() },
                   });
                   if (error) {
-                    console.error("[Auth] Google OAuth error:", error.message, error);
+                    if (import.meta.env.DEV) console.error("[Auth] Google OAuth error:", error.message, error);
                     setFormError(friendlyError(error.message));
                     setLoading(false);
                   } else if (data?.url) {
