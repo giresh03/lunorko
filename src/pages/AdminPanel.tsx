@@ -179,7 +179,7 @@ const AdminPanel = () => {
       return;
     }
     try {
-      const payload = { ...resourceForm, sort_order: Number(resourceForm.sort_order) };
+      const payload = { ...resourceForm, sort_order: Number(resourceForm.sort_order), action: editingResource ? "update-resource" : "add-resource" };
       if (editingResource) {
         await callAdmin("update-resource", "POST", { id: editingResource.id, ...payload });
         toast({ title: "Resource updated" });

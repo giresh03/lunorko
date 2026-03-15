@@ -57,13 +57,15 @@ serve(async (req) => {
     const url = new URL(req.url);
     let action = (url.searchParams.get("action") || "").trim();
 
-    // Parse body for POST requests (also allow action in body as fallback)
+    // Parse body for POST requests first (action can also come from body as fallback)
     let body: Record<string, unknown> = {};
     if (req.method === "POST") {
       try {
         const raw = await req.text();
         body = raw ? JSON.parse(raw) : {};
-        if (!action && typeof body.action === "string") action = (body.action as string).trim();
+        // Action from body as fallback when URL param is missing
+        const bodyAction = typeof body.action === "string" ? (body.action as string).trim() : "";
+        if (!action && bodyAction) action = bodyAction;
       } catch {
         return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
