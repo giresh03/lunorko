@@ -211,6 +211,17 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      if (action === "delete-user") {
+        const { user_id } = body as { user_id: string };
+        if (!user_id) return new Response(JSON.stringify({ error: "user_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // Delete subscriptions first (service role bypasses RLS)
+        await adminClient.from("subscriptions").delete().eq("user_id", user_id);
+        // Delete user from auth (cascades to profiles, user_roles via FK)
+        const { error } = await adminClient.auth.admin.deleteUser(user_id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       return new Response(JSON.stringify({ error: `Unknown POST action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

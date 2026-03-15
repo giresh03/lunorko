@@ -19,6 +19,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useToast } from "@/hooks/use-toast";
@@ -310,6 +314,20 @@ const AdminPanel = () => {
     fetchAll();
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      await callAdmin("delete-user", "POST", { user_id: userId });
+      toast({ title: "User and subscription removed", variant: "destructive" });
+      setSelectedUser(null);
+      setDeleteUserDialog(false);
+      fetchAll();
+    } catch (e: any) {
+      toast({ title: "Failed to remove user", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const [deleteUserDialog, setDeleteUserDialog] = useState(false);
+
   if (adminLoading || !isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -512,6 +530,30 @@ const AdminPanel = () => {
                     ) : (
                       <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleBanUser(selectedUser.user_id)}><Ban className="h-4 w-4 mr-1" /> Ban User</Button>
                     )}
+                    <AlertDialog open={deleteUserDialog} onOpenChange={setDeleteUserDialog}>
+                      {selectedUser.user_id !== user?.id && (
+                        <Button variant="outline" size="sm" className="text-destructive" onClick={() => setDeleteUserDialog(true)}>
+                          <Trash2 className="h-4 w-4 mr-1" /> Remove User
+                        </Button>
+                      )}
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove user permanently?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will delete {selectedUser?.display_name || selectedUser?.email} and all their subscriptions. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => selectedUser && handleDeleteUser(selectedUser.user_id)}
+                          >
+                            Remove User
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
