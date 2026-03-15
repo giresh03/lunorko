@@ -315,14 +315,19 @@ const AdminPanel = () => {
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (!userId) {
+      toast({ title: "Invalid user", variant: "destructive" });
+      return;
+    }
     try {
-      await callAdmin("delete-user", "POST", { user_id: userId });
+      await callAdmin("delete-user", "POST", { user_id: userId, action: "delete-user" });
       toast({ title: "User and subscription removed", variant: "destructive" });
       setSelectedUser(null);
       setDeleteUserDialog(false);
       fetchAll();
     } catch (e: any) {
-      toast({ title: "Failed to remove user", description: e?.message, variant: "destructive" });
+      toast({ title: "Failed to remove user", description: e?.message || "Check console for details", variant: "destructive" });
+      console.error("Delete user error:", e);
     }
   };
 
