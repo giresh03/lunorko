@@ -1120,14 +1120,6 @@ ${jsCode}
     setAiSuggestion(null);
   }, [activeTab]);
 
-  // Apply fix to editor (replaces or inserts)
-  const applyFixToEditor = useCallback((code: string) => {
-    applyCodeToEditor(code, activeTab?.language || "javascript");
-    setAiExplanation(null);
-  }, [activeTab?.language, applyCodeToEditor]);
-
-  const teachingMode = repeatedErrorCount >= 1;
-
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
     const activeLanguage = activeTab?.language;
@@ -1154,6 +1146,14 @@ ${jsCode}
       setActiveTabId(newId);
     }
   }, [activeTabId, activeTab, updateNode, addChild]);
+
+  // Apply fix to editor (replaces or inserts)
+  const applyFixToEditor = useCallback((code: string) => {
+    applyCodeToEditor(code, activeTab?.language || "javascript");
+    setAiExplanation(null);
+  }, [activeTab?.language, applyCodeToEditor]);
+
+  const teachingMode = repeatedErrorCount >= 1;
 
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
