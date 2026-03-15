@@ -40,6 +40,13 @@ const invokeAI = async (action: string, body: Record<string, unknown>) => {
   return data;
 };
 
+// Speech-to-text: Web Speech API (Chrome, Safari, Edge)
+const getSpeechRecognition = () => {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognition; webkitSpeechRecognition?: new () => SpeechRecognition };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+};
+
 const AIAvatar = ({ isSpeaking }: { isSpeaking: boolean }) => (
   <div className="relative flex items-center justify-center">
     <div
@@ -62,6 +69,8 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const listeningBaseRef = useRef("");
 
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
@@ -72,11 +81,13 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
   const [history, setHistory] = useState<QARecord[]>([]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [finished, setFinished] = useState(false);
   const [summary, setSummary] = useState<{ summary: string; overallScore: number; tips: string[] } | null>(null);
 
   const domain = domains.find((d) => d.id === domainId);
   const totalQuestions = 5;
+  const speechSupported = !!getSpeechRecognition();
 
   const startCamera = useCallback(async () => {
     try {
@@ -114,6 +125,54 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
     window.speechSynthesis.speak(utterance);
   }, []);
 
+  const startListening = useCallback(() => {
+    const SR = getSpeechRecognition();
+    if (!SR || isListening || !currentQuestion) return;
+    try {
+      stopListening();
+      listeningBaseRef.current = userAnswer.trim() ? userAnswer + " " : userAnswer;
+      const recognition = new SR();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.onresult = (e: SpeechRecognitionEvent) => {
+        let transcript = "";
+        for (let i = 0; i < e.results.length; i++) {
+          transcript += e.results[i][0].transcript;
+        }
+        setUserAnswer(listeningBaseRef.current + transcript);
+      };
+      recognition.onerror = (e: SpeechRecognitionErrorEvent) => {
+        if (e.error !== "aborted" && e.error !== "no-speech") {
+          toast({ title: "Voice input", description: "Could not capture speech. Try typing instead.", variant: "destructive" });
+        }
+        setIsListening(false);
+      };
+      recognition.onend = () => setIsListening(false);
+      recognition.start();
+      recognitionRef.current = recognition as SpeechRecognition;
+      setIsListening(true);
+    } catch (err) {
+      toast({ title: "Voice input", description: "Not supported in this browser. Use Chrome or Safari.", variant: "destructive" });
+    }
+  }, [currentQuestion, isListening, userAnswer, toast]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  }, []);
+
+  useEffect(() => {
+    return () => stopListening();
+  }, [stopListening]);
+
   const loadNextQuestion = useCallback(async (overrideIndex?: number) => {
     const idx = overrideIndex ?? questionIndex;
     if (idx >= totalQuestions) {
@@ -135,6 +194,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
     }
 
     setLoading(true);
+    stopListening();
     setCurrentQuestion(null);
     setUserAnswer("");
     try {
@@ -151,7 +211,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
       setCurrentQuestion("Tell me about your experience in this domain.");
     }
     setLoading(false);
-  }, [domainId, questionIndex, history, toast, speakQuestion]);
+  }, [domainId, questionIndex, history, toast, speakQuestion, stopListening]);
 
   const loadFirstQuestion = useCallback(() => {
     loadNextQuestion(0);
@@ -165,6 +225,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
     const answer = userAnswer.trim();
     if (!answer || !currentQuestion) return;
 
+    stopListening();
     setEvaluating(true);
     try {
       const sessionHistory = history.map((h) => ({ q: h.question, a: h.answer }));
@@ -277,7 +338,17 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
           ) : currentQuestion ? (
             <div className="space-y-2">
               <p className="text-lg font-medium text-foreground">{currentQuestion}</p>
-              <p className="text-sm text-muted-foreground">Type or speak your answer below.</p>
+              <p className="text-sm text-muted-foreground">
+                {speechSupported ? "Type or tap the mic to speak your answer (voice-to-text)." : "Type your answer below."}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-1 -ml-2"
+                onClick={() => speakQuestion(currentQuestion)}
+              >
+                🔊 Hear question again
+              </Button>
             </div>
           ) : null}
         </CardContent>
@@ -332,14 +403,28 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
           </div>
 
           <div>
-            <Textarea
-              placeholder="Type your answer here..."
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              rows={4}
-              className="resize-none"
-              disabled={!currentQuestion || evaluating}
-            />
+            <div className="relative">
+              <Textarea
+                placeholder={speechSupported ? "Type or tap the mic to speak your answer..." : "Type your answer here..."}
+                value={userAnswer}
+                onChange={(e) => setUserAnswer(e.target.value)}
+                rows={4}
+                className="resize-none pr-12"
+                disabled={!currentQuestion || evaluating}
+              />
+              {speechSupported && currentQuestion && !evaluating && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={isListening ? "default" : "outline"}
+                  className={`absolute right-2 top-2 h-9 w-9 ${isListening ? "animate-pulse bg-primary" : ""}`}
+                  onClick={() => (isListening ? stopListening() : startListening())}
+                  title={isListening ? "Stop speaking" : "Speak your answer (voice-to-text)"}
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
             <Button
               className="mt-2 w-full"
               onClick={handleSubmitAnswer}
