@@ -55,7 +55,7 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const action = url.searchParams.get("action");
+    const action = (url.searchParams.get("action") || "").trim();
 
     if (action === "stats") {
       // Count unique site visitors (by visitor_id)
@@ -83,7 +83,6 @@ serve(async (req) => {
 
       const { data: revenueData } = await adminClient.from("subscriptions").select("amount").eq("status", "active");
       const totalRevenue = (revenueData || []).reduce((sum: number, s: any) => sum + (s.amount || 0), 0);
-      const { count: totalMentors } = await adminClient.from("mentors").select("*", { count: "exact", head: true });
       const { count: totalBookings } = await adminClient.from("bookings").select("*", { count: "exact", head: true });
 
       return new Response(JSON.stringify({
@@ -91,7 +90,6 @@ serve(async (req) => {
         totalUsers: totalUsers || 0,
         totalPaidUsers: totalPaidUsers,
         totalRevenue: totalRevenue / 100,
-        totalMentors: totalMentors || 0,
         totalBookings: totalBookings || 0,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -162,11 +160,6 @@ serve(async (req) => {
       return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (action === "mentors") {
-      const { data } = await adminClient.from("mentors").select("*").order("created_at", { ascending: false });
-      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
     if (action === "payment-requests") {
       const { data } = await adminClient.from("payment_requests").select("*").order("created_at", { ascending: false }).limit(200);
       // Enrich with user emails
@@ -181,13 +174,23 @@ serve(async (req) => {
     }
 
     if (action === "resources") {
-      const { data } = await adminClient.from("admin_resources").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
-      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      try {
+        const { data, error } = await adminClient.from("admin_resources").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+        if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch {
+        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     if (action === "pop-ads") {
-      const { data } = await adminClient.from("pop_ads").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
-      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      try {
+        const { data, error } = await adminClient.from("pop_ads").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+        if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch {
+        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     if (action === "community-posts") {
@@ -201,8 +204,17 @@ serve(async (req) => {
     }
 
     if (action === "community-guidelines") {
-      const { data } = await adminClient.from("community_guidelines").select("*").order("sort_order", { ascending: true });
-      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      try {
+        const { data, error } = await adminClient.from("community_guidelines").select("*").order("sort_order", { ascending: true });
+        if (error) {
+          console.error("community_guidelines error:", error.message);
+          return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (e) {
+        console.error("community_guidelines:", e);
+        return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // POST actions for managing data
@@ -240,25 +252,6 @@ serve(async (req) => {
       if (action === "reject-payment") {
         const { id, admin_notes } = body;
         await adminClient.from("payment_requests").update({ status: "rejected", admin_notes: admin_notes || null, reviewed_at: new Date().toISOString() }).eq("id", id);
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      if (action === "add-mentor") {
-        const { error } = await adminClient.from("mentors").insert(body);
-        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      if (action === "update-mentor") {
-        const { id, ...updates } = body;
-        const { error } = await adminClient.from("mentors").update(updates).eq("id", id);
-        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      if (action === "delete-mentor") {
-        const { error } = await adminClient.from("mentors").delete().eq("id", body.id);
-        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -356,7 +349,7 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: `Unknown action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("Admin error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500, headers: corsHeaders });

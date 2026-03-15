@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, CreditCard, TrendingUp, UserCheck, Calendar,
-  LayoutDashboard, BookOpen, Shield, Loader2, LogOut,
+  LayoutDashboard, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
-  CheckCircle, XCircle, Receipt, Video, FileText, Megaphone,
+  CheckCircle, XCircle, Receipt, Video, Megaphone,
   MessageSquare, Ban, UserPlus
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -30,7 +30,6 @@ interface AdminStats {
   totalUsers: number;
   totalPaidUsers: number;
   totalRevenue: number;
-  totalMentors: number;
   totalBookings: number;
 }
 
@@ -44,7 +43,6 @@ const AdminPanel = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
-  const [mentors, setMentors] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
   const [popAds, setPopAds] = useState<any[]>([]);
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
@@ -52,15 +50,6 @@ const AdminPanel = () => {
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedUser, setSelectedUser] = useState<any>(null);
-
-  // Mentor form
-  const [mentorDialog, setMentorDialog] = useState(false);
-  const [editingMentor, setEditingMentor] = useState<any>(null);
-  const [mentorForm, setMentorForm] = useState({
-    name: "", email: "", company: "", role: "", domain_id: "",
-    bio: "", years_experience: 1, meeting_link: "",
-    tech_stack: "", career_tips: "", journey_summary: "", college_preparation: "",
-  });
 
   // Resource form
   const [resourceDialog, setResourceDialog] = useState(false);
@@ -136,7 +125,6 @@ const AdminPanel = () => {
         callAdmin("stats"),
         callAdmin("users"),
         callAdmin("subscriptions"),
-        callAdmin("mentors"),
         callAdmin("payment-requests"),
         callAdmin("visitor-trends"),
         callAdmin("resources"),
@@ -145,14 +133,13 @@ const AdminPanel = () => {
         callAdmin("community-guidelines"),
       ]);
 
-      const [statsData, usersData, subsData, mentorsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData] = results.map((r) =>
+      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData] = results.map((r) =>
         r.status === "fulfilled" ? r.value : null
       );
 
       setStats((statsData as AdminStats) || null);
       setUsers(Array.isArray(usersData) ? usersData : []);
       setSubscriptions(Array.isArray(subsData) ? subsData : []);
-      setMentors(Array.isArray(mentorsData) ? mentorsData : []);
       setPaymentRequests(Array.isArray(prData) ? prData : []);
       setVisitorTrends(Array.isArray(trendsData) ? trendsData : []);
       setResources(Array.isArray(resourcesData) ? resourcesData : []);
@@ -171,7 +158,6 @@ const AdminPanel = () => {
       setStats(null);
       setUsers([]);
       setSubscriptions([]);
-      setMentors([]);
 
       if ((e?.message || "").toLowerCase().includes("not authenticated")) {
         navigate("/auth");
@@ -179,36 +165,6 @@ const AdminPanel = () => {
     } finally {
       setLoadingData(false);
     }
-  };
-
-  const handleSaveMentor = async () => {
-    const payload = {
-      ...mentorForm,
-      years_experience: Number(mentorForm.years_experience),
-      tech_stack: mentorForm.tech_stack.split(",").map((s) => s.trim()).filter(Boolean),
-    };
-
-    if (editingMentor) {
-      await callAdmin("update-mentor", "POST", { id: editingMentor.id, ...payload });
-      toast({ title: "Mentor updated" });
-    } else {
-      await callAdmin("add-mentor", "POST", payload);
-      toast({ title: "Mentor added" });
-    }
-    setMentorDialog(false);
-    setEditingMentor(null);
-    resetMentorForm();
-    fetchAll();
-  };
-
-  const handleDeleteMentor = async (id: string) => {
-    await callAdmin("delete-mentor", "POST", { id });
-    toast({ title: "Mentor deleted" });
-    fetchAll();
-  };
-
-  const resetMentorForm = () => {
-    setMentorForm({ name: "", email: "", company: "", role: "", domain_id: "", bio: "", years_experience: 1, meeting_link: "", tech_stack: "", career_tips: "", journey_summary: "", college_preparation: "" });
   };
 
   const DOMAIN_IDS = ["web-development", "app-development", "cybersecurity", "data-science", "cloud-computing", "devops", "database", "iot", "blockchain", "ui-ux", "dsa", "system-design"];
@@ -342,19 +298,6 @@ const AdminPanel = () => {
     fetchAll();
   };
 
-  const openEditMentor = (m: any) => {
-    setEditingMentor(m);
-    setMentorForm({
-      name: m.name || "", email: m.email || "", company: m.company || "",
-      role: m.role || "", domain_id: m.domain_id || "", bio: m.bio || "",
-      years_experience: m.years_experience || 1, meeting_link: m.meeting_link || "",
-      tech_stack: (m.tech_stack || []).join(", "),
-      career_tips: m.career_tips || "", journey_summary: m.journey_summary || "",
-      college_preparation: m.college_preparation || "",
-    });
-    setMentorDialog(true);
-  };
-
   if (adminLoading || !isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -387,13 +330,12 @@ const AdminPanel = () => {
       <main className="container mx-auto px-4 py-8">
         {/* Stats Cards */}
         {stats && (
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-6 mb-8">
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-8">
             {[
               { label: "Site Visitors", value: stats.totalVisitors, icon: Eye, color: "text-cyan-400" },
               { label: "Registered Users", value: stats.totalUsers, icon: Users, color: "text-blue-400" },
               { label: "Paid Users", value: stats.totalPaidUsers, icon: UserCheck, color: "text-green-400" },
               { label: "Revenue (₹)", value: `₹${Number(stats.totalRevenue ?? 0).toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
-              { label: "Mentors", value: stats.totalMentors, icon: BookOpen, color: "text-purple-400" },
               { label: "Bookings", value: stats.totalBookings, icon: Calendar, color: "text-pink-400" },
             ].map((s, i) => (
               <div key={i} className="rounded-xl border border-border bg-card p-5 hover:border-primary/20 transition-all">
@@ -415,7 +357,6 @@ const AdminPanel = () => {
             <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" /> Users</TabsTrigger>
             <TabsTrigger value="subscriptions"><CreditCard className="mr-2 h-4 w-4" /> Subscriptions</TabsTrigger>
             <TabsTrigger value="payment-requests"><Receipt className="mr-2 h-4 w-4" /> Payment Requests{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
-            <TabsTrigger value="mentors"><BookOpen className="mr-2 h-4 w-4" /> Mentors</TabsTrigger>
             <TabsTrigger value="resources"><Video className="mr-2 h-4 w-4" /> Resources</TabsTrigger>
             <TabsTrigger value="pop-ads"><Megaphone className="mr-2 h-4 w-4" /> Pop Ads</TabsTrigger>
             <TabsTrigger value="community"><MessageSquare className="mr-2 h-4 w-4" /> Community</TabsTrigger>
@@ -773,86 +714,6 @@ const AdminPanel = () => {
                   ))}
                   {paymentRequests.length === 0 && (
                     <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No payment requests yet</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
-
-          {/* Mentors */}
-          <TabsContent value="mentors">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-foreground">Manage Mentors</h3>
-              <Dialog open={mentorDialog} onOpenChange={(open) => { setMentorDialog(open); if (!open) { setEditingMentor(null); resetMentorForm(); } }}>
-                <DialogTrigger asChild>
-                  <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Add Mentor</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{editingMentor ? "Edit Mentor" : "Add New Mentor"}</DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="text-sm font-medium text-foreground">Name</label><Input value={mentorForm.name} onChange={(e) => setMentorForm({ ...mentorForm, name: e.target.value })} /></div>
-                      <div><label className="text-sm font-medium text-foreground">Email</label><Input value={mentorForm.email} onChange={(e) => setMentorForm({ ...mentorForm, email: e.target.value })} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="text-sm font-medium text-foreground">Company</label><Input value={mentorForm.company} onChange={(e) => setMentorForm({ ...mentorForm, company: e.target.value })} /></div>
-                      <div><label className="text-sm font-medium text-foreground">Role</label><Input value={mentorForm.role} onChange={(e) => setMentorForm({ ...mentorForm, role: e.target.value })} /></div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="text-sm font-medium text-foreground">Domain ID</label><Input value={mentorForm.domain_id} onChange={(e) => setMentorForm({ ...mentorForm, domain_id: e.target.value })} placeholder="e.g. web-development" /></div>
-                      <div><label className="text-sm font-medium text-foreground">Years of Experience</label><Input type="number" value={mentorForm.years_experience} onChange={(e) => setMentorForm({ ...mentorForm, years_experience: Number(e.target.value) })} /></div>
-                    </div>
-                    <div><label className="text-sm font-medium text-foreground">Bio</label><Textarea value={mentorForm.bio} onChange={(e) => setMentorForm({ ...mentorForm, bio: e.target.value })} /></div>
-                    <div><label className="text-sm font-medium text-foreground">Tech Stack (comma separated)</label><Input value={mentorForm.tech_stack} onChange={(e) => setMentorForm({ ...mentorForm, tech_stack: e.target.value })} placeholder="React, Node.js, Python" /></div>
-                    <div><label className="text-sm font-medium text-foreground">Meeting Link</label><Input value={mentorForm.meeting_link} onChange={(e) => setMentorForm({ ...mentorForm, meeting_link: e.target.value })} /></div>
-                    <div><label className="text-sm font-medium text-foreground">Career Tips</label><Textarea value={mentorForm.career_tips} onChange={(e) => setMentorForm({ ...mentorForm, career_tips: e.target.value })} /></div>
-                    <div><label className="text-sm font-medium text-foreground">Journey Summary</label><Textarea value={mentorForm.journey_summary} onChange={(e) => setMentorForm({ ...mentorForm, journey_summary: e.target.value })} /></div>
-                    <div><label className="text-sm font-medium text-foreground">College Preparation</label><Textarea value={mentorForm.college_preparation} onChange={(e) => setMentorForm({ ...mentorForm, college_preparation: e.target.value })} /></div>
-                    <Button onClick={handleSaveMentor}>{editingMentor ? "Update Mentor" : "Add Mentor"}</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Domain</TableHead>
-                    <TableHead>Experience</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mentors.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-medium">{m.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{m.company}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-xs">{m.domain_id}</Badge></TableCell>
-                      <TableCell>{m.years_experience} yrs</TableCell>
-                      <TableCell>
-                        <Badge variant={m.is_active ? "default" : "destructive"} className="text-xs">
-                          {m.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditMentor(m)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteMentor(m.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {mentors.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No mentors yet</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
