@@ -20,3 +20,17 @@ export function getSiteUrl(): string {
 export function getAuthRedirectUrl(): string {
   return `${getSiteUrl()}/auth`;
 }
+
+/**
+ * Sign in with Google using Supabase OAuth.
+ * Add this redirect URL in Supabase: Authentication → URL Configuration → Redirect URLs
+ * e.g. http://localhost:8081/auth, https://lunor.online/auth
+ */
+export async function signInWithGoogle(): Promise<{ error?: Error }> {
+  const { supabase } = await import("@/integrations/supabase/client");
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: getAuthRedirectUrl() },
+  });
+  return error ? { error } : {};
+}

@@ -10,8 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { getAuthRedirectUrl, getSiteUrl } from "@/lib/auth";
-import { lovable } from "@/integrations/lovable";
+import { getSiteUrl, signInWithGoogle } from "@/lib/auth";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import logo from "@/assets/logo.jpeg";
@@ -35,6 +34,9 @@ const forgotSchema = z.object({
 type FieldErrors = Record<string, string>;
 
 const friendlyError = (msg: string): string => {
+  if (msg.includes("redirect_uri_mismatch") || msg.includes("redirect_uri")) {
+    return "OAuth redirect URL mismatch. Add your site URL to Supabase: Authentication → URL Configuration → Redirect URLs (e.g. http://localhost:8081/auth, https://lunor.online/auth).";
+  }
   if (msg.includes("Invalid login credentials")) return "Incorrect email or password. Please try again or reset your password.";
   if (msg.includes("Email not confirmed")) return "Please check your inbox and confirm your email before signing in.";
   if (msg.includes("User already registered")) return "An account with this email already exists. Try signing in instead.";
@@ -332,14 +334,12 @@ const Auth = () => {
                 onClick={async () => {
                   setLoading(true);
                   clearMessages();
-                  const result = await lovable.auth.signInWithOAuth("google", {
-                    redirect_uri: getAuthRedirectUrl(),
-                  });
-                  if (result.error) {
-                    if (import.meta.env.DEV) console.error("[Auth] Google OAuth error:", result.error);
-                    setFormError(friendlyError(result.error instanceof Error ? result.error.message : String(result.error)));
-                    setLoading(false);
+                  const { error } = await signInWithGoogle();
+                  if (error) {
+                    if (import.meta.env.DEV) console.error("[Auth] Google OAuth error:", error);
+                    setFormError(friendlyError(error.message));
                   }
+                  setLoading(false);
                 }}
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">

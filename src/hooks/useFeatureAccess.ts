@@ -15,7 +15,7 @@ export type Feature =
 const PLAN_FEATURES: Record<string, Feature[]> = {
   free: [],
   pro: ["videos", "code-editor", "notes", "community", "domains"],
-  premium: ["videos", "code-editor", "notes", "community", "domains", "projects", "skill-radar"],
+  premium: ["videos", "code-editor", "notes", "community", "domains", "projects", "skill-radar", "interview-prep"],
   professional: [
     "videos", "code-editor", "notes", "community", "domains",
     "projects", "skill-radar", "resume-builder", "interview-prep", "hackathons",

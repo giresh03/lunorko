@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, User, LayoutDashboard, Shield, Loader2, Trophy, Radar, FileText, CreditCard } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Shield, Loader2, Trophy, Radar, FileText, CreditCard, Video } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,8 +14,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import logo from "@/assets/logo.jpeg";
-import { lovable } from "@/integrations/lovable";
-import { getAuthRedirectUrl } from "@/lib/auth";
+import { signInWithGoogle } from "@/lib/auth";
 
 const GoogleIcon = () => (
   <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -31,6 +30,7 @@ const navLinks = [
   { to: "/domains", label: "Domains" },
   { to: "/community", label: "Community" },
   { to: "/projects", label: "Projects" },
+  { to: "/ai-interview", label: "AI Interview" },
   { to: "/pricing", label: "Pricing" },
   { to: "/about", label: "About" },
 ];
@@ -157,6 +157,11 @@ const Navbar = () => {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <Link to="/ai-interview" className="cursor-pointer">
+                          <Video className="mr-2 h-4 w-4" /> AI Interview
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <Link to="/pricing" className="cursor-pointer">
                           <CreditCard className="mr-2 h-4 w-4" /> Subscription
                         </Link>
@@ -186,9 +191,7 @@ const Navbar = () => {
                     disabled={googleLoading}
                     onClick={async () => {
                       setGoogleLoading(true);
-                      await lovable.auth.signInWithOAuth("google", {
-                        redirect_uri: getAuthRedirectUrl(),
-                      });
+                      await signInWithGoogle();
                       setGoogleLoading(false);
                     }}
                   >
@@ -233,6 +236,9 @@ const Navbar = () => {
                     <Link to="/dashboard" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50" onClick={() => setOpen(false)}>
                       Dashboard
                     </Link>
+                    <Link to="/ai-interview" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50" onClick={() => setOpen(false)}>
+                      AI Interview
+                    </Link>
                     <span className="text-sm text-muted-foreground py-2 px-3">
                       {user.user_metadata?.display_name || user.email?.split("@")[0]}
                     </span>
@@ -249,9 +255,7 @@ const Navbar = () => {
                       disabled={googleLoading}
                       onClick={async () => {
                         setGoogleLoading(true);
-                        await lovable.auth.signInWithOAuth("google", {
-                          redirect_uri: getAuthRedirectUrl(),
-                        });
+                        await signInWithGoogle();
                         setGoogleLoading(false);
                         setOpen(false);
                       }}

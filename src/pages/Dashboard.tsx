@@ -1,5 +1,5 @@
 import { Link, Navigate } from "react-router-dom";
-import { BookOpen, Clock, Trophy, TrendingUp, Trash2 } from "lucide-react";
+import { BookOpen, Clock, Trophy, TrendingUp, Trash2, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import Navbar from "@/components/Navbar";
@@ -105,6 +105,20 @@ const Dashboard = () => {
 
               {/* Right column */}
               <div className="space-y-8">
+                {/* Quick Actions */}
+                <Link
+                  to="/ai-interview"
+                  className="flex items-center gap-4 rounded-lg border border-primary/30 bg-primary/5 p-4 transition-colors hover:border-primary/50 hover:bg-primary/10"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20">
+                    <Video className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">AI Video Interview</p>
+                    <p className="text-xs text-muted-foreground">Practice with virtual AI robot</p>
+                  </div>
+                </Link>
+
                 {/* Bookmarks */}
                 <div>
                   <h2 className="mb-4 text-lg font-semibold text-foreground">Bookmarks</h2>

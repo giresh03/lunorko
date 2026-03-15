@@ -22,6 +22,7 @@ import SkillRadar from "./pages/SkillRadar";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import PromoVideo from "./pages/PromoVideo";
 import ProjectBuilder from "./pages/ProjectBuilder";
+import AIVideoInterview from "./pages/AIVideoInterview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const AppContent = () => {
         <Route path="/resume-builder" element={<ResumeBuilder />} />
         <Route path="/promo" element={<PromoVideo />} />
         <Route path="/projects" element={<ProjectBuilder />} />
+        <Route path="/ai-interview" element={<AIVideoInterview />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
