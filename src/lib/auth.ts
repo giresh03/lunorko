@@ -22,15 +22,15 @@ export function getAuthRedirectUrl(): string {
 }
 
 /**
- * Sign in with Google using Supabase OAuth.
- * Add this redirect URL in Supabase: Authentication → URL Configuration → Redirect URLs
- * e.g. http://localhost:8081/auth, https://lunor.online/auth
+ * Sign in with Google using Lovable Cloud managed OAuth.
  */
 export async function signInWithGoogle(): Promise<{ error?: Error }> {
-  const { supabase } = await import("@/integrations/supabase/client");
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: getAuthRedirectUrl() },
+  const { lovable } = await import("@/integrations/lovable");
+  const result = await lovable.auth.signInWithOAuth("google", {
+    redirect_uri: getAuthRedirectUrl(),
   });
-  return error ? { error } : {};
+  if (result.error) {
+    return { error: result.error instanceof Error ? result.error : new Error(String(result.error)) };
+  }
+  return {};
 }

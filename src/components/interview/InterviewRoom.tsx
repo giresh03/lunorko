@@ -43,7 +43,7 @@ const invokeAI = async (action: string, body: Record<string, unknown>) => {
 // Speech-to-text: Web Speech API (Chrome, Safari, Edge)
 const getSpeechRecognition = () => {
   if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognition; webkitSpeechRecognition?: new () => SpeechRecognition };
+  const w = window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 };
 
@@ -69,7 +69,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const listeningBaseRef = useRef("");
 
   const [videoEnabled, setVideoEnabled] = useState(true);
@@ -150,7 +150,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
       };
       recognition.onend = () => setIsListening(false);
       recognition.start();
-      recognitionRef.current = recognition as SpeechRecognition;
+      recognitionRef.current = recognition;
       setIsListening(true);
     } catch (err) {
       toast({ title: "Voice input", description: "Not supported in this browser. Use Chrome or Safari.", variant: "destructive" });
