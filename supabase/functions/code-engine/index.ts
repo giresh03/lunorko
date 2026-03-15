@@ -469,6 +469,156 @@ ${code}
       });
     }
 
+    // ============= ACTION: analyze-code (real-time AI guidance) =============
+    if (action === "analyze-code") {
+      const { code, language, cursorLine, domain } = body;
+      const selectedModel = "google/gemini-2.5-flash-lite";
+      console.log(`[code-engine] analyze-code lang=${language}, line=${cursorLine}`);
+
+      const lines = code.split("\n");
+      const contextBefore = lines.slice(Math.max(0, cursorLine - 15), cursorLine + 1).join("\n");
+      const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+
+      const analyzePrompt = `As a coding mentor, analyze this ${language} code the user is writing.
+
+Code so far:
+\`\`\`${language}
+${contextBefore}
+\`\`\`
+
+Respond in JSON only:
+{
+  "intent": "brief description of what the user seems to be building (1 sentence)",
+  "suggestion": "next step or fix (1-2 sentences, actionable)",
+  "nextLine": "optional: exact next line of code to suggest (or null)",
+  "hasError": false
+}
+
+If you detect an obvious error (unclosed tag, syntax mistake), set hasError: true and explain in suggestion.
+Keep responses concise.`;
+
+      const response = await fetch(LOVABLE_AI_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            { role: "system", content: basePrompt + " Respond ONLY with valid JSON. No markdown, no explanation outside JSON." },
+            { role: "user", content: analyzePrompt },
+          ],
+          stream: false,
+          max_tokens: 300,
+        }),
+      });
+
+      if (!response.ok) {
+        return new Response(JSON.stringify({ intent: "", suggestion: "", nextLine: null, hasError: false }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content?.trim() || "{}";
+      let parsed: { intent?: string; suggestion?: string; nextLine?: string | null; hasError?: boolean } = {};
+      try {
+        parsed = JSON.parse(content.replace(/```json\n?|\n?```/g, "")) || {};
+      } catch {
+        parsed = { intent: "", suggestion: content.slice(0, 200), nextLine: null, hasError: false };
+      }
+
+      return new Response(
+        JSON.stringify({
+          intent: parsed.intent || "",
+          suggestion: parsed.suggestion || "",
+          nextLine: parsed.nextLine || null,
+          hasError: !!parsed.hasError,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ============= ACTION: explain-error (AI explanation for errors) =============
+    if (action === "explain-error") {
+      const { error, code, language, domain } = body;
+      const selectedModel = "google/gemini-2.5-flash-lite";
+      console.log(`[code-engine] explain-error`);
+
+      const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+
+      const explainPrompt = `The user has this error in their ${language} code:
+
+Error: ${error}
+
+Relevant code:
+\`\`\`${language}
+${(code || "").slice(0, 500)}
+\`\`\`
+
+Respond in JSON:
+{
+  "explanation": "Clear, friendly explanation (2-3 sentences)",
+  "fix": "Exact code fix or suggestion",
+  "concept": "Brief concept name for diagram (e.g. 'HTML closing tags', 'Flexbox layout')"
+}`;
+
+      const response = await fetch(LOVABLE_AI_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [
+            { role: "system", content: basePrompt + " Respond ONLY with valid JSON." },
+            { role: "user", content: explainPrompt },
+          ],
+          stream: false,
+          max_tokens: 400,
+        }),
+      });
+
+      if (!response.ok) {
+        return new Response(
+          JSON.stringify({ explanation: "Could not get AI explanation.", fix: "", concept: "" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content?.trim() || "{}";
+      let parsed: { explanation?: string; fix?: string; concept?: string } = {};
+      try {
+        parsed = JSON.parse(content.replace(/```json\n?|\n?```/g, "")) || {};
+      } catch {
+        parsed = { explanation: content.slice(0, 300), fix: "", concept: "" };
+      }
+
+      const concept = parsed.concept || "code concept";
+      const diagramUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(`educational diagram explaining ${concept}, clean infographic style, no watermark`)}?width=400&height=300&nologo=true`;
+
+      return new Response(
+        JSON.stringify({
+          explanation: parsed.explanation || "",
+          fix: parsed.fix || "",
+          concept: parsed.concept || "",
+          diagramUrl,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ============= ACTION: concept-image (AI generated concept diagram) =============
+    if (action === "concept-image") {
+      const { concept } = body;
+      if (!concept || typeof concept !== "string") {
+        return new Response(JSON.stringify({ error: "concept is required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(`educational diagram: ${concept}, clean infographic, developer tutorial style, no watermark`)}?width=500&height=350&nologo=true`;
+      return new Response(JSON.stringify({ url }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ============= ACTION: visual-assets (generated image URLs from prompt) =============
     if (action === "visual-assets") {
       const { prompt, domain: visualDomain, count } = body;

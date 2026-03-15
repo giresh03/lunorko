@@ -19,6 +19,9 @@ import {
   findCachedAIResponse, isOnline, getOfflineStatus, setOfflineMode,
   type CachedSnippet,
 } from "@/lib/offlineCache";
+import { detectErrors } from "@/lib/codeErrorDetector";
+import { AIGuidanceDropdown } from "@/components/editor/AIGuidanceDropdown";
+import { AIExplanationCard } from "@/components/editor/AIExplanationCard";
 
 // -- Project types --
 interface SavedProject {
@@ -374,7 +377,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets">("files");
+  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons">("files");
   const [showAIPanel, setShowAIPanel] = useState(true);
   const [online, setOnline] = useState(isOnline());
 
@@ -467,6 +470,15 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const ghostTextTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const monacoEditorRef = useRef<any>(null);
   const ghostDisposableRef = useRef<any>(null);
+
+  // AI real-time assistant state
+  const [aiSuggestion, setAiSuggestion] = useState<{ intent: string; suggestion: string; nextLine: string | null; hasError: boolean } | null>(null);
+  const [aiExplanation, setAiExplanation] = useState<{ explanation: string; fix: string; diagramUrl?: string } | null>(null);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiDropdownPosition, setAiDropdownPosition] = useState<{ top: number; left: number } | null>(null);
+  const [repeatedErrorCount, setRepeatedErrorCount] = useState(0);
+  const lastErrorKeyRef = useRef<string>("");
+  const aiAnalysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // New file/folder input
   const [newItemParent, setNewItemParent] = useState<string | null>(null);
@@ -991,6 +1003,126 @@ ${jsCode}
     setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: val || "", isModified: true } : t));
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
+
+  // Play subtle error sound when mistake detected
+  const playErrorSound = useCallback(() => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      osc.frequency.value = 400;
+      osc.type = "sine";
+      const gain = ctx.createGain();
+      gain.gain.value = 0.08;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    } catch {}
+  }, []);
+
+  // Fetch AI analysis (intent, suggestion, next line)
+  const fetchAIAnalysis = useCallback(async (code: string, language: string, cursorLine: number) => {
+    if (!online) return;
+    setAiAnalyzing(true);
+    try {
+      const resp = await fetch(CODE_ENGINE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainName }),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.intent || data.suggestion) {
+        setAiSuggestion({
+          intent: data.intent || "",
+          suggestion: data.suggestion || "",
+          nextLine: data.nextLine || null,
+          hasError: !!data.hasError,
+        });
+        // Position dropdown near cursor
+        const editor = monacoEditorRef.current;
+        if (editor) {
+          const pos = editor.getPosition();
+          if (pos) {
+            const coords = editor.getScrolledVisiblePosition(pos);
+            if (coords) {
+              const rect = editor.getContainerDomNode()?.getBoundingClientRect();
+              if (rect) {
+                setAiDropdownPosition({ top: rect.top + coords.top + 20, left: rect.left + coords.left });
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+    setAiAnalyzing(false);
+  }, [online, domainName]);
+
+  // Fetch AI error explanation
+  const fetchAIExplainError = useCallback(async (error: string, code: string, language: string) => {
+    if (!online) return;
+    try {
+      const resp = await fetch(CODE_ENGINE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainName }),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      setAiExplanation({
+        explanation: data.explanation || "",
+        fix: data.fix || "",
+        diagramUrl: data.diagramUrl,
+      });
+    } catch {}
+  }, [online, domainName]);
+
+  // Debounced AI analysis: 2 seconds after typing stops
+  useEffect(() => {
+    if (!activeTab || !online || chatLoading) return;
+    const code = activeTab.content;
+    if (code.length < 5) return;
+    if (aiAnalysisTimerRef.current) clearTimeout(aiAnalysisTimerRef.current);
+    aiAnalysisTimerRef.current = setTimeout(() => {
+      const editor = monacoEditorRef.current;
+      const cursorLine = editor?.getPosition()?.lineNumber ?? 1;
+      fetchAIAnalysis(code, activeTab.language, cursorLine - 1);
+      aiAnalysisTimerRef.current = null;
+    }, 2000);
+    return () => {
+      if (aiAnalysisTimerRef.current) clearTimeout(aiAnalysisTimerRef.current);
+    };
+  }, [activeTab?.content, activeTab?.language, activeTab?.id, online, chatLoading, fetchAIAnalysis]);
+
+  // Error detection: when mistake occurs, highlight + sound + AI explanation
+  useEffect(() => {
+    if (!activeTab) return;
+    const err = detectErrors(activeTab.content, activeTab.language);
+    if (err) {
+      const key = `${err.message}-${err.line ?? 0}`;
+      if (lastErrorKeyRef.current !== key) {
+        lastErrorKeyRef.current = key;
+        setRepeatedErrorCount((c) => c + 1);
+        playErrorSound();
+        fetchAIExplainError(err.message, activeTab.content, activeTab.language);
+      }
+    } else {
+      lastErrorKeyRef.current = "";
+    }
+  }, [activeTab?.content, activeTab?.language, activeTab?.id, playErrorSound, fetchAIExplainError]);
+
+  // Insert code at cursor (for AI suggestion)
+  const insertCodeAtCursor = useCallback((code: string) => {
+    const editor = monacoEditorRef.current;
+    if (!editor || !activeTab) return;
+    const pos = editor.getPosition();
+    if (!pos) return;
+    editor.executeEdits("ai-insert", [{ range: { startLineNumber: pos.lineNumber, startColumn: pos.column, endLineNumber: pos.lineNumber, endColumn: pos.column }, text: code }]);
+    setAiSuggestion(null);
+    setAiDropdownPosition(null);
+  }, [activeTab]);
+
+  const teachingMode = repeatedErrorCount >= 3;
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
@@ -1801,6 +1933,9 @@ ${jsCode}
           <button onClick={() => { setShowSidebar(true); setSidebarTab("snippets"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "snippets" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Offline Snippets">
             <FileCode2 className="h-4 w-4" />
           </button>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab("lessons"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "lessons" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Lesson Instructions">
+            <BookOpen className="h-4 w-4" />
+          </button>
           <button className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors">
             <GitBranch className="h-4 w-4" />
           </button>
@@ -1818,7 +1953,7 @@ ${jsCode}
           <div className="flex flex-col w-56 border-r shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border }}>
               <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
-                {sidebarTab === "files" ? "Explorer" : sidebarTab === "snippets" ? "Snippets" : "Search"}
+                {sidebarTab === "files" ? "Explorer" : sidebarTab === "snippets" ? "Snippets" : sidebarTab === "lessons" ? "Lessons" : "Search"}
               </span>
               {!online && <span className="text-[8px] px-1 py-0.5 rounded" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>OFFLINE</span>}
               {sidebarTab === "files" && (
@@ -1851,6 +1986,29 @@ ${jsCode}
                 {fileTree.map((node) => (
                   <FileItem key={node.id} node={node} depth={0} activeFileId={activeTabId} onSelect={handleSelectFile} onToggle={handleToggleFolder} onDelete={handleDeleteNode} onRename={handleRenameNode} themeColors={currentTheme.uiColors} />
                 ))}
+              </div>
+            ) : sidebarTab === "lessons" ? (
+              <div className="flex-1 overflow-y-auto py-3 px-3">
+                <div className="space-y-3 text-xs" style={{ color: currentTheme.uiColors.text }}>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.accent }}>Lesson Instructions</h3>
+                  <p style={{ color: currentTheme.uiColors.muted }}>
+                    The AI assistant analyzes your code in real time. When you pause typing for 2 seconds or write incorrect code, it will:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1" style={{ color: currentTheme.uiColors.muted }}>
+                    <li>Explain what you&apos;re building</li>
+                    <li>Suggest the next line of code</li>
+                    <li>Show error explanations with diagrams</li>
+                    <li>Offer &quot;Insert suggested code&quot; to apply fixes</li>
+                  </ul>
+                  {teachingMode && (
+                    <div className="rounded-lg p-2 border" style={{ backgroundColor: currentTheme.uiColors.accent + "10", borderColor: currentTheme.uiColors.accent + "40" }}>
+                      <p className="text-[10px] font-medium" style={{ color: currentTheme.uiColors.accent }}>Teaching Mode Active</p>
+                      <p className="text-[10px] mt-1" style={{ color: currentTheme.uiColors.muted }}>
+                        You&apos;ve made similar errors a few times. The AI will provide step-by-step guidance and small exercises to help you learn.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : sidebarTab === "snippets" ? (
               <div className="flex-1 overflow-y-auto py-1">
@@ -1951,7 +2109,17 @@ ${jsCode}
           {/* Monaco editor + Preview */}
           <div className="flex flex-1 overflow-hidden">
             {/* Editor */}
-            <div className={`flex-1 overflow-hidden ${showPreview ? "w-1/2" : "w-full"}`}>
+            <div className={`relative flex-1 overflow-hidden ${showPreview ? "w-1/2" : "w-full"}`}>
+              {/* Floating AI suggestion dropdown near cursor */}
+              {aiSuggestion && aiDropdownPosition && (
+                <AIGuidanceDropdown
+                  suggestion={aiSuggestion}
+                  onInsertCode={insertCodeAtCursor}
+                  onDismiss={() => { setAiSuggestion(null); setAiDropdownPosition(null); }}
+                  themeColors={currentTheme.uiColors}
+                  position={aiDropdownPosition}
+                />
+              )}
               {activeTab ? (
                 <Editor
                   height="100%"
@@ -2294,7 +2462,12 @@ ${jsCode}
             <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0" style={{ borderColor: currentTheme.uiColors.border }}>
               <Sparkles className="h-4 w-4" style={{ color: currentTheme.uiColors.accent }} />
               <span className="text-xs font-semibold" style={{ color: currentTheme.uiColors.text }}>AI Assistant</span>
-              <span className="rounded-sm px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>Diff Review</span>
+              {teachingMode && (
+                <span className="rounded-sm px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>Teaching Mode</span>
+              )}
+              {aiAnalyzing && (
+                <Loader2 className="h-3 w-3 animate-spin" style={{ color: currentTheme.uiColors.accent }} />
+              )}
               <div className="flex-1" />
               <button onClick={handleClearChat} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="Clear chat">
                 <Trash2 className="h-3 w-3" />
@@ -2304,8 +2477,59 @@ ${jsCode}
               </button>
             </div>
 
-            {/* Chat messages */}
+            {/* Chat messages + AI guidance */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3" style={{ backgroundColor: currentTheme.uiColors.bg }}>
+              {/* AI Guidance card (from 2s pause or incorrect code) */}
+              {aiSuggestion && (
+                <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
+                  <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border }}>
+                    <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                      <Sparkles className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                      AI Guidance
+                    </span>
+                    <button onClick={() => { setAiSuggestion(null); setAiDropdownPosition(null); }} className="p-0.5" style={{ color: currentTheme.uiColors.muted }}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {aiSuggestion.intent && (
+                      <p className="text-xs font-medium" style={{ color: currentTheme.uiColors.text }}>{aiSuggestion.intent}</p>
+                    )}
+                    <p className="text-xs" style={{ color: currentTheme.uiColors.muted }}>{aiSuggestion.suggestion}</p>
+                    {aiSuggestion.nextLine && (
+                      <button
+                        onClick={() => insertCodeAtCursor(aiSuggestion!.nextLine!)}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                        style={{ backgroundColor: currentTheme.uiColors.accent + "25", color: currentTheme.uiColors.accent }}
+                      >
+                        <ArrowRightToLine className="h-3 w-3" />
+                        Insert suggested code
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Error explanation card */}
+              {aiExplanation && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-[9px] font-semibold uppercase" style={{ color: currentTheme.uiColors.muted }}>Error Explanation</span>
+                    <button onClick={() => setAiExplanation(null)} className="p-0.5" style={{ color: currentTheme.uiColors.muted }}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <AIExplanationCard
+                    explanation={aiExplanation.explanation}
+                    fix={aiExplanation.fix}
+                    diagramUrl={aiExplanation.diagramUrl}
+                    onInsertFix={(code) => applyCodeToEditor(code, activeTab?.language || "javascript")}
+                    onDismiss={() => setAiExplanation(null)}
+                    themeColors={currentTheme.uiColors}
+                  />
+                </div>
+              )}
+
               {messages.map((msg, i) => (
                 <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: msg.role === "user" ? currentTheme.uiColors.border : currentTheme.uiColors.accent + "20" }}>
