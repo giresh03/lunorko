@@ -25,6 +25,7 @@ import ProjectBuilder from "./pages/ProjectBuilder";
 import AIVideoInterview from "./pages/AIVideoInterview";
 import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
 import NotFound from "./pages/NotFound";
+import PopAd from "./components/PopAd";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const AppContent = () => {
 
   return (
     <BrowserRouter>
+      <PopAd />
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/domains" element={<Domains />} />

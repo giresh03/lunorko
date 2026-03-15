@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import EditorPaywall from "@/components/EditorPaywall";
 import DesignEditorMain from "@/components/design-editor/DesignEditorMain";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
   CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useDashboard } from "@/hooks/useDashboard";
 import { domains, type Resource } from "@/lib/domains";
+import { supabase } from "@/integrations/supabase/client";
 
 const sourceColors: Record<string, string> = {
   YouTube: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -126,6 +127,33 @@ const DomainDetail = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
+  const [adminResources, setAdminResources] = useState<Resource[]>([]);
+
+  useEffect(() => {
+    if (!domainId) return;
+    const fetchAdminResources = async () => {
+      const { data } = await supabase
+        .from("admin_resources")
+        .select("id, title, resource_type, source, url, duration, thumbnail, description")
+        .eq("domain_id", domainId)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (data) {
+        const mapped: Resource[] = data.map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          type: (r.resource_type === "material" ? "article" : r.resource_type) as "video" | "article" | "course",
+          source: r.source,
+          url: r.url,
+          duration: r.duration,
+          thumbnail: r.thumbnail,
+          description: r.description,
+        }));
+        setAdminResources(mapped);
+      }
+    };
+    fetchAdminResources();
+  }, [domainId]);
   const isUIUXDomain = domainId === 'ui-ux';
   const { toast } = useToast();
   const { user } = useAuth();
@@ -153,8 +181,9 @@ const DomainDetail = () => {
   }
 
   const Icon = domain.icon;
-  const videos = domain.resources.filter((r) => r.type === "video" || r.type === "course");
-  const articles = domain.resources.filter((r) => r.type === "article");
+  const allResources: Resource[] = [...adminResources, ...domain.resources];
+  const videos = allResources.filter((r) => r.type === "video" || r.type === "course");
+  const articles = allResources.filter((r) => r.type === "article");
 
   if (isFullscreenIDE && hasEditorAccess) {
     if (isUIUXDomain) {
@@ -276,7 +305,7 @@ const DomainDetail = () => {
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Resources</p>
-                    <p className="text-2xl font-bold text-foreground">{domain.resources.length}</p>
+                    <p className="text-2xl font-bold text-foreground">{allResources.length}</p>
                   </div>
                 </div>
                 <div className="flex gap-3 text-xs text-muted-foreground">

@@ -35,16 +35,22 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
     const userId = authUser.id;
+    const userEmail = authUser.email || "";
 
-    // Check admin role
-    const { data: roleData } = await adminClient
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .single();
+    // lunor.ko@gmail.com is the designated admin account; otherwise check user_roles
+    const isDesignatedAdmin = userEmail === "lunor.ko@gmail.com";
+    let hasAdminRole = false;
+    if (!isDesignatedAdmin) {
+      const { data: roleData } = await adminClient
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle();
+      hasAdminRole = !!roleData;
+    }
 
-    if (!roleData) {
+    if (!isDesignatedAdmin && !hasAdminRole) {
       return new Response(JSON.stringify({ error: "Forbidden: Admin only" }), { status: 403, headers: corsHeaders });
     }
 
@@ -131,6 +137,7 @@ serve(async (req) => {
         return {
           id: profile?.id || au.id,
           user_id: au.id,
+          banned_until: au.banned_until || null,
           display_name: profile?.display_name || au.user_metadata?.full_name || au.user_metadata?.name || au.user_metadata?.display_name || au.email?.split("@")[0] || "Unnamed",
           avatar_url: profile?.avatar_url || au.user_metadata?.picture || au.user_metadata?.avatar_url,
           email: au.email || au.user_metadata?.email || "",
@@ -171,6 +178,31 @@ serve(async (req) => {
       }
       const enriched = (data || []).map((r: any) => ({ ...r, email: emailMap[r.user_id] || "" }));
       return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "resources") {
+      const { data } = await adminClient.from("admin_resources").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "pop-ads") {
+      const { data } = await adminClient.from("pop_ads").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "community-posts") {
+      const { data: posts } = await adminClient.from("community_posts").select("*").order("created_at", { ascending: false }).limit(200);
+      const userIds = [...new Set((posts || []).map((p: any) => p.user_id))];
+      const { data: profiles } = await adminClient.from("profiles").select("user_id, display_name, avatar_url").in("user_id", userIds);
+      const profileMap: Record<string, any> = {};
+      (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p; });
+      const enriched = (posts || []).map((p: any) => ({ ...p, author: profileMap[p.user_id] }));
+      return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "community-guidelines") {
+      const { data } = await adminClient.from("community_guidelines").select("*").order("sort_order", { ascending: true });
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // POST actions for managing data
@@ -226,12 +258,105 @@ serve(async (req) => {
 
       if (action === "delete-mentor") {
         const { error } = await adminClient.from("mentors").delete().eq("id", body.id);
-        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "add-resource") {
+        const { error } = await adminClient.from("admin_resources").insert({ ...body, updated_at: new Date().toISOString() });
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "update-resource") {
+        const { id, ...updates } = body;
+        const { error } = await adminClient.from("admin_resources").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "delete-resource") {
+        const { error } = await adminClient.from("admin_resources").delete().eq("id", body.id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "add-pop-ad") {
+        const { error } = await adminClient.from("pop_ads").insert({ ...body, updated_at: new Date().toISOString() });
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "update-pop-ad") {
+        const { id, ...updates } = body;
+        const { error } = await adminClient.from("pop_ads").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "delete-pop-ad") {
+        const { error } = await adminClient.from("pop_ads").delete().eq("id", body.id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "remove-community-post") {
+        const { id, reason } = body;
+        const { error } = await adminClient.from("community_posts").update({
+          is_removed: true,
+          removed_at: new Date().toISOString(),
+          removed_by: userId,
+          removal_reason: reason || "Violation of community guidelines",
+        }).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "restore-community-post") {
+        const { id } = body;
+        const { error } = await adminClient.from("community_posts").update({
+          is_removed: false,
+          removed_at: null,
+          removed_by: null,
+          removal_reason: null,
+        }).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "add-guideline") {
+        const { error } = await adminClient.from("community_guidelines").insert({ ...body, updated_at: new Date().toISOString() });
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "update-guideline") {
+        const { id, ...updates } = body;
+        const { error } = await adminClient.from("community_guidelines").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "delete-guideline") {
+        const { error } = await adminClient.from("community_guidelines").delete().eq("id", body.id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "set-user-role") {
+        const { user_id, role } = body;
+        await adminClient.from("user_roles").delete().eq("user_id", user_id);
+        if (role && role !== "user") {
+          await adminClient.from("user_roles").insert({ user_id, role });
+        }
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "ban-user") {
+        const { user_id } = body;
+        await adminClient.auth.admin.updateUserById(user_id, { ban_duration: "876000h" });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "unban-user") {
+        const { user_id } = body;
+        await adminClient.auth.admin.updateUserById(user_id, { ban_duration: "none" });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("Admin error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), { status: 500, headers: corsHeaders });

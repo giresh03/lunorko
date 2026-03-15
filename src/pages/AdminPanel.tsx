@@ -4,7 +4,8 @@ import {
   Users, CreditCard, TrendingUp, UserCheck, Calendar,
   LayoutDashboard, BookOpen, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
-  CheckCircle, XCircle, Receipt
+  CheckCircle, XCircle, Receipt, Video, FileText, Megaphone,
+  MessageSquare, Ban, UserPlus
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,10 @@ const AdminPanel = () => {
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [mentors, setMentors] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [popAds, setPopAds] = useState<any[]>([]);
+  const [communityPosts, setCommunityPosts] = useState<any[]>([]);
+  const [communityGuidelines, setCommunityGuidelines] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -56,6 +61,28 @@ const AdminPanel = () => {
     bio: "", years_experience: 1, meeting_link: "",
     tech_stack: "", career_tips: "", journey_summary: "", college_preparation: "",
   });
+
+  // Resource form
+  const [resourceDialog, setResourceDialog] = useState(false);
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [resourceForm, setResourceForm] = useState({
+    domain_id: "web-development", title: "", resource_type: "video" as const,
+    source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0,
+  });
+
+  // Pop ad form
+  const [popAdDialog, setPopAdDialog] = useState(false);
+  const [editingPopAd, setEditingPopAd] = useState<any>(null);
+  const [popAdForm, setPopAdForm] = useState({
+    title: "", image_url: "", link_url: "", festival_name: "",
+    start_date: new Date().toISOString().slice(0, 10),
+    end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    is_active: true, sort_order: 0,
+  });
+
+  const [guidelineDialog, setGuidelineDialog] = useState(false);
+  const [editingGuideline, setEditingGuideline] = useState<any>(null);
+  const [guidelineForm, setGuidelineForm] = useState({ domain_id: "", guideline_text: "", sort_order: 0 });
 
   const callAdmin = async (action: string, method = "GET", body?: any) => {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -105,21 +132,33 @@ const AdminPanel = () => {
   const fetchAll = async () => {
     setLoadingData(true);
     try {
-      const [statsData, usersData, subsData, mentorsData, prData, trendsData] = await Promise.all([
+      const results = await Promise.allSettled([
         callAdmin("stats"),
         callAdmin("users"),
         callAdmin("subscriptions"),
         callAdmin("mentors"),
         callAdmin("payment-requests"),
         callAdmin("visitor-trends"),
+        callAdmin("resources"),
+        callAdmin("pop-ads"),
+        callAdmin("community-posts"),
+        callAdmin("community-guidelines"),
       ]);
 
-      setStats(statsData as AdminStats);
+      const [statsData, usersData, subsData, mentorsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData] = results.map((r) =>
+        r.status === "fulfilled" ? r.value : null
+      );
+
+      setStats((statsData as AdminStats) || null);
       setUsers(Array.isArray(usersData) ? usersData : []);
       setSubscriptions(Array.isArray(subsData) ? subsData : []);
       setMentors(Array.isArray(mentorsData) ? mentorsData : []);
       setPaymentRequests(Array.isArray(prData) ? prData : []);
       setVisitorTrends(Array.isArray(trendsData) ? trendsData : []);
+      setResources(Array.isArray(resourcesData) ? resourcesData : []);
+      setPopAds(Array.isArray(popAdsData) ? popAdsData : []);
+      setCommunityPosts(Array.isArray(communityPostsData) ? communityPostsData : []);
+      setCommunityGuidelines(Array.isArray(guidelinesData) ? guidelinesData : []);
     } catch (e: any) {
       console.error(e);
       toast({
@@ -170,6 +209,137 @@ const AdminPanel = () => {
 
   const resetMentorForm = () => {
     setMentorForm({ name: "", email: "", company: "", role: "", domain_id: "", bio: "", years_experience: 1, meeting_link: "", tech_stack: "", career_tips: "", journey_summary: "", college_preparation: "" });
+  };
+
+  const DOMAIN_IDS = ["web-development", "app-development", "cybersecurity", "data-science", "cloud-computing", "devops", "database", "iot", "blockchain", "ui-ux", "dsa", "system-design"];
+
+  const handleSaveResource = async () => {
+    const payload = { ...resourceForm, sort_order: Number(resourceForm.sort_order) };
+    if (editingResource) {
+      await callAdmin("update-resource", "POST", { id: editingResource.id, ...payload });
+      toast({ title: "Resource updated" });
+    } else {
+      await callAdmin("add-resource", "POST", payload);
+      toast({ title: "Resource added" });
+    }
+    setResourceDialog(false);
+    setEditingResource(null);
+    setResourceForm({ domain_id: "web-development", title: "", resource_type: "video", source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0 });
+    fetchAll();
+  };
+
+  const handleDeleteResource = async (id: string) => {
+    await callAdmin("delete-resource", "POST", { id });
+    toast({ title: "Resource deleted" });
+    fetchAll();
+  };
+
+  const openEditResource = (r: any) => {
+    setEditingResource(r);
+    setResourceForm({
+      domain_id: r.domain_id || "web-development",
+      title: r.title || "",
+      resource_type: (r.resource_type || "video") as "video" | "article" | "course" | "material",
+      source: r.source || "Custom",
+      url: r.url || "",
+      duration: r.duration || "",
+      thumbnail: r.thumbnail || "",
+      description: r.description || "",
+      sort_order: r.sort_order ?? 0,
+    });
+    setResourceDialog(true);
+  };
+
+  const handleSavePopAd = async () => {
+    const payload = { ...popAdForm, sort_order: Number(popAdForm.sort_order) };
+    if (editingPopAd) {
+      await callAdmin("update-pop-ad", "POST", { id: editingPopAd.id, ...payload });
+      toast({ title: "Pop ad updated" });
+    } else {
+      await callAdmin("add-pop-ad", "POST", payload);
+      toast({ title: "Pop ad added" });
+    }
+    setPopAdDialog(false);
+    setEditingPopAd(null);
+    setPopAdForm({
+      title: "", image_url: "", link_url: "", festival_name: "",
+      start_date: new Date().toISOString().slice(0, 10),
+      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      is_active: true, sort_order: 0,
+    });
+    fetchAll();
+  };
+
+  const handleDeletePopAd = async (id: string) => {
+    await callAdmin("delete-pop-ad", "POST", { id });
+    toast({ title: "Pop ad deleted" });
+    fetchAll();
+  };
+
+  const openEditPopAd = (p: any) => {
+    setEditingPopAd(p);
+    setPopAdForm({
+      title: p.title || "",
+      image_url: p.image_url || "",
+      link_url: p.link_url || "",
+      festival_name: p.festival_name || "",
+      start_date: p.start_date ? p.start_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      end_date: p.end_date ? p.end_date.slice(0, 10) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      is_active: p.is_active ?? true,
+      sort_order: p.sort_order ?? 0,
+    });
+    setPopAdDialog(true);
+  };
+
+  const handleRemovePost = async (id: string, reason?: string) => {
+    await callAdmin("remove-community-post", "POST", { id, reason });
+    toast({ title: "Post removed" });
+    fetchAll();
+  };
+
+  const handleRestorePost = async (id: string) => {
+    await callAdmin("restore-community-post", "POST", { id });
+    toast({ title: "Post restored" });
+    fetchAll();
+  };
+
+  const handleSaveGuideline = async () => {
+    const payload = { ...guidelineForm, sort_order: Number(guidelineForm.sort_order) };
+    if (editingGuideline) {
+      await callAdmin("update-guideline", "POST", { id: editingGuideline.id, ...payload });
+      toast({ title: "Guideline updated" });
+    } else {
+      await callAdmin("add-guideline", "POST", payload);
+      toast({ title: "Guideline added" });
+    }
+    setGuidelineDialog(false);
+    setEditingGuideline(null);
+    setGuidelineForm({ domain_id: "", guideline_text: "", sort_order: 0 });
+    fetchAll();
+  };
+
+  const handleDeleteGuideline = async (id: string) => {
+    await callAdmin("delete-guideline", "POST", { id });
+    toast({ title: "Guideline deleted" });
+    fetchAll();
+  };
+
+  const handleSetUserRole = async (userId: string, role: string) => {
+    await callAdmin("set-user-role", "POST", { user_id: userId, role });
+    toast({ title: `Role set to ${role}` });
+    fetchAll();
+  };
+
+  const handleBanUser = async (userId: string) => {
+    await callAdmin("ban-user", "POST", { user_id: userId });
+    toast({ title: "User banned", variant: "destructive" });
+    fetchAll();
+  };
+
+  const handleUnbanUser = async (userId: string) => {
+    await callAdmin("unban-user", "POST", { user_id: userId });
+    toast({ title: "User unbanned" });
+    fetchAll();
   };
 
   const openEditMentor = (m: any) => {
@@ -246,6 +416,10 @@ const AdminPanel = () => {
             <TabsTrigger value="subscriptions"><CreditCard className="mr-2 h-4 w-4" /> Subscriptions</TabsTrigger>
             <TabsTrigger value="payment-requests"><Receipt className="mr-2 h-4 w-4" /> Payment Requests{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
             <TabsTrigger value="mentors"><BookOpen className="mr-2 h-4 w-4" /> Mentors</TabsTrigger>
+            <TabsTrigger value="resources"><Video className="mr-2 h-4 w-4" /> Resources</TabsTrigger>
+            <TabsTrigger value="pop-ads"><Megaphone className="mr-2 h-4 w-4" /> Pop Ads</TabsTrigger>
+            <TabsTrigger value="community"><MessageSquare className="mr-2 h-4 w-4" /> Community</TabsTrigger>
+            <TabsTrigger value="guidelines"><Shield className="mr-2 h-4 w-4" /> Guidelines</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -371,6 +545,20 @@ const AdminPanel = () => {
                         <Badge key={r} variant={r === "admin" ? "default" : "outline"} className="text-xs capitalize">{r}</Badge>
                       ))}
                     </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    <span className="text-sm font-medium text-foreground">Set role:</span>
+                    {["user", "moderator", "admin"].map((role) => (
+                      <Button key={role} variant={(selectedUser.roles || ["user"])[0] === role ? "default" : "outline"} size="sm" onClick={() => handleSetUserRole(selectedUser.user_id, role)}>
+                        {role}
+                      </Button>
+                    ))}
+                    {selectedUser.banned_until ? (
+                      <Button variant="outline" size="sm" className="text-green-600" onClick={() => handleUnbanUser(selectedUser.user_id)}><UserPlus className="h-4 w-4 mr-1" /> Unban</Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="text-destructive" onClick={() => handleBanUser(selectedUser.user_id)}><Ban className="h-4 w-4 mr-1" /> Ban User</Button>
+                    )}
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -666,6 +854,246 @@ const AdminPanel = () => {
                   {mentors.length === 0 && (
                     <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No mentors yet</TableCell></TableRow>
                   )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Resources */}
+          <TabsContent value="resources">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-foreground">Manage Resources (Videos, Articles, Materials)</h3>
+              <Dialog open={resourceDialog} onOpenChange={(open) => { setResourceDialog(open); if (!open) { setEditingResource(null); setResourceForm({ domain_id: "web-development", title: "", resource_type: "video", source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0 }); } }}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Add Resource</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingResource ? "Edit Resource" : "Add Resource"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Domain</label>
+                        <select className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3" value={resourceForm.domain_id} onChange={(e) => setResourceForm({ ...resourceForm, domain_id: e.target.value })}>
+                          {DOMAIN_IDS.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Type</label>
+                        <select className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3" value={resourceForm.resource_type} onChange={(e) => setResourceForm({ ...resourceForm, resource_type: e.target.value as any })}>
+                          <option value="video">Video</option>
+                          <option value="article">Article</option>
+                          <option value="course">Course</option>
+                          <option value="material">Material</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div><label className="text-sm font-medium text-foreground">Title</label><Input value={resourceForm.title} onChange={(e) => setResourceForm({ ...resourceForm, title: e.target.value })} placeholder="Resource title" /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="text-sm font-medium text-foreground">Source</label><Input value={resourceForm.source} onChange={(e) => setResourceForm({ ...resourceForm, source: e.target.value })} placeholder="YouTube, Udemy, etc." /></div>
+                      <div><label className="text-sm font-medium text-foreground">Duration</label><Input value={resourceForm.duration} onChange={(e) => setResourceForm({ ...resourceForm, duration: e.target.value })} placeholder="e.g. 2h 30m" /></div>
+                    </div>
+                    <div><label className="text-sm font-medium text-foreground">URL</label><Input value={resourceForm.url} onChange={(e) => setResourceForm({ ...resourceForm, url: e.target.value })} placeholder="https://..." /></div>
+                    <div><label className="text-sm font-medium text-foreground">Thumbnail URL</label><Input value={resourceForm.thumbnail} onChange={(e) => setResourceForm({ ...resourceForm, thumbnail: e.target.value })} placeholder="https://..." /></div>
+                    <div><label className="text-sm font-medium text-foreground">Description</label><Textarea value={resourceForm.description} onChange={(e) => setResourceForm({ ...resourceForm, description: e.target.value })} /></div>
+                    <div><label className="text-sm font-medium text-foreground">Sort Order</label><Input type="number" value={resourceForm.sort_order} onChange={(e) => setResourceForm({ ...resourceForm, sort_order: Number(e.target.value) })} /></div>
+                    <Button onClick={handleSaveResource}>{editingResource ? "Update Resource" : "Add Resource"}</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {resources.map((r) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{r.title}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{r.domain_id}</Badge></TableCell>
+                      <TableCell><Badge variant="secondary" className="text-xs capitalize">{r.resource_type}</Badge></TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{r.source}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{r.duration || "—"}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditResource(r)}><Edit className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteResource(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {resources.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No resources yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Pop Ads */}
+          <TabsContent value="pop-ads">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-foreground">Festival Pop Ads & Banners</h3>
+              <Dialog open={popAdDialog} onOpenChange={(open) => { setPopAdDialog(open); if (!open) { setEditingPopAd(null); setPopAdForm({ title: "", image_url: "", link_url: "", festival_name: "", start_date: new Date().toISOString().slice(0, 10), end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10), is_active: true, sort_order: 0 }); } }}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Add Pop Ad</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingPopAd ? "Edit Pop Ad" : "Add Pop Ad"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div><label className="text-sm font-medium text-foreground">Title</label><Input value={popAdForm.title} onChange={(e) => setPopAdForm({ ...popAdForm, title: e.target.value })} placeholder="Banner title" /></div>
+                    <div><label className="text-sm font-medium text-foreground">Festival Name</label><Input value={popAdForm.festival_name} onChange={(e) => setPopAdForm({ ...popAdForm, festival_name: e.target.value })} placeholder="e.g. Diwali, Holi" /></div>
+                    <div><label className="text-sm font-medium text-foreground">Image URL</label><Input value={popAdForm.image_url} onChange={(e) => setPopAdForm({ ...popAdForm, image_url: e.target.value })} placeholder="https://..." /></div>
+                    <div><label className="text-sm font-medium text-foreground">Link URL</label><Input value={popAdForm.link_url} onChange={(e) => setPopAdForm({ ...popAdForm, link_url: e.target.value })} placeholder="https://..." /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="text-sm font-medium text-foreground">Start Date</label><Input type="date" value={popAdForm.start_date} onChange={(e) => setPopAdForm({ ...popAdForm, start_date: e.target.value })} /></div>
+                      <div><label className="text-sm font-medium text-foreground">End Date</label><Input type="date" value={popAdForm.end_date} onChange={(e) => setPopAdForm({ ...popAdForm, end_date: e.target.value })} /></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" id="popad-active" checked={popAdForm.is_active} onChange={(e) => setPopAdForm({ ...popAdForm, is_active: e.target.checked })} />
+                      <label htmlFor="popad-active" className="text-sm font-medium text-foreground">Active</label>
+                    </div>
+                    <div><label className="text-sm font-medium text-foreground">Sort Order</label><Input type="number" value={popAdForm.sort_order} onChange={(e) => setPopAdForm({ ...popAdForm, sort_order: Number(e.target.value) })} /></div>
+                    <Button onClick={handleSavePopAd}>{editingPopAd ? "Update Pop Ad" : "Add Pop Ad"}</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Festival</TableHead>
+                    <TableHead>Start</TableHead>
+                    <TableHead>End</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {popAds.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">{p.title || "—"}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{p.festival_name}</Badge></TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{new Date(p.start_date).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{new Date(p.end_date).toLocaleDateString()}</TableCell>
+                      <TableCell><Badge variant={p.is_active ? "default" : "secondary"} className="text-xs">{p.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditPopAd(p)}><Edit className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeletePopAd(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {popAds.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No pop ads yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Community Moderation */}
+          <TabsContent value="community">
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <h3 className="text-lg font-bold text-foreground p-4 flex items-center gap-2"><MessageSquare className="h-5 w-5" /> Community Posts Moderation</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Author</TableHead>
+                    <TableHead>Content</TableHead>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Posted</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {communityPosts.map((p) => (
+                    <TableRow key={p.id} className={p.is_removed ? "opacity-60" : ""}>
+                      <TableCell className="font-medium">{p.author?.display_name || "Unknown"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">{p.content || p.title || "—"}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{p.domain_id || "—"}</Badge></TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Badge variant={p.is_removed ? "destructive" : "default"} className="text-xs">{p.is_removed ? "Removed" : "Visible"}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {p.is_removed ? (
+                          <Button variant="ghost" size="sm" onClick={() => handleRestorePost(p.id)}><UserPlus className="h-4 w-4 mr-1" /> Restore</Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleRemovePost(p.id)}><Ban className="h-4 w-4 mr-1" /> Remove</Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {communityPosts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No community posts yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Guidelines */}
+          <TabsContent value="guidelines">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-foreground">Community Guidelines</h3>
+              <Dialog open={guidelineDialog} onOpenChange={(open) => { setGuidelineDialog(open); if (!open) { setEditingGuideline(null); setGuidelineForm({ domain_id: "", guideline_text: "", sort_order: 0 }); } }}>
+                <DialogTrigger asChild>
+                  <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Add Guideline</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingGuideline ? "Edit Guideline" : "Add Guideline"}</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Domain (optional)</label>
+                      <select className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3" value={guidelineForm.domain_id} onChange={(e) => setGuidelineForm({ ...guidelineForm, domain_id: e.target.value })}>
+                        <option value="">All domains</option>
+                        {DOMAIN_IDS.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                    <div><label className="text-sm font-medium text-foreground">Guideline Text</label><Textarea value={guidelineForm.guideline_text} onChange={(e) => setGuidelineForm({ ...guidelineForm, guideline_text: e.target.value })} placeholder="Be respectful..." rows={4} /></div>
+                    <div><label className="text-sm font-medium text-foreground">Sort Order</label><Input type="number" value={guidelineForm.sort_order} onChange={(e) => setGuidelineForm({ ...guidelineForm, sort_order: Number(e.target.value) })} /></div>
+                    <Button onClick={handleSaveGuideline}>{editingGuideline ? "Update Guideline" : "Add Guideline"}</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Guideline</TableHead>
+                    <TableHead>Order</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {communityGuidelines.map((g) => (
+                    <TableRow key={g.id}>
+                      <TableCell><Badge variant="outline" className="text-xs">{g.domain_id || "All"}</Badge></TableCell>
+                      <TableCell className="max-w-[400px] text-sm">{g.guideline_text}</TableCell>
+                      <TableCell className="text-muted-foreground">{g.sort_order}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingGuideline(g); setGuidelineForm({ domain_id: g.domain_id || "", guideline_text: g.guideline_text || "", sort_order: g.sort_order ?? 0 }); setGuidelineDialog(true); }}><Edit className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteGuideline(g.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {communityGuidelines.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No guidelines yet</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
