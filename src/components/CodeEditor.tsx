@@ -1026,9 +1026,14 @@ ${jsCode}
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainName, teachingMode: isTeachingMode }),
+        body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainId, teachingMode: isTeachingMode }),
       });
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        if (import.meta.env.DEV) console.warn("[CodeEditor] analyze-code failed:", resp.status, err);
+        setAiAnalyzing(false);
+        return;
+      }
       const data = await resp.json();
       if (data.intent || data.suggestion) {
         setAiSuggestion({
@@ -1039,9 +1044,11 @@ ${jsCode}
           diagramUrl: data.diagramUrl,
         });
       }
-    } catch {}
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn("[CodeEditor] analyze-code error:", e);
+    }
     setAiAnalyzing(false);
-  }, [online, domainName]);
+  }, [online, domainId]);
 
   // Fetch AI error explanation
   const fetchAIExplainError = useCallback(async (error: string, code: string, language: string, isTeachingMode: boolean) => {
@@ -1050,30 +1057,36 @@ ${jsCode}
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainName, teachingMode: isTeachingMode }),
+        body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode }),
       });
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        if (import.meta.env.DEV) console.warn("[CodeEditor] explain-error failed:", resp.status);
+        return;
+      }
       const data = await resp.json();
       setAiExplanation({
         explanation: data.explanation || "",
         fix: data.fix || "",
         diagramUrl: data.diagramUrl,
       });
-    } catch {}
-  }, [online, domainName]);
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn("[CodeEditor] explain-error error:", e);
+    }
+  }, [online, domainId]);
 
-  // Debounced AI analysis: 2 seconds after typing stops
+  // Debounced AI analysis: 2s after typing stops (1.5s in teaching mode for faster feedback)
   useEffect(() => {
     if (!activeTab || !online || chatLoading) return;
     const code = activeTab.content;
     if (code.length < 5) return;
     if (aiAnalysisTimerRef.current) clearTimeout(aiAnalysisTimerRef.current);
+    const delay = repeatedErrorCount >= 1 ? 1500 : 2000;
     aiAnalysisTimerRef.current = setTimeout(() => {
       const editor = monacoEditorRef.current;
       const cursorLine = editor?.getPosition()?.lineNumber ?? 1;
-      fetchAIAnalysis(code, activeTab.language, cursorLine - 1, repeatedErrorCount >= 2);
+      fetchAIAnalysis(code, activeTab.language, cursorLine - 1, repeatedErrorCount >= 1);
       aiAnalysisTimerRef.current = null;
-    }, 2000);
+    }, delay);
     return () => {
       if (aiAnalysisTimerRef.current) clearTimeout(aiAnalysisTimerRef.current);
     };
@@ -1090,7 +1103,7 @@ ${jsCode}
         setRepeatedErrorCount((c) => c + 1);
         setAiSuggestion(null);
         playErrorSound();
-        fetchAIExplainError(err.message, activeTab.content, activeTab.language, repeatedErrorCount >= 1);
+        fetchAIExplainError(err.message, activeTab.content, activeTab.language, repeatedErrorCount >= 0);
       }
     } else {
       lastErrorKeyRef.current = "";
@@ -1113,7 +1126,7 @@ ${jsCode}
     setAiExplanation(null);
   }, [activeTab?.language, applyCodeToEditor]);
 
-  const teachingMode = repeatedErrorCount >= 2;
+  const teachingMode = repeatedErrorCount >= 1;
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
@@ -1148,13 +1161,13 @@ ${jsCode}
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainName, model: selectedModel }),
+        body: JSON.stringify({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainId, model: selectedModel }),
       });
       if (!resp.ok) return null;
       const data = await resp.json();
       return data.suggestion || null;
     } catch { return null; }
-  }, [domainName, selectedModel]);
+  }, [domainId, selectedModel]);
 
   // Register Monaco inline completion provider
   useEffect(() => {

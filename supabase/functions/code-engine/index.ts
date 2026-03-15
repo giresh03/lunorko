@@ -198,8 +198,24 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const body = await req.json();
-    const { action, domain } = body;
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON body" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (!body || typeof body !== "object") {
+      return new Response(
+        JSON.stringify({ error: "Request body required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const action = body.action as string | undefined;
+    const rawDomain = (body.domain as string) || "web-development";
+    const domain = typeof rawDomain === "string" ? rawDomain.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "web-development" : "web-development";
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -668,8 +684,9 @@ Respond in JSON:
       );
     }
 
+    console.error("[code-engine] Unknown action:", action, "keys:", Object.keys(body || {}));
     return new Response(
-      JSON.stringify({ error: `Unknown action: ${action}` }),
+      JSON.stringify({ error: `Unknown action: ${action ?? "undefined"}` }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
