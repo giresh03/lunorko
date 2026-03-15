@@ -213,24 +213,23 @@ serve(async (req) => {
 
       if (action === "delete-user") {
         const { user_id } = body as { user_id: string };
-        if (!user_id) return new Response(JSON.stringify({ error: "user_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!user_id) return new Response(JSON.stringify({ success: false, error: "user_id required" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         try {
           // Clear FK references that block auth user delete (removed_by in community_posts has no ON DELETE)
-          try {
-            await adminClient.from("community_posts").update({ removed_by: null }).eq("removed_by", user_id);
-          } catch (_) { /* column may not exist */ }
-          // Delete user data
+          const { error: cpErr } = await adminClient.from("community_posts").update({ removed_by: null }).eq("removed_by", user_id);
+          if (cpErr) console.warn("community_posts update:", cpErr.message);
+          // Delete user data (ignore errors - tables may not exist)
           await adminClient.from("payment_requests").delete().eq("user_id", user_id);
           await adminClient.from("subscriptions").delete().eq("user_id", user_id);
-          const { error } = await adminClient.auth.admin.deleteUser(user_id);
-          if (error) {
-            console.error("deleteUser error:", error.message);
-            return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          const { error: delErr } = await adminClient.auth.admin.deleteUser(user_id);
+          if (delErr) {
+            console.error("deleteUser error:", delErr.message);
+            return new Response(JSON.stringify({ success: false, error: delErr.message }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
           return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         } catch (e: any) {
           console.error("delete-user exception:", e);
-          return new Response(JSON.stringify({ error: e?.message || "Failed to delete user" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(JSON.stringify({ success: false, error: String(e?.message || e || "Failed to delete user") }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       }
 

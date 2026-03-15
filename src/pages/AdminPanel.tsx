@@ -320,7 +320,10 @@ const AdminPanel = () => {
       return;
     }
     try {
-      await callAdmin("delete-user", "POST", { user_id: userId, action: "delete-user" });
+      const res = await callAdmin("delete-user", "POST", { user_id: userId, action: "delete-user" });
+      if (res?.success === false) {
+        throw new Error(res?.error || "Delete failed");
+      }
       toast({ title: "User and subscription removed", variant: "destructive" });
       setSelectedUser(null);
       setDeleteUserDialog(false);
