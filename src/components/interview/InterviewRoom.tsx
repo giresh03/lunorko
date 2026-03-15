@@ -43,7 +43,7 @@ const invokeAI = async (action: string, body: Record<string, unknown>) => {
 // Speech-to-text: Web Speech API (Chrome, Safari, Edge)
 const getSpeechRecognition = () => {
   if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognition; webkitSpeechRecognition?: new () => SpeechRecognition };
+  const w = window as unknown as { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 };
 
