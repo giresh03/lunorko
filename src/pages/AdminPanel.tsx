@@ -170,18 +170,30 @@ const AdminPanel = () => {
   const DOMAIN_IDS = ["web-development", "app-development", "cybersecurity", "data-science", "cloud-computing", "devops", "database", "iot", "blockchain", "ui-ux", "dsa", "system-design"];
 
   const handleSaveResource = async () => {
-    const payload = { ...resourceForm, sort_order: Number(resourceForm.sort_order) };
-    if (editingResource) {
-      await callAdmin("update-resource", "POST", { id: editingResource.id, ...payload });
-      toast({ title: "Resource updated" });
-    } else {
-      await callAdmin("add-resource", "POST", payload);
-      toast({ title: "Resource added" });
+    if (!resourceForm.title?.trim()) {
+      toast({ title: "Title is required", variant: "destructive" });
+      return;
     }
-    setResourceDialog(false);
-    setEditingResource(null);
-    setResourceForm({ domain_id: "web-development", title: "", resource_type: "video", source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0 });
-    fetchAll();
+    if (!resourceForm.url?.trim()) {
+      toast({ title: "URL is required", variant: "destructive" });
+      return;
+    }
+    try {
+      const payload = { ...resourceForm, sort_order: Number(resourceForm.sort_order) };
+      if (editingResource) {
+        await callAdmin("update-resource", "POST", { id: editingResource.id, ...payload });
+        toast({ title: "Resource updated" });
+      } else {
+        await callAdmin("add-resource", "POST", payload);
+        toast({ title: "Resource added" });
+      }
+      setResourceDialog(false);
+      setEditingResource(null);
+      setResourceForm({ domain_id: "web-development", title: "", resource_type: "video", source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0 });
+      fetchAll();
+    } catch (e: any) {
+      toast({ title: "Failed to save resource", description: e?.message || "Please try again", variant: "destructive" });
+    }
   };
 
   const handleDeleteResource = async (id: string) => {
