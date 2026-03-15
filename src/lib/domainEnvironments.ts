@@ -30,73 +30,14 @@ export const domainEnvironments: Record<string, DomainEnvironment> = {
   },
   "app-development": {
     id: "app-development",
-    primaryLanguage: "html",
-    supportedLanguages: ["html", "css", "javascript", "json"],
+    primaryLanguage: "javascript",
+    supportedLanguages: ["javascript", "typescript", "json"],
     runtime: "native",
-    defaultFileName: "index.html",
-    starterCode: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>App - Lunor.AI</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="app">
-    <h1>Hello World</h1>
-    <p>Edit index.html, styles.css, and script.js to build your app.</p>
-  </div>
-  <script src="script.js"></script>
-</body>
-</html>`,
+    defaultFileName: "App.jsx",
+    starterCode: `// React Native App\nimport React, { useState } from 'react';\n\nfunction App() {\n  const [count, setCount] = useState(0);\n  console.log('App rendered, count:', count);\n  return { type: 'View', children: [{ type: 'Text', value: 'Count: ' + count }] };\n}\n\nconsole.log(JSON.stringify(App(), null, 2));\n`,
     templateFiles: [
-      { name: "index.html", language: "html", content: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>App - Lunor.AI</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="app">
-    <h1>Hello World</h1>
-    <p>Edit index.html, styles.css, and script.js to build your app.</p>
-  </div>
-  <script src="script.js"></script>
-</body>
-</html>` },
-      { name: "styles.css", language: "css", content: `/* App styles */
-:root {
-  --bg: #0f0f23;
-  --text: #e0e0e0;
-  --primary: #00d4aa;
-}
-
-* { margin: 0; box-sizing: border-box; }
-
-body {
-  font-family: system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.app {
-  max-width: 393px;
-  margin: 0 auto;
-}
-
-h1 { font-size: 24px; margin-bottom: 12px; }
-p { color: #94a3b8; }
-` },
-      { name: "script.js", language: "javascript", content: `// App logic
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('App loaded!');
-});
-` },
+      { name: "App.jsx", language: "javascript", content: `import React, { useState } from 'react';\nimport { View, Text, Button } from 'react-native';\n\nexport default function App() {\n  const [count, setCount] = useState(0);\n  return (\n    <View>\n      <Text>Count: {count}</Text>\n      <Button title="+" onPress={() => setCount(c => c + 1)} />\n    </View>\n  );\n}\n` },
+      { name: "app.json", language: "json", content: `{\n  "expo": {\n    "name": "MyApp",\n    "slug": "my-app",\n    "version": "1.0.0"\n  }\n}\n` },
     ],
   },
   "data-science": {

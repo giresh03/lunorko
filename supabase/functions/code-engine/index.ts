@@ -206,7 +206,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "LOVABLE_API_KEY is not configured",
-          hint: "Set the Edge Function secret: npx supabase secrets set LOVABLE_API_KEY=... --project-ref byveaoqwuwyhaykgjufj",
+          hint: "Set the Edge Function secret: npx supabase secrets set LOVABLE_API_KEY=...",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -431,7 +431,7 @@ ${code}
 
     // ============= ACTION: autocomplete (ghost text) =============
     if (action === "autocomplete") {
-      const { code, language, cursorLine, cursorColumn, model } = body;
+      const { code, language, cursorLine, cursorColumn } = body;
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
 

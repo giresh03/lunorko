@@ -27,15 +27,33 @@ const invokeAI = async (action: string, body: Record<string, unknown>) => {
   const token = sessionData?.session?.access_token;
   if (!token) throw new Error("Not authenticated");
 
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-interview`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ action, ...body }),
-  });
-  const data = await res.json();
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-interview`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action, ...body }),
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("fetch") || msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+      throw new Error(
+        "Network error. Deploy the ai-interview function: run 'supabase functions deploy ai-interview' and ensure your site URL is in Supabase redirect URLs."
+      );
+    }
+    throw e;
+  }
+
+  let data: { error?: string };
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(res.status === 404 ? "AI Interview function not deployed. Run: supabase functions deploy ai-interview" : `Request failed (${res.status})`);
+  }
   if (data.error) throw new Error(data.error);
   return data;
 };
