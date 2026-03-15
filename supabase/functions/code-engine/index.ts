@@ -471,13 +471,16 @@ ${code}
 
     // ============= ACTION: analyze-code (real-time AI guidance) =============
     if (action === "analyze-code") {
-      const { code, language, cursorLine, domain } = body;
+      const { code, language, cursorLine, domain, teachingMode } = body;
       const selectedModel = "google/gemini-2.5-flash-lite";
-      console.log(`[code-engine] analyze-code lang=${language}, line=${cursorLine}`);
+      console.log(`[code-engine] analyze-code lang=${language}, line=${cursorLine}, teachingMode=${!!teachingMode}`);
 
       const lines = code.split("\n");
       const contextBefore = lines.slice(Math.max(0, cursorLine - 15), cursorLine + 1).join("\n");
       const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+      const teachingHint = teachingMode
+        ? "\n\nTEACHING MODE: The user has made repeated errors. Provide step-by-step guidance, break concepts into small pieces, and suggest a simple exercise or next action."
+        : "";
 
       const analyzePrompt = `As a coding mentor, analyze this ${language} code the user is writing.
 
@@ -491,11 +494,12 @@ Respond in JSON only:
   "intent": "brief description of what the user seems to be building (1 sentence)",
   "suggestion": "next step or fix (1-2 sentences, actionable)",
   "nextLine": "optional: exact next line of code to suggest (or null)",
-  "hasError": false
+  "hasError": false,
+  "concept": "brief concept name for a visual diagram (e.g. 'HTML button element', 'JavaScript event handler')"
 }
 
 If you detect an obvious error (unclosed tag, syntax mistake), set hasError: true and explain in suggestion.
-Keep responses concise.`;
+Keep responses concise.${teachingHint}`;
 
       const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
@@ -519,12 +523,15 @@ Keep responses concise.`;
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content?.trim() || "{}";
-      let parsed: { intent?: string; suggestion?: string; nextLine?: string | null; hasError?: boolean } = {};
+      let parsed: { intent?: string; suggestion?: string; nextLine?: string | null; hasError?: boolean; concept?: string } = {};
       try {
         parsed = JSON.parse(content.replace(/```json\n?|\n?```/g, "")) || {};
       } catch {
-        parsed = { intent: "", suggestion: content.slice(0, 200), nextLine: null, hasError: false };
+        parsed = { intent: "", suggestion: content.slice(0, 200), nextLine: null, hasError: false, concept: "" };
       }
+
+      const concept = parsed.concept || "code concept";
+      const diagramUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(`educational diagram: ${concept}, clean infographic, developer tutorial style, no watermark`)}?width=500&height=320&nologo=true`;
 
       return new Response(
         JSON.stringify({
@@ -532,6 +539,8 @@ Keep responses concise.`;
           suggestion: parsed.suggestion || "",
           nextLine: parsed.nextLine || null,
           hasError: !!parsed.hasError,
+          concept: parsed.concept || "",
+          diagramUrl,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -539,11 +548,14 @@ Keep responses concise.`;
 
     // ============= ACTION: explain-error (AI explanation for errors) =============
     if (action === "explain-error") {
-      const { error, code, language, domain } = body;
+      const { error, code, language, domain, teachingMode } = body;
       const selectedModel = "google/gemini-2.5-flash-lite";
-      console.log(`[code-engine] explain-error`);
+      console.log(`[code-engine] explain-error teachingMode=${!!teachingMode}`);
 
       const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+      const teachingHint = teachingMode
+        ? "\n\nTEACHING MODE: Provide step-by-step guidance. Break the concept into small pieces. Include a simple example. Be encouraging."
+        : "";
 
       const explainPrompt = `The user has this error in their ${language} code:
 
@@ -559,7 +571,7 @@ Respond in JSON:
   "explanation": "Clear, friendly explanation (2-3 sentences)",
   "fix": "Exact code fix or suggestion",
   "concept": "Brief concept name for diagram (e.g. 'HTML closing tags', 'Flexbox layout')"
-}`;
+}${teachingHint}`;
 
       const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",

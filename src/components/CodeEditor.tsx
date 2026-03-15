@@ -20,8 +20,7 @@ import {
   type CachedSnippet,
 } from "@/lib/offlineCache";
 import { detectErrors } from "@/lib/codeErrorDetector";
-import { AIGuidanceDropdown } from "@/components/editor/AIGuidanceDropdown";
-import { AIExplanationCard } from "@/components/editor/AIExplanationCard";
+import { AIModalPopup } from "@/components/editor/AIModalPopup";
 
 // -- Project types --
 interface SavedProject {
@@ -472,10 +471,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const ghostDisposableRef = useRef<any>(null);
 
   // AI real-time assistant state
-  const [aiSuggestion, setAiSuggestion] = useState<{ intent: string; suggestion: string; nextLine: string | null; hasError: boolean } | null>(null);
+  const [aiSuggestion, setAiSuggestion] = useState<{ intent: string; suggestion: string; nextLine: string | null; hasError: boolean; diagramUrl?: string } | null>(null);
   const [aiExplanation, setAiExplanation] = useState<{ explanation: string; fix: string; diagramUrl?: string } | null>(null);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
-  const [aiDropdownPosition, setAiDropdownPosition] = useState<{ top: number; left: number } | null>(null);
   const [repeatedErrorCount, setRepeatedErrorCount] = useState(0);
   const lastErrorKeyRef = useRef<string>("");
   const aiAnalysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1021,14 +1019,14 @@ ${jsCode}
   }, []);
 
   // Fetch AI analysis (intent, suggestion, next line)
-  const fetchAIAnalysis = useCallback(async (code: string, language: string, cursorLine: number) => {
+  const fetchAIAnalysis = useCallback(async (code: string, language: string, cursorLine: number, isTeachingMode: boolean) => {
     if (!online) return;
     setAiAnalyzing(true);
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainName }),
+        body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainName, teachingMode: isTeachingMode }),
       });
       if (!resp.ok) return;
       const data = await resp.json();
@@ -1038,34 +1036,21 @@ ${jsCode}
           suggestion: data.suggestion || "",
           nextLine: data.nextLine || null,
           hasError: !!data.hasError,
+          diagramUrl: data.diagramUrl,
         });
-        // Position dropdown near cursor
-        const editor = monacoEditorRef.current;
-        if (editor) {
-          const pos = editor.getPosition();
-          if (pos) {
-            const coords = editor.getScrolledVisiblePosition(pos);
-            if (coords) {
-              const rect = editor.getContainerDomNode()?.getBoundingClientRect();
-              if (rect) {
-                setAiDropdownPosition({ top: rect.top + coords.top + 20, left: rect.left + coords.left });
-              }
-            }
-          }
-        }
       }
     } catch {}
     setAiAnalyzing(false);
   }, [online, domainName]);
 
   // Fetch AI error explanation
-  const fetchAIExplainError = useCallback(async (error: string, code: string, language: string) => {
+  const fetchAIExplainError = useCallback(async (error: string, code: string, language: string, isTeachingMode: boolean) => {
     if (!online) return;
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-        body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainName }),
+        body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainName, teachingMode: isTeachingMode }),
       });
       if (!resp.ok) return;
       const data = await resp.json();
@@ -1086,13 +1071,13 @@ ${jsCode}
     aiAnalysisTimerRef.current = setTimeout(() => {
       const editor = monacoEditorRef.current;
       const cursorLine = editor?.getPosition()?.lineNumber ?? 1;
-      fetchAIAnalysis(code, activeTab.language, cursorLine - 1);
+      fetchAIAnalysis(code, activeTab.language, cursorLine - 1, repeatedErrorCount >= 2);
       aiAnalysisTimerRef.current = null;
     }, 2000);
     return () => {
       if (aiAnalysisTimerRef.current) clearTimeout(aiAnalysisTimerRef.current);
     };
-  }, [activeTab?.content, activeTab?.language, activeTab?.id, online, chatLoading, fetchAIAnalysis]);
+  }, [activeTab?.content, activeTab?.language, activeTab?.id, online, chatLoading, fetchAIAnalysis, repeatedErrorCount]);
 
   // Error detection: when mistake occurs, highlight + sound + AI explanation
   useEffect(() => {
@@ -1103,13 +1088,14 @@ ${jsCode}
       if (lastErrorKeyRef.current !== key) {
         lastErrorKeyRef.current = key;
         setRepeatedErrorCount((c) => c + 1);
+        setAiSuggestion(null);
         playErrorSound();
-        fetchAIExplainError(err.message, activeTab.content, activeTab.language);
+        fetchAIExplainError(err.message, activeTab.content, activeTab.language, repeatedErrorCount >= 1);
       }
     } else {
       lastErrorKeyRef.current = "";
     }
-  }, [activeTab?.content, activeTab?.language, activeTab?.id, playErrorSound, fetchAIExplainError]);
+  }, [activeTab?.content, activeTab?.language, activeTab?.id, playErrorSound, fetchAIExplainError, repeatedErrorCount]);
 
   // Insert code at cursor (for AI suggestion)
   const insertCodeAtCursor = useCallback((code: string) => {
@@ -1119,10 +1105,15 @@ ${jsCode}
     if (!pos) return;
     editor.executeEdits("ai-insert", [{ range: { startLineNumber: pos.lineNumber, startColumn: pos.column, endLineNumber: pos.lineNumber, endColumn: pos.column }, text: code }]);
     setAiSuggestion(null);
-    setAiDropdownPosition(null);
   }, [activeTab]);
 
-  const teachingMode = repeatedErrorCount >= 3;
+  // Apply fix to editor (replaces or inserts)
+  const applyFixToEditor = useCallback((code: string) => {
+    applyCodeToEditor(code, activeTab?.language || "javascript");
+    setAiExplanation(null);
+  }, [activeTab?.language, applyCodeToEditor]);
+
+  const teachingMode = repeatedErrorCount >= 2;
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
@@ -1820,6 +1811,25 @@ ${jsCode}
     <div className="flex flex-col h-screen w-full overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.text }}>
       {newProjectDialog}
 
+      {/* Centered AI modal for suggestions and error explanations (error takes priority) */}
+      {aiExplanation ? (
+        <AIModalPopup
+          type="error"
+          explanation={aiExplanation}
+          onInsertCode={applyFixToEditor}
+          onDismiss={() => setAiExplanation(null)}
+          themeColors={currentTheme.uiColors}
+        />
+      ) : aiSuggestion ? (
+        <AIModalPopup
+          type="suggestion"
+          suggestion={aiSuggestion}
+          onInsertCode={insertCodeAtCursor}
+          onDismiss={() => setAiSuggestion(null)}
+          themeColors={currentTheme.uiColors}
+        />
+      ) : null}
+
       {/* Title bar with File menu */}
       <div className="flex items-center justify-between h-9 border-b px-3 shrink-0 select-none" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
         <div className="flex items-center gap-1">
@@ -2110,16 +2120,6 @@ ${jsCode}
           <div className="flex flex-1 overflow-hidden">
             {/* Editor */}
             <div className={`relative flex-1 overflow-hidden ${showPreview ? "w-1/2" : "w-full"}`}>
-              {/* Floating AI suggestion dropdown near cursor */}
-              {aiSuggestion && aiDropdownPosition && (
-                <AIGuidanceDropdown
-                  suggestion={aiSuggestion}
-                  onInsertCode={insertCodeAtCursor}
-                  onDismiss={() => { setAiSuggestion(null); setAiDropdownPosition(null); }}
-                  themeColors={currentTheme.uiColors}
-                  position={aiDropdownPosition}
-                />
-              )}
               {activeTab ? (
                 <Editor
                   height="100%"
@@ -2477,59 +2477,8 @@ ${jsCode}
               </button>
             </div>
 
-            {/* Chat messages + AI guidance */}
+            {/* Chat messages */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3" style={{ backgroundColor: currentTheme.uiColors.bg }}>
-              {/* AI Guidance card (from 2s pause or incorrect code) */}
-              {aiSuggestion && (
-                <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
-                  <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border }}>
-                    <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
-                      <Sparkles className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
-                      AI Guidance
-                    </span>
-                    <button onClick={() => { setAiSuggestion(null); setAiDropdownPosition(null); }} className="p-0.5" style={{ color: currentTheme.uiColors.muted }}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    {aiSuggestion.intent && (
-                      <p className="text-xs font-medium" style={{ color: currentTheme.uiColors.text }}>{aiSuggestion.intent}</p>
-                    )}
-                    <p className="text-xs" style={{ color: currentTheme.uiColors.muted }}>{aiSuggestion.suggestion}</p>
-                    {aiSuggestion.nextLine && (
-                      <button
-                        onClick={() => insertCodeAtCursor(aiSuggestion!.nextLine!)}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
-                        style={{ backgroundColor: currentTheme.uiColors.accent + "25", color: currentTheme.uiColors.accent }}
-                      >
-                        <ArrowRightToLine className="h-3 w-3" />
-                        Insert suggested code
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Error explanation card */}
-              {aiExplanation && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between px-1">
-                    <span className="text-[9px] font-semibold uppercase" style={{ color: currentTheme.uiColors.muted }}>Error Explanation</span>
-                    <button onClick={() => setAiExplanation(null)} className="p-0.5" style={{ color: currentTheme.uiColors.muted }}>
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <AIExplanationCard
-                    explanation={aiExplanation.explanation}
-                    fix={aiExplanation.fix}
-                    diagramUrl={aiExplanation.diagramUrl}
-                    onInsertFix={(code) => applyCodeToEditor(code, activeTab?.language || "javascript")}
-                    onDismiss={() => setAiExplanation(null)}
-                    themeColors={currentTheme.uiColors}
-                  />
-                </div>
-              )}
-
               {messages.map((msg, i) => (
                 <div key={i} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: msg.role === "user" ? currentTheme.uiColors.border : currentTheme.uiColors.accent + "20" }}>

@@ -35,7 +35,8 @@ type FieldErrors = Record<string, string>;
 
 const friendlyError = (msg: string): string => {
   if (msg.includes("redirect_uri_mismatch") || msg.includes("redirect_uri")) {
-    return "OAuth redirect URL mismatch. Add your site URL to Supabase: Authentication → URL Configuration → Redirect URLs (e.g. http://localhost:8081/auth, https://lunor.online/auth).";
+    const url = typeof window !== "undefined" ? `${window.location.origin}/auth` : "http://localhost:8080/auth";
+    return `OAuth redirect URL mismatch. Add "${url}" to Supabase: Authentication → URL Configuration → Redirect URLs. See docs/GOOGLE_LOGIN_SETUP.md`;
   }
   if (msg.includes("Invalid login credentials")) return "Incorrect email or password. Please try again or reset your password.";
   if (msg.includes("Email not confirmed")) return "Please check your inbox and confirm your email before signing in.";

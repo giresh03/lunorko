@@ -72,11 +72,13 @@ export function detectHTMLErrors(code: string): DetectedError | null {
 }
 
 export function detectJSErrors(code: string): DetectedError | null {
-  // Unclosed string
+  // Unclosed string (ignore inside template literals and comments)
   const singleQuotes = (code.match(/'/g) || []).length;
   const doubleQuotes = (code.match(/"/g) || []).length;
+  const backticks = (code.match(/`/g) || []).length;
   if (singleQuotes % 2 !== 0) return { message: "Unclosed single-quoted string" };
   if (doubleQuotes % 2 !== 0) return { message: "Unclosed double-quoted string" };
+  if (backticks % 2 !== 0) return { message: "Unclosed template literal (backticks)" };
 
   // Unclosed brackets (simple)
   const opens = (code.match(/[(\[{]/g) || []).length;
@@ -88,8 +90,18 @@ export function detectJSErrors(code: string): DetectedError | null {
   return null;
 }
 
+export function detectCSSErrors(code: string): DetectedError | null {
+  const opens = (code.match(/\{/g) || []).length;
+  const closes = (code.match(/\}/g) || []).length;
+  if (opens !== closes) {
+    return { message: opens > closes ? "Missing closing brace } in CSS" : "Extra closing brace }" };
+  }
+  return null;
+}
+
 export function detectErrors(code: string, language: string): DetectedError | null {
   if (language === "html" || language === "xml") return detectHTMLErrors(code);
   if (["javascript", "typescript", "jsx", "tsx"].includes(language)) return detectJSErrors(code);
+  if (language === "css") return detectCSSErrors(code);
   return null;
 }
