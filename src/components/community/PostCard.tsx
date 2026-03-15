@@ -136,10 +136,17 @@ const PostCard = ({ post, profiles, onRefresh }: { post: Post; profiles: Record<
       <h3 className="text-base font-semibold text-foreground mb-1">{post.title}</h3>
       <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-3">{post.content}</p>
 
-      {/* Image */}
+      {/* Image - centered, half screen max, stunning presentation */}
       {post.image_url && (
-        <div className="mb-3 rounded-lg overflow-hidden border border-border">
-          <img src={post.image_url} alt="Post attachment" className="w-full max-h-96 object-cover cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(post.image_url!, '_blank')} />
+        <div className="mb-3 flex justify-center">
+          <div className="rounded-xl overflow-hidden border border-border shadow-lg hover:shadow-xl transition-shadow max-w-[min(50vw,480px)]">
+            <img
+              src={post.image_url}
+              alt="Post attachment"
+              className="max-h-72 w-auto object-contain cursor-pointer hover:opacity-95 transition-opacity block"
+              onClick={() => window.open(post.image_url!, "_blank")}
+            />
+          </div>
         </div>
       )}
 
