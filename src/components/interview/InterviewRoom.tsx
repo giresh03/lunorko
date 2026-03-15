@@ -69,7 +69,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const listeningBaseRef = useRef("");
 
   const [videoEnabled, setVideoEnabled] = useState(true);
