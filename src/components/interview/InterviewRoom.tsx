@@ -150,7 +150,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
       };
       recognition.onend = () => setIsListening(false);
       recognition.start();
-      recognitionRef.current = recognition as SpeechRecognition;
+      recognitionRef.current = recognition;
       setIsListening(true);
     } catch (err) {
       toast({ title: "Voice input", description: "Not supported in this browser. Use Chrome or Safari.", variant: "destructive" });
