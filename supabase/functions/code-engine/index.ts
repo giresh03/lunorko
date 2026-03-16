@@ -230,7 +230,8 @@ serve(async (req) => {
 
     // ============= ACTION: generate (AI code generation with streaming) =============
     if (action === "generate") {
-      const { messages, model } = body;
+      const messages = body.messages as Array<{ role: string; content: string }>;
+      const model = body.model as string | undefined;
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
