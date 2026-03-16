@@ -247,7 +247,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
     setEvaluating(true);
     try {
       const sessionHistory = history.map((h) => ({ q: h.question, a: h.answer }));
-      const data = await invokeAI("evaluate-answer", {
+      const data: any = await invokeAI("evaluate-answer", {
         domain: domainId,
         question: currentQuestion,
         answer,

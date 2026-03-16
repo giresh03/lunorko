@@ -133,7 +133,7 @@ const DomainDetail = () => {
     if (!domainId) return;
     const fetchAdminResources = async () => {
       const { data } = await supabase
-        .from("admin_resources")
+        .from("admin_resources" as any)
         .select("id, title, resource_type, source, url, duration, thumbnail, description")
         .eq("domain_id", domainId)
         .eq("is_active", true)

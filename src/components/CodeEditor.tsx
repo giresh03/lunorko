@@ -981,7 +981,7 @@ ${jsCode}
 
     if (isHtml) {
       setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
-    } else if (isJsLike && hasJSX) {
+    } else if (isJsLike && hasJSXContent) {
       setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
       setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));

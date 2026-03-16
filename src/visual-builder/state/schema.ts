@@ -43,7 +43,7 @@ export interface BaseElement {
     opacity?: string;
     width?: string;
     height?: string;
-    objectFit?: string;
+    objectFit?: "contain" | "cover" | "fill" | "none" | "scale-down";
     alignSelf?: string;
     border?: string;
   };
