@@ -1,8 +1,22 @@
-# Admin Panel Deployment
+# Admin Panel & Edge Functions Deployment
 
 ## Project mismatch
 
 Your app uses **lgtpgglphbcncrtaajsg** (from `.env`). Ensure functions are deployed to this project.
+
+## Deploy code-engine (AI Assistant — fixes "Request failed" 404)
+
+The AI Assistant in Web Development, App Development, and other domains calls the `code-engine` Edge Function. If you see **"Request failed"** or **404** in the console, deploy it:
+
+```bash
+npx supabase functions deploy code-engine --project-ref lgtpgglphbcncrtaajsg
+```
+
+Or with Supabase CLI:
+
+```bash
+supabase functions deploy code-engine --project-ref lgtpgglphbcncrtaajsg
+```
 
 ## Deploy admin-dashboard function
 
