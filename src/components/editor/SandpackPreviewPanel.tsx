@@ -74,7 +74,6 @@ export default function SandpackPreviewPanel({
         options={{
           externalResources: ["https://cdn.tailwindcss.com"],
           autorun: true,
-          showSandpackErrorOverlay: true,
         }}
       >
         <SandpackFileSync files={files} />
@@ -82,13 +81,12 @@ export default function SandpackPreviewPanel({
           {showEditor ? (
             <>
               <SandpackCodeEditor />
-              <SandpackPreview showSandpackErrorOverlay />
+              <SandpackPreview />
             </>
           ) : (
             <SandpackPreview
-              showOpenInCodeSandboxButton={false}
+              showOpenInCodeSandbox={false}
               showRefreshButton={false}
-              showSandpackErrorOverlay
               style={{ height: "100%", minHeight: 300 }}
             />
           )}

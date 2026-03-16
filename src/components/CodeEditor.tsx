@@ -1355,7 +1355,7 @@ ${jsCode}
       setShowPreview(true);
       setShowTerminal(true);
       setOutput([`$ Running ${activeTab.name}...`, "🌐 Live preview rendering..."]);
-      setPreviewUrl(null);
+      // Preview URL not needed for inline preview
       const hasJSXInFile = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
