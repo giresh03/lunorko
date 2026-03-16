@@ -63,11 +63,11 @@ const Community = () => {
 
   const fetchPosts = async () => {
     setLoading(true);
-    let query = supabase
+    let query = (supabase
       .from("community_posts")
-      .select("*")
+      .select("*") as any)
       .eq("domain_id", selectedDomain)
-      .eq("is_removed" as any, false)
+      .eq("is_removed", false)
       .order("is_pinned", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(50);
