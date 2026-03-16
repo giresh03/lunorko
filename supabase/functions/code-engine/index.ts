@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -197,6 +198,17 @@ ${code}
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // Auth check
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+  const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
+  const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
+  if (authError || !authUser) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
   try {
     let body: Record<string, unknown>;
     try {
@@ -371,7 +383,7 @@ ${stackDirective}`;
 
     // ============= ACTION: generate-tests =============
     if (action === "generate-tests") {
-      const { code, language, filename, model } = body;
+      const { code, language, filename, model } = body as { code: string; language: string; filename: string; model: string };
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate-tests lang=${language}, file=${filename}`);
 
@@ -407,7 +419,7 @@ ${code}
 
     // ============= ACTION: generate-docs =============
     if (action === "generate-docs") {
-      const { code, language, filename, model } = body;
+      const { code, language, filename, model } = body as { code: string; language: string; filename: string; model: string };
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate-docs lang=${language}, file=${filename}`);
 
@@ -449,7 +461,7 @@ ${code}
 
     // ============= ACTION: autocomplete (ghost text) =============
     if (action === "autocomplete") {
-      const { code, language, cursorLine, cursorColumn } = body;
+      const { code, language, cursorLine, cursorColumn } = body as { code: string; language: string; cursorLine: number; cursorColumn: number };
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
 
@@ -489,13 +501,13 @@ ${code}
 
     // ============= ACTION: analyze-code (real-time AI guidance) =============
     if (action === "analyze-code") {
-      const { code, language, cursorLine, domain, teachingMode } = body;
+      const { code, language, cursorLine, domain: actionDomain, teachingMode } = body as { code: string; language: string; cursorLine: number; domain: string; teachingMode: boolean };
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] analyze-code lang=${language}, line=${cursorLine}, teachingMode=${!!teachingMode}`);
 
       const lines = code.split("\n");
       const contextBefore = lines.slice(Math.max(0, cursorLine - 15), cursorLine + 1).join("\n");
-      const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+      const basePrompt = domainPrompts[actionDomain || domain] || `You are a coding mentor for ${actionDomain || domain}.`;
       const teachingHint = teachingMode
         ? "\n\nTEACHING MODE: The user has made repeated errors. Provide step-by-step guidance, break concepts into small pieces, and suggest a simple exercise or next action."
         : "";
@@ -566,18 +578,18 @@ Keep responses concise.${teachingHint}`;
 
     // ============= ACTION: explain-error (AI explanation for errors) =============
     if (action === "explain-error") {
-      const { error, code, language, domain, teachingMode } = body;
+      const { error: codeError, code, language, domain: actionDomain, teachingMode } = body as { error: string; code: string; language: string; domain: string; teachingMode: boolean };
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] explain-error teachingMode=${!!teachingMode}`);
 
-      const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+      const basePrompt = domainPrompts[actionDomain || domain] || `You are a coding mentor for ${actionDomain || domain}.`;
       const teachingHint = teachingMode
         ? "\n\nTEACHING MODE: Provide step-by-step guidance. Break the concept into small pieces. Include a simple example. Be encouraging."
         : "";
 
       const explainPrompt = `The user has this error in their ${language} code:
 
-Error: ${error}
+Error: ${codeError}
 
 Relevant code:
 \`\`\`${language}
