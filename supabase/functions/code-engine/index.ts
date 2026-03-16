@@ -589,7 +589,7 @@ Keep responses concise.${teachingHint}`;
 
       const explainPrompt = `The user has this error in their ${language} code:
 
-Error: ${error}
+Error: ${codeError}
 
 Relevant code:
 \`\`\`${language}
