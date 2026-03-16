@@ -105,7 +105,7 @@ npx serve .
               dependencies: {
                 react: "^18.3.1",
                 "react-dom": "^18.3.1",
-                lucide-react: "^0.462.0",
+                "lucide-react": "^0.462.0",
               },
               devDependencies: {
                 "@vitejs/plugin-react-swc": "^3.11.0",

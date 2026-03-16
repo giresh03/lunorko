@@ -303,7 +303,8 @@ ${stackDirective}`;
 
     // ============= ACTION: execute (run code with domain-aware runtime) =============
     if (action === "execute") {
-      const { code, language } = body;
+      const code = body.code as string | undefined;
+      const language = body.language as string;
       console.log(`[code-engine] execute domain=${domain}, language=${language}, codeLen=${code?.length}`);
 
       if (!code || typeof code !== "string") {
