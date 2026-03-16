@@ -973,10 +973,10 @@ ${jsCode}
     const allFiles = collectFiles(fileTree);
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
-    const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
+    const hasJSXContent = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
     const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
     const filesList = Object.entries(allFiles).map(([path, content]) => ({ path, content }));
-    const isReactProject = hasJSX(filesList);
+    const isReactProject = filesList.some(f => /\.(jsx|tsx)$/i.test(f.path) || (/\.(js|ts)$/i.test(f.path) && /<\w+[\s/>]/.test(f.content)));
     if (!isReactProject) setPreviewUrl(null);
 
     if (isHtml) {
