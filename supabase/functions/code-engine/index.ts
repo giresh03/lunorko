@@ -461,7 +461,7 @@ ${code}
 
     // ============= ACTION: autocomplete (ghost text) =============
     if (action === "autocomplete") {
-      const { code, language, cursorLine, cursorColumn } = body;
+      const { code, language, cursorLine, cursorColumn } = body as { code: string; language: string; cursorLine: number; cursorColumn: number };
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
 
