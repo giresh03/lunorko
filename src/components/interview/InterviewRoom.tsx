@@ -217,7 +217,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
     setUserAnswer("");
     try {
       const sessionHistory = history.map((h) => ({ q: h.question, a: h.answer }));
-      const data = await invokeAI("generate-question", {
+      const data: any = await invokeAI("generate-question", {
         domain: domainId,
         questionIndex: idx,
         sessionHistory,
