@@ -47,8 +47,8 @@ function updateElementInTree(
   id: string,
   updates: Partial<PageElement>
 ): PageElement[] {
-  return elements.map((el): PageElement => {
-    if (el.id === id) return { ...el, ...updates };
+  return elements.map((el) => {
+    if (el.id === id) return { ...el, ...updates } as PageElement;
     if (el.children) {
       return { ...el, children: updateElementInTree(el.children, id, updates) };
     }
