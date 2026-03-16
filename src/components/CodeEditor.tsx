@@ -22,8 +22,8 @@ import {
 import { detectErrors } from "@/lib/codeErrorDetector";
 import { AIModalPopup } from "@/components/editor/AIModalPopup";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
-import { WebContainer } from "@webcontainer/api";
-import { buildWebContainerFiles, hasJSX } from "@/lib/webcontainerProject";
+import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import { hasJSX } from "@/lib/sandpackProject";
 
 // -- Project types --
 interface SavedProject {
@@ -401,8 +401,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showTerminal, setShowTerminal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const webcontainerRef = useRef<InstanceType<typeof WebContainer> | null>(null);
   type DevicePreset = "iphone-se" | "iphone-15" | "pixel-8" | "ipad-mini" | "ipad-pro" | "android-tab" | "desktop";
   const DEVICE_PRESETS: Record<DevicePreset, { label: string; w: number; h: number; type: "phone" | "tablet" | "desktop"; notch: "dynamic-island" | "notch" | "punch-hole" | "none" }> = {
     "iphone-se": { label: "iPhone SE", w: 320, h: 568, type: "phone", notch: "none" },
@@ -976,8 +974,7 @@ ${jsCode}
     const hasJSXContent = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
     const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
     const filesList = Object.entries(allFiles).map(([path, content]) => ({ path, content }));
-    const isReactProject = filesList.some(f => /\.(jsx|tsx)$/i.test(f.path) || (/\.(js|ts)$/i.test(f.path) && /<\w+[\s/>]/.test(f.content)));
-    if (!isReactProject) setPreviewUrl(null);
+    const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
       setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
@@ -1344,42 +1341,11 @@ ${jsCode}
     const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const isAppDomain = domainId === "app-development" || domainId === "web-development";
 
-    // For React/JSX projects: run in WebContainer (Vite) - automatic local run
+    // For React/JSX projects: use Sandpack - runs instantly in browser
     if (isReactProject && isAppDomain) {
       setShowPreview(true);
       setShowTerminal(true);
-      setOutput([`$ Running ${activeTab.name}...`, "🚀 Starting Vite dev server in browser..."]);
-      setPreviewUrl(null);
-      try {
-        if (!webcontainerRef.current) {
-          setOutput((p) => [...p, "⏳ Booting WebContainer (first time may take a few seconds)..."]);
-          webcontainerRef.current = await WebContainer.boot({ coep: "credentialless" });
-        }
-        const tree = buildWebContainerFiles(fileTree, currentProjectName || "app");
-        await webcontainerRef.current.mount(tree);
-        setOutput((p) => [...p, "📦 Running npm install..."]);
-        const install = await webcontainerRef.current.spawn("npm", ["install"]);
-        const exit = await install.exit;
-        if (exit !== 0) {
-          setOutput((p) => [...p, "❌ npm install failed"]);
-          setIsRunning(false);
-          return;
-        }
-        setOutput((p) => [...p, "▶️ Starting dev server..."]);
-        const unsub = webcontainerRef.current.on("server-ready", (port, url) => {
-          setPreviewUrl(url);
-          setPreviewContent("");
-          setOutput((p) => [...p, `✅ App running at ${url}`]);
-          unsub();
-        });
-        await webcontainerRef.current.spawn("npm", ["run", "dev"]);
-      } catch (e) {
-        setOutput((p) => [...p, `❌ ${e instanceof Error ? e.message : String(e)}`]);
-        setOutput((p) => [...p, "↩️ Falling back to quick preview..."]);
-        const hasJSXInFile = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
-        const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
-        setPreviewContent(hasJSXInFile || usesDOM ? buildAppPreviewHtml(activeTab.content, lang, allFiles) : buildVanillaJsPreview(activeTab.content, allFiles));
-      }
+      setOutput([`$ Running ${activeTab.name}...`, "✅ Sandpack preview ready — edits auto-update"]);
       setIsRunning(false);
       return;
     }
@@ -2245,7 +2211,13 @@ ${jsCode}
             </div>
 
             {/* Web Preview */}
-            {showPreview && activeTab && (
+            {showPreview && activeTab && (() => {
+              const allFilesForPreview = collectFiles(fileTree);
+              const filesListForPreview = Object.entries(allFilesForPreview).map(([path, content]) => ({ path, content }));
+              const isReactProjectPreview = hasJSX(filesListForPreview);
+              const isAppOrWebDomain = domainId === "app-development" || domainId === "web-development";
+              const showSandpackPreview = isAppOrWebDomain && isReactProjectPreview;
+              return (
               <div className={`flex flex-col border-l border-border overflow-hidden ${previewFullscreen ? "fixed inset-0 z-50 w-full h-full border-l-0" : "w-1/2"}`}>
                 <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0 gap-1">
                   {isAppDomain ? <Smartphone className="h-3 w-3 text-primary" /> : <Eye className="h-3 w-3 text-primary" />}
@@ -2360,15 +2332,11 @@ ${jsCode}
                   </button>
                   <button
                     onClick={() => {
-                      if (previewUrl) {
-                        window.open(previewUrl, "_blank");
-                      } else {
-                        const newWindow = window.open("", "_blank");
-                        if (newWindow) {
-                          newWindow.document.open();
-                          newWindow.document.write(previewContent);
-                          newWindow.document.close();
-                        }
+                      const newWindow = window.open("", "_blank");
+                      if (newWindow && previewContent) {
+                        newWindow.document.open();
+                        newWindow.document.write(previewContent);
+                        newWindow.document.close();
                       }
                     }}
                     className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
@@ -2383,8 +2351,15 @@ ${jsCode}
                     <X className="h-3 w-3" />
                   </button>
                 </div>
-                <div className={`flex-1 flex items-center justify-center overflow-auto ${isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
-                  {isAppDomain && currentDevice.type === "phone" ? (
+                <div className={`flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
+                  {showSandpackPreview ? (
+                    <SandpackPreviewPanel
+                      fileTree={fileTree}
+                      projectName={currentProjectName || "app"}
+                      showEditor={false}
+                      className="w-full h-full"
+                    />
+                  ) : isAppDomain && currentDevice.type === "phone" ? (
                     /* Phone frame */
                     <div className="relative flex flex-col items-center" style={{ transform: currentDevice.h > 700 ? "scale(0.72)" : "scale(0.85)", transformOrigin: "top center" }}>
                       <div className="relative rounded-[2.5rem] border-[3px] border-[#333] bg-[#111] shadow-2xl overflow-hidden" style={{ width: `${currentDevice.w}px`, height: `${currentDevice.h}px` }}>
@@ -2411,11 +2386,10 @@ ${jsCode}
                         </div>
                         <iframe
                           ref={iframeRef}
-                          src={previewUrl || undefined}
-                          srcDoc={previewUrl ? undefined : previewContent}
+                          srcDoc={previewContent}
                           className="border-0 w-full"
                           style={{ height: "calc(100% - 48px)" }}
-                          sandbox={previewUrl ? undefined : "allow-scripts allow-modals allow-forms allow-popups"}
+                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
                         {/* Debug overlay - phone */}
@@ -2471,11 +2445,10 @@ ${jsCode}
                         </div>
                         <iframe
                           ref={iframeRef}
-                          src={previewUrl || undefined}
-                          srcDoc={previewUrl ? undefined : previewContent}
+                          srcDoc={previewContent}
                           className="border-0 w-full"
                           style={{ height: "calc(100% - 32px)" }}
-                          sandbox={previewUrl ? undefined : "allow-scripts allow-modals allow-forms allow-popups"}
+                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
                         {/* Debug overlay - tablet */}
@@ -2510,21 +2483,20 @@ ${jsCode}
                   ) : (
                     <iframe
                       ref={iframeRef}
-                      src={previewUrl || undefined}
-                      srcDoc={previewUrl ? undefined : previewContent}
+                      srcDoc={previewContent}
                       className="border-0 bg-white transition-all duration-200"
                       style={{
                         width: currentDevice.type === "phone" ? `${currentDevice.w}px` : currentDevice.type === "tablet" ? `${currentDevice.w}px` : "100%",
                         height: "100%",
                         maxWidth: "100%",
                       }}
-                      sandbox={previewUrl ? undefined : "allow-scripts allow-modals allow-forms allow-popups"}
+                      sandbox="allow-scripts allow-modals allow-forms allow-popups"
                       title="Web Preview"
                     />
                   )}
                 </div>
               </div>
-            )}
+            );})()}
           </div>
 
           {/* Terminal panel (bottom) */}

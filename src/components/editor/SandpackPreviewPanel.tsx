@@ -1,0 +1,99 @@
+import { useMemo, useEffect, useRef } from "react";
+import {
+  SandpackProvider,
+  SandpackLayout,
+  SandpackPreview,
+  SandpackCodeEditor,
+  useSandpack,
+} from "@codesandbox/sandpack-react";
+import { buildSandpackFiles } from "@/lib/sandpackProject";
+
+interface FileNode {
+  id: string;
+  name: string;
+  type: "file" | "folder";
+  language?: string;
+  content?: string;
+  children?: FileNode[];
+}
+
+function SandpackFileSync({ files }: { files: Record<string, string | { code: string }> }) {
+  const { sandpack } = useSandpack();
+  const prevFilesRef = useRef<string>("");
+
+  useEffect(() => {
+    const filesKey = JSON.stringify(files);
+    if (filesKey === prevFilesRef.current) return;
+    prevFilesRef.current = filesKey;
+
+    const timer = setTimeout(() => {
+      Object.entries(files).forEach(([path, content]) => {
+        const code = typeof content === "string" ? content : content.code;
+        if (path.startsWith("/") && code) {
+          sandpack.updateFile(path, code);
+        }
+      });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [files, sandpack]);
+
+  return null;
+}
+
+interface SandpackPreviewPanelProps {
+  fileTree: FileNode[];
+  projectName: string;
+  showEditor?: boolean;
+  className?: string;
+}
+
+export default function SandpackPreviewPanel({
+  fileTree,
+  projectName,
+  showEditor = false,
+  className = "",
+}: SandpackPreviewPanelProps) {
+  const files = useMemo(
+    () => buildSandpackFiles(fileTree, projectName),
+    [fileTree, projectName]
+  );
+
+  return (
+    <div className={`sandpack-preview-panel h-full flex flex-col min-h-0 ${className}`}>
+      <SandpackProvider
+        template="react"
+        files={files}
+        customSetup={{
+          dependencies: {
+            react: "^18.3.1",
+            "react-dom": "^18.3.1",
+            "lucide-react": "^0.462.0",
+          },
+          entry: "/src/index.jsx",
+        }}
+        options={{
+          externalResources: ["https://cdn.tailwindcss.com"],
+          autorun: true,
+          showSandpackErrorOverlay: true,
+        }}
+      >
+        <SandpackFileSync files={files} />
+        <SandpackLayout>
+          {showEditor ? (
+            <>
+              <SandpackCodeEditor />
+              <SandpackPreview showSandpackErrorOverlay />
+            </>
+          ) : (
+            <SandpackPreview
+              showOpenInCodeSandboxButton={false}
+              showRefreshButton={false}
+              showSandpackErrorOverlay
+              style={{ height: "100%", minHeight: 300 }}
+            />
+          )}
+        </SandpackLayout>
+      </SandpackProvider>
+    </div>
+  );
+}

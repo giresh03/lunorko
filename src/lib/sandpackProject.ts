@@ -1,6 +1,6 @@
 /**
- * Build project file structure for WebContainer (Vite + React)
- * FileSystemTree format: { "name": { file: { contents } } | { directory: { ... } } }
+ * Build Sandpack files from fileTree for browser-based React runtime
+ * Sandpack format: { "/path/to/file": "content" | { code, readOnly?, active?, hidden? } }
  */
 
 export interface FileNode {
@@ -27,6 +27,25 @@ function collectFiles(nodes: FileNode[]): { path: string; content: string }[] {
   return out;
 }
 
+/** Extract local component paths from imports like: import X from './Y' or import Navbar from './components/Navbar' */
+function extractLocalImports(code: string): string[] {
+  const paths: string[] = [];
+  const regex = /import\s+(?:\{([^}]+)\}|(\w+))\s+from\s+['"]\.\/([^'"]+)['"]/g;
+  let m;
+  while ((m = regex.exec(code)) !== null) {
+    const relPath = m[3].replace(/\.(jsx?|tsx?)$/, "");
+    if (relPath && !paths.includes(relPath)) paths.push(relPath);
+  }
+  return paths;
+}
+
+/** Generate placeholder component for missing imports */
+function placeholderComponent(name: string): string {
+  return `export default function ${name}() {
+  return <div style={{ padding: 8, border: '1px dashed #666', borderRadius: 4, color: '#888', fontSize: 12 }}>${name} (placeholder)</div>;
+}`;
+}
+
 export function hasJSX(files: { path: string; content: string }[]): boolean {
   return files.some(
     (f) =>
@@ -35,25 +54,14 @@ export function hasJSX(files: { path: string; content: string }[]): boolean {
   );
 }
 
-type FileSystemTree = Record<string, { file: { contents: string } } | { directory: FileSystemTree }>;
+export type SandpackFiles = Record<string, string | { code: string; readOnly?: boolean; active?: boolean; hidden?: boolean }>;
 
-function setInTree(tree: FileSystemTree, path: string, contents: string) {
-  const parts = path.split("/");
-  let current = tree;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    if (!current[part]) current[part] = { directory: {} };
-    current = (current[part] as { directory: FileSystemTree }).directory;
-  }
-  current[parts[parts.length - 1]] = { file: { contents } };
-}
-
-export function buildWebContainerFiles(
+export function buildSandpackFiles(
   fileTree: FileNode[],
   projectName: string
-): FileSystemTree {
+): SandpackFiles {
   const files = collectFiles(fileTree);
-  const tree: FileSystemTree = {};
+  const result: SandpackFiles = {};
 
   const appFile = files.find(
     (f) =>
@@ -96,51 +104,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 )
 `;
 
-  setInTree(
-    tree,
-    "package.json",
-    JSON.stringify(
-        {
-          name: projectName.toLowerCase().replace(/[^a-z0-9-]/g, "-") || "app",
-          private: true,
-          version: "1.0.0",
-          type: "module",
-          scripts: {
-            dev: "vite",
-            build: "vite build",
-            preview: "vite preview",
-          },
-          dependencies: {
-            react: "^18.3.1",
-            "react-dom": "^18.3.1",
-            "lucide-react": "^0.462.0",
-          },
-          devDependencies: {
-            "@vitejs/plugin-react-swc": "^3.11.0",
-            vite: "^5.4.19",
-          },
-        },
-        null,
-        2
-      )
+  result["/package.json"] = JSON.stringify(
+    {
+      name: projectName.toLowerCase().replace(/[^a-z0-9-]/g, "-") || "app",
+      private: true,
+      version: "1.0.0",
+      dependencies: {
+        react: "^18.3.1",
+        "react-dom": "^18.3.1",
+        "lucide-react": "^0.462.0",
+      },
+    },
+    null,
+    2
   );
 
-  setInTree(
-    tree,
-    "vite.config.js",
-    `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
-
-export default defineConfig({
-  plugins: [react()],
-})
-`
-  );
-
-  setInTree(
-    tree,
-    "index.html",
-    `<!DOCTYPE html>
+  result["/index.html"] = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -149,21 +128,33 @@ export default defineConfig({
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-`
-  );
+`;
 
-  setInTree(tree, "src/App.jsx", appContent);
-  setInTree(tree, "src/main.jsx", mainContent);
+  result["/src/index.jsx"] = mainContent;
+  result["/src/App.jsx"] = appContent;
 
+  const existingPaths = new Set<string>(["/src/App.jsx", "/src/index.jsx"]);
   const skipPaths = ["App.jsx", "App.tsx", "App.js", "App.ts", "index.jsx", "index.tsx", "main.jsx", "main.tsx"];
+
   for (const { path, content } of files) {
     if (skipPaths.some((s) => path.endsWith(s))) continue;
-    const dest = path.startsWith("src/") ? path : `src/${path}`;
-    setInTree(tree, dest, content);
+    const dest = path.startsWith("src/") ? `/src/${path}` : path.startsWith("/") ? path : `/src/${path}`;
+    result[dest] = content;
+    existingPaths.add(dest);
   }
 
-  return tree;
+  const allCode = Object.values(result).map((v) => (typeof v === "string" ? v : v.code)).join("\n");
+  const localImports = extractLocalImports(allCode);
+  for (const relPath of localImports) {
+    const path = `/src/${relPath}.jsx`;
+    const name = relPath.split("/").pop() || "Component";
+    const displayName = name.replace(/^[a-z]/, (c) => c.toUpperCase());
+    if (!existingPaths.has(path) && !result[path]) {
+      result[path] = placeholderComponent(displayName);
+    }
+  }
+
+  return result;
 }
