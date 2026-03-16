@@ -81,7 +81,7 @@ const Community = () => {
 
     // Fetch profiles
     if (data && data.length > 0) {
-      const userIds = [...new Set(data.map((p) => p.user_id))];
+      const userIds = [...new Set((data as any[]).map((p: any) => p.user_id as string))];
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("user_id, display_name")
