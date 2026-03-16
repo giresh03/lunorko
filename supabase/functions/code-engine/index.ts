@@ -383,7 +383,7 @@ ${stackDirective}`;
 
     // ============= ACTION: generate-tests =============
     if (action === "generate-tests") {
-      const { code, language, filename, model } = body;
+      const { code, language, filename, model } = body as { code: string; language: string; filename: string; model: string };
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate-tests lang=${language}, file=${filename}`);
 
