@@ -7,7 +7,7 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,9 @@ import {
 } from "@/lib/offlineCache";
 import { detectErrors } from "@/lib/codeErrorDetector";
 import { AIModalPopup } from "@/components/editor/AIModalPopup";
+import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
+import { WebContainer } from "@webcontainer/api";
+import { buildWebContainerFiles, hasJSX } from "@/lib/webcontainerProject";
 
 // -- Project types --
 interface SavedProject {
@@ -398,6 +401,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showTerminal, setShowTerminal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const webcontainerRef = useRef<InstanceType<typeof WebContainer> | null>(null);
   type DevicePreset = "iphone-se" | "iphone-15" | "pixel-8" | "ipad-mini" | "ipad-pro" | "android-tab" | "desktop";
   const DEVICE_PRESETS: Record<DevicePreset, { label: string; w: number; h: number; type: "phone" | "tablet" | "desktop"; notch: "dynamic-island" | "notch" | "punch-hole" | "none" }> = {
     "iphone-se": { label: "iPhone SE", w: 320, h: 568, type: "phone", notch: "none" },
@@ -601,7 +606,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       .filter(([name]) => name.endsWith(".css"))
       .map(([name, content]) => `/* ${name} */\n${content}`)
       .join("\n");
-    const strippedCode = code
+    // Replace lucide-react imports with shim (so icons like ShoppingBag work)
+    let processedCode = code.replace(
+      /import\s+{([^}]+)}\s+from\s+['"]lucide-react['"]\s*;?/g,
+      (_, names) => names.split(",").map((n: string) => n.trim()).filter(Boolean)
+        .map((n: string) => `const ${n} = window.${n} || window._iconProxy?.${n} || (p=>React.createElement('span',{style:{width:(p?.size||16)+'px',height:(p?.size||16)+'px',fontSize:'10px',border:'1px dashed #555',borderRadius:'2px',color:'#888'}},'⬡'));`)
+        .join("\n")
+    );
+    const strippedCode = processedCode
       .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
       .replace(/^\s*import\s+['"][^'"]+['"];?\s*$/gm, "")
       .replace(/^\s*export\s+(default\s+)?/gm, "");
@@ -687,6 +699,7 @@ const _iconSvgs = {
   Heart: '<path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 000-7.8z"/>',
   Star: '<polygon points="12 2 15.1 8.3 22 9.2 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.2 8.9 8.3 12 2"/>',
   ShoppingCart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 002 1.6h9.7a2 2 0 002-1.6L23 6H6"/>',
+  ShoppingBag: '<path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>',
   Home: '<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   User: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   Settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h.09a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06"/>',
@@ -962,6 +975,9 @@ ${jsCode}
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
     const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
     const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
+    const filesList = Object.entries(allFiles).map(([path, content]) => ({ path, content }));
+    const isReactProject = hasJSX(filesList);
+    if (!isReactProject) setPreviewUrl(null);
 
     if (isHtml) {
       setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
@@ -1322,27 +1338,71 @@ ${jsCode}
     const lang = activeTab.language;
     const isHtml = lang === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(lang) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
+    const allFiles = collectFiles(fileTree);
+    const filesList = Object.entries(allFiles).map(([path, content]) => ({ path, content }));
+    const isReactProject = hasJSX(filesList);
+    const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const isAppDomain = domainId === "app-development" || domainId === "web-development";
 
-    // For HTML/JS/React files, render visually in the preview iframe
+    // For React/JSX projects: run in WebContainer (Vite) - automatic local run
+    if (isReactProject && isAppDomain) {
+      setShowPreview(true);
+      setShowTerminal(true);
+      setOutput([`$ Running ${activeTab.name}...`, "🚀 Starting Vite dev server in browser..."]);
+      setPreviewUrl(null);
+      try {
+        if (!webcontainerRef.current) {
+          setOutput((p) => [...p, "⏳ Booting WebContainer (first time may take a few seconds)..."]);
+          webcontainerRef.current = await WebContainer.boot({ coep: "credentialless" });
+        }
+        const tree = buildWebContainerFiles(fileTree, currentProjectName || "app");
+        await webcontainerRef.current.mount(tree);
+        setOutput((p) => [...p, "📦 Running npm install..."]);
+        const install = await webcontainerRef.current.spawn("npm", ["install"]);
+        const exit = await install.exit;
+        if (exit !== 0) {
+          setOutput((p) => [...p, "❌ npm install failed"]);
+          setIsRunning(false);
+          return;
+        }
+        setOutput((p) => [...p, "▶️ Starting dev server..."]);
+        const unsub = webcontainerRef.current.on("server-ready", (port, url) => {
+          setPreviewUrl(url);
+          setPreviewContent("");
+          setOutput((p) => [...p, `✅ App running at ${url}`]);
+          unsub();
+        });
+        await webcontainerRef.current.spawn("npm", ["run", "dev"]);
+      } catch (e) {
+        setOutput((p) => [...p, `❌ ${e instanceof Error ? e.message : String(e)}`]);
+        setOutput((p) => [...p, "↩️ Falling back to quick preview..."]);
+        const hasJSXInFile = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
+        const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
+        setPreviewContent(hasJSXInFile || usesDOM ? buildAppPreviewHtml(activeTab.content, lang, allFiles) : buildVanillaJsPreview(activeTab.content, allFiles));
+      }
+      setIsRunning(false);
+      return;
+    }
+
+    // For HTML/JS (non-React): use Babel/HTML preview
     if (isHtml || isJsLike) {
       setShowPreview(true);
       setShowTerminal(true);
       setOutput([`$ Running ${activeTab.name}...`, "🌐 Live preview rendering..."]);
-      // Trigger preview update immediately
-      const allFiles = collectFiles(fileTree);
-      const hasJSX = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
+      setPreviewUrl(null);
+      const hasJSXInFile = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
       if (isHtml) {
         setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
-      } else if (isJsLike && hasJSX) {
+      } else if (isJsLike && hasJSXInFile) {
         setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       } else if (isJsLike && usesDOM) {
         setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
       } else {
         setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       }
-      setOutput(prev => [...prev, "✅ Preview rendered successfully"]);
+      setOutput((p) => [...p, "✅ Preview rendered successfully"]);
       setIsRunning(false);
       return;
     }
@@ -1372,7 +1432,7 @@ ${jsCode}
       setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
     }
     setIsRunning(false);
-  }, [activeTab, domainName, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview]);
+  }, [activeTab, domainName, fileTree, currentProjectName, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview]);
 
   const handleCopy = () => {
     if (activeTab) navigator.clipboard.writeText(activeTab.content);
@@ -1966,6 +2026,11 @@ ${jsCode}
           <button onClick={() => setShowAIPanel(!showAIPanel)} className={`p-2 rounded-md transition-colors ${showAIPanel ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             <Sparkles className="h-4 w-4" />
           </button>
+          <RunLocallyDialog fileTree={fileTree} domainName={domainName} projectName={currentProjectName || "my-app"}>
+            <button className="p-2 rounded-md text-muted-foreground hover:text-foreground transition-colors" title="Run Locally">
+              <Download className="h-4 w-4" />
+            </button>
+          </RunLocallyDialog>
           <button onClick={() => setShowTerminal(!showTerminal)} className={`p-2 rounded-md transition-colors ${showTerminal ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`}>
             <TerminalIcon className="h-4 w-4" />
           </button>
@@ -2113,6 +2178,12 @@ ${jsCode}
                 {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 Run
               </Button>
+              <RunLocallyDialog fileTree={fileTree} domainName={domainName} projectName={currentProjectName || "my-app"}>
+                <Button size="sm" variant="outline" className="h-6 gap-1 px-2.5 text-[10px]">
+                  <Download className="h-3 w-3" />
+                  Run Locally
+                </Button>
+              </RunLocallyDialog>
               {activeTab && (
                 (activeTab.language === "html" || activeTab.name.endsWith(".html") ||
                   (isAppDomain && (["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name)))
@@ -2289,11 +2360,15 @@ ${jsCode}
                   </button>
                   <button
                     onClick={() => {
-                      const newWindow = window.open("", "_blank");
-                      if (newWindow) {
-                        newWindow.document.open();
-                        newWindow.document.write(previewContent);
-                        newWindow.document.close();
+                      if (previewUrl) {
+                        window.open(previewUrl, "_blank");
+                      } else {
+                        const newWindow = window.open("", "_blank");
+                        if (newWindow) {
+                          newWindow.document.open();
+                          newWindow.document.write(previewContent);
+                          newWindow.document.close();
+                        }
                       }
                     }}
                     className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
@@ -2336,10 +2411,11 @@ ${jsCode}
                         </div>
                         <iframe
                           ref={iframeRef}
-                          srcDoc={previewContent}
+                          src={previewUrl || undefined}
+                          srcDoc={previewUrl ? undefined : previewContent}
                           className="border-0 w-full"
                           style={{ height: "calc(100% - 48px)" }}
-                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                          sandbox={previewUrl ? undefined : "allow-scripts allow-modals allow-forms allow-popups"}
                           title="App Preview"
                         />
                         {/* Debug overlay - phone */}
@@ -2395,10 +2471,11 @@ ${jsCode}
                         </div>
                         <iframe
                           ref={iframeRef}
-                          srcDoc={previewContent}
+                          src={previewUrl || undefined}
+                          srcDoc={previewUrl ? undefined : previewContent}
                           className="border-0 w-full"
                           style={{ height: "calc(100% - 32px)" }}
-                          sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                          sandbox={previewUrl ? undefined : "allow-scripts allow-modals allow-forms allow-popups"}
                           title="App Preview"
                         />
                         {/* Debug overlay - tablet */}
@@ -2433,14 +2510,15 @@ ${jsCode}
                   ) : (
                     <iframe
                       ref={iframeRef}
-                      srcDoc={previewContent}
+                      src={previewUrl || undefined}
+                      srcDoc={previewUrl ? undefined : previewContent}
                       className="border-0 bg-white transition-all duration-200"
                       style={{
                         width: currentDevice.type === "phone" ? `${currentDevice.w}px` : currentDevice.type === "tablet" ? `${currentDevice.w}px` : "100%",
                         height: "100%",
                         maxWidth: "100%",
                       }}
-                      sandbox="allow-scripts allow-modals allow-forms allow-popups"
+                      sandbox={previewUrl ? undefined : "allow-scripts allow-modals allow-forms allow-popups"}
                       title="Web Preview"
                     />
                   )}
