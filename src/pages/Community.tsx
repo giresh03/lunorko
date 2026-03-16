@@ -63,9 +63,9 @@ const Community = () => {
 
   const fetchPosts = async () => {
     setLoading(true);
-    let query = supabase
+    let query = (supabase
       .from("community_posts")
-      .select("*")
+      .select("*") as any)
       .eq("domain_id", selectedDomain)
       .eq("is_removed", false)
       .order("is_pinned", { ascending: false })
@@ -81,7 +81,7 @@ const Community = () => {
 
     // Fetch profiles
     if (data && data.length > 0) {
-      const userIds = [...new Set(data.map((p) => p.user_id))];
+      const userIds = [...new Set((data as any[]).map((p: any) => p.user_id as string))];
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("user_id, display_name")

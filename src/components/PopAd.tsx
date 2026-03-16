@@ -23,7 +23,7 @@ const PopAd = () => {
     const fetchActiveAd = async () => {
       try {
         const { data, error } = await supabase
-          .from("pop_ads")
+          .from("pop_ads" as any)
           .select("id, title, image_url, link_url, festival_name, start_date, end_date")
           .eq("is_active", true)
           .lte("start_date", today)
@@ -33,8 +33,9 @@ const PopAd = () => {
           .maybeSingle();
 
         if (!error && data) {
-          const wasDismissed = sessionStorage.getItem(`popad-dismissed-${data.id}`);
-          if (!wasDismissed) setAd(data);
+          const row = data as any;
+          const wasDismissed = sessionStorage.getItem(`popad-dismissed-${row.id}`);
+          if (!wasDismissed) setAd(row as PopAd);
         }
       } catch {
         // pop_ads table may not exist yet (404) - fail silently

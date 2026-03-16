@@ -198,7 +198,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
       setLoading(true);
       try {
         const sessionHistory = history.map((h) => ({ q: h.question, a: h.answer, score: h.score }));
-        const data = await invokeAI("get-summary", {
+        const data: any = await invokeAI("get-summary", {
           domain: domainId,
           sessionHistory,
         });
@@ -217,7 +217,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
     setUserAnswer("");
     try {
       const sessionHistory = history.map((h) => ({ q: h.question, a: h.answer }));
-      const data = await invokeAI("generate-question", {
+      const data: any = await invokeAI("generate-question", {
         domain: domainId,
         questionIndex: idx,
         sessionHistory,
@@ -247,7 +247,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
     setEvaluating(true);
     try {
       const sessionHistory = history.map((h) => ({ q: h.question, a: h.answer }));
-      const data = await invokeAI("evaluate-answer", {
+      const data: any = await invokeAI("evaluate-answer", {
         domain: domainId,
         question: currentQuestion,
         answer,
