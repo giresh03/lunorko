@@ -182,7 +182,7 @@ export const COMPONENT_TEMPLATES: { id: string; label: string; icon: string; ele
         {
           id: "",
           type: "container",
-          styles: { flex: "1", padding: "16px", backgroundColor: "#f1f5f9", borderRadius: "8px" },
+          styles: { display: "flex", gap: "16px", padding: "16px", backgroundColor: "#f1f5f9", borderRadius: "8px" },
           children: [{ id: "", type: "text", content: "Column 1", styles: {} }],
         },
         {
