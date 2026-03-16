@@ -1,10 +1,19 @@
 ---
 description: Modern web UI patterns - use Radix/shadcn components with radix-nova style
-globs: "**/*.tsx,**/*.ts,**/*.css"
+globs: "**/*.tsx,**/*.ts,**/*.css,**/*.js,**/*.jsx"
 alwaysApply: false
 ---
 
 # Web Development - Modern Theme & Component Patterns
+
+## MERN Stack (Full-Stack)
+
+When the prompt mentions **MERN**, **MongoDB**, **Express**, **Node.js** (backend), or **full-stack JavaScript**:
+- Use rule: `.cursor/rules/mern-stack.mdc`
+- File structure: `docs/mern-stack/file-structure.md`
+- Setup commands: `docs/mern-stack/setup-commands.md`
+- Official docs: `docs/mern-stack/official-docs.md`
+- Follow official Node, Express, MongoDB, React documentation conventions
 
 ## Theme & Style
 

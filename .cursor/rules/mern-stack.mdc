@@ -1,0 +1,32 @@
+---
+description: MERN stack - follow official Node, Express, MongoDB, React docs; use pre-built structure
+globs: "**/*.{js,jsx,ts,tsx,json}"
+alwaysApply: false
+---
+
+# MERN Stack - Official Documentation Rules
+
+## When This Rule Applies
+
+Prompts mentioning: **MERN**, **MongoDB**, **Express**, **Node.js**, **React** (full-stack), **MEAN**, **full-stack JavaScript**
+
+## Official Documentation (Follow These)
+
+| Tech | Official Docs | Key Conventions |
+|------|---------------|-----------------|
+| **Node.js** | https://nodejs.org/docs/latest/api/ | Use ESM (`"type": "module"`) or CommonJS; follow fs, path, http, events APIs |
+| **Express** | https://expressjs.com/en/api.html | Middleware pattern: `(req, res, next) => {}`; use `express.json()`, `express.static()`; error-handling middleware has 4 args |
+| **MongoDB** | https://www.mongodb.com/docs/drivers/node/current/ | Use `MongoClient`, `db.collection()`, async/await; follow CRUD patterns |
+| **React** | https://react.dev | Functional components, hooks; follow React docs patterns |
+
+## Pre-Built File Structure
+
+Use the structure in `docs/mern-stack/file-structure.md`. Run setup commands from `docs/mern-stack/setup-commands.md`.
+
+## Rules
+
+1. **Node.js**: Prefer `import`/`export` (ESM) when `"type": "module"` in package.json; use `__dirname` replacement `import.meta.url` + `fileURLToPath` when needed
+2. **Express**: Controllers thin; business logic in services; use `express.Router()` for routes; error middleware: `(err, req, res, next) => {}`
+3. **MongoDB**: Connect once, reuse client; use `try/catch`; use `ObjectId` for `_id` queries
+4. **React**: Use `createRoot`; prefer `useState`, `useEffect`, custom hooks; colocate by feature
+5. **Structure**: Feature-first (auth, user, product) not file-type-first (routes, controllers)
