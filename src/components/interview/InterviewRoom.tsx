@@ -198,7 +198,7 @@ export default function InterviewRoom({ domainId, onEnd }: InterviewRoomProps) {
       setLoading(true);
       try {
         const sessionHistory = history.map((h) => ({ q: h.question, a: h.answer, score: h.score }));
-        const data = await invokeAI("get-summary", {
+        const data: any = await invokeAI("get-summary", {
           domain: domainId,
           sessionHistory,
         });
