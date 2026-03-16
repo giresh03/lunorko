@@ -501,7 +501,7 @@ ${code}
 
     // ============= ACTION: analyze-code (real-time AI guidance) =============
     if (action === "analyze-code") {
-      const { code, language, cursorLine, domain, teachingMode } = body;
+      const { code, language, cursorLine, domain: actionDomain, teachingMode } = body as { code: string; language: string; cursorLine: number; domain: string; teachingMode: boolean };
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] analyze-code lang=${language}, line=${cursorLine}, teachingMode=${!!teachingMode}`);
 
