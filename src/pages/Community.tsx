@@ -67,7 +67,7 @@ const Community = () => {
       .from("community_posts")
       .select("*")
       .eq("domain_id", selectedDomain)
-      .eq("is_removed", false)
+      .eq("is_removed" as any, false)
       .order("is_pinned", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(50);

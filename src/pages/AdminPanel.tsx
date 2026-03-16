@@ -59,7 +59,7 @@ const AdminPanel = () => {
   const [resourceDialog, setResourceDialog] = useState(false);
   const [editingResource, setEditingResource] = useState<any>(null);
   const [resourceForm, setResourceForm] = useState({
-    domain_id: "web-development", title: "", resource_type: "video" as const,
+    domain_id: "web-development", title: "", resource_type: "video" as "video" | "article" | "course" | "material",
     source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0,
   });
 
