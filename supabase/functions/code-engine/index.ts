@@ -582,7 +582,7 @@ Keep responses concise.${teachingHint}`;
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] explain-error teachingMode=${!!teachingMode}`);
 
-      const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+      const basePrompt = domainPrompts[actionDomain || domain] || `You are a coding mentor for ${actionDomain || domain}.`;
       const teachingHint = teachingMode
         ? "\n\nTEACHING MODE: Provide step-by-step guidance. Break the concept into small pieces. Include a simple example. Be encouraging."
         : "";
