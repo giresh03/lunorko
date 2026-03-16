@@ -33,8 +33,9 @@ const PopAd = () => {
           .maybeSingle();
 
         if (!error && data) {
-          const wasDismissed = sessionStorage.getItem(`popad-dismissed-${data.id}`);
-          if (!wasDismissed) setAd(data);
+          const row = data as any;
+          const wasDismissed = sessionStorage.getItem(`popad-dismissed-${row.id}`);
+          if (!wasDismissed) setAd(row as PopAd);
         }
       } catch {
         // pop_ads table may not exist yet (404) - fail silently
