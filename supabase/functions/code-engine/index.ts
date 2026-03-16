@@ -419,7 +419,7 @@ ${code}
 
     // ============= ACTION: generate-docs =============
     if (action === "generate-docs") {
-      const { code, language, filename, model } = body;
+      const { code, language, filename, model } = body as { code: string; language: string; filename: string; model: string };
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate-docs lang=${language}, file=${filename}`);
 
