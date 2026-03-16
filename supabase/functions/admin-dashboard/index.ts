@@ -215,16 +215,20 @@ serve(async (req) => {
         const { user_id } = body as { user_id: string };
         if (!user_id) return new Response(JSON.stringify({ success: false, error: "user_id required" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         try {
-          // Clear FK references that block auth user delete (removed_by in community_posts has no ON DELETE)
-          const { error: cpErr } = await adminClient.from("community_posts").update({ removed_by: null }).eq("removed_by", user_id);
-          if (cpErr) console.warn("community_posts update:", cpErr.message);
-          // Delete user data (ignore errors - tables may not exist)
+          // 1. Clear FK references that block auth user delete
+          await adminClient.from("community_posts").update({ removed_by: null }).eq("removed_by", user_id);
+          // 2. Delete user data in order
           await adminClient.from("payment_requests").delete().eq("user_id", user_id);
           await adminClient.from("subscriptions").delete().eq("user_id", user_id);
+          // 3. Try auth delete
           const { error: delErr } = await adminClient.auth.admin.deleteUser(user_id);
           if (delErr) {
-            console.error("deleteUser error:", delErr.message);
-            return new Response(JSON.stringify({ success: false, error: delErr.message }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            // Fallback: revoke access (delete subs + ban) if deleteUser fails
+            await adminClient.auth.admin.updateUserById(user_id, { ban_duration: "876000h" });
+            return new Response(JSON.stringify({
+              success: true,
+              message: "User access revoked (subscriptions removed, account banned). Full delete failed: " + delErr.message,
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
           }
           return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         } catch (e: any) {

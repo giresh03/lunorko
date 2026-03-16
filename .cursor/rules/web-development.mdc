@@ -1,0 +1,82 @@
+---
+description: Modern web UI patterns - use Radix/shadcn components with radix-nova style
+globs: "**/*.tsx,**/*.ts,**/*.css"
+alwaysApply: false
+---
+
+# Web Development - Modern Theme & Component Patterns
+
+## Theme & Style
+
+- **Design system**: Radix UI + shadcn/ui (radix-nova style)
+- **Styling**: Tailwind CSS with CSS variables (--primary, --foreground, --muted, --border, --card)
+- **Aesthetic**: Modern, clean, accessible. Use semantic colors (text-foreground, text-muted-foreground, bg-card, border-border)
+- **Animations**: Use tailwindcss-animate (accordion-up, accordion-down, etc.)
+
+## Component Mapping
+
+When the prompt mentions these concepts, use the corresponding pattern:
+
+| Prompt keywords | Use component | Reference |
+|-----------------|---------------|-----------|
+| accordion, FAQ, expandable, collapsible sections, reveal content | Accordion | See accordion reference below |
+| tabs, tabbed interface | Tabs | @/components/ui/tabs |
+| cards, card layout | Card | @/components/ui/card |
+| dialog, modal | Dialog | @/components/ui/dialog |
+| dropdown, menu | DropdownMenu | @/components/ui/dropdown-menu |
+
+## Accordion Reference (FAQ / Expandable Sections)
+
+**Import:**
+```tsx
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+```
+
+**Basic usage (single item open):**
+```tsx
+<Accordion type="single" collapsible defaultValue="item-1">
+  <AccordionItem value="item-1">
+    <AccordionTrigger>Is it accessible?</AccordionTrigger>
+    <AccordionContent>
+      Yes. It adheres to the WAI-ARIA design pattern.
+    </AccordionContent>
+  </AccordionItem>
+</Accordion>
+```
+
+**FAQ-style with bordered cards:**
+```tsx
+<Accordion type="single" collapsible className="space-y-3">
+  {items.map((item, i) => (
+    <AccordionItem
+      key={i}
+      value={`item-${i}`}
+      className="rounded-lg border border-border bg-card px-6 transition-colors hover:border-primary/30"
+    >
+      <AccordionTrigger className="text-left text-sm font-semibold text-foreground hover:no-underline">
+        {item.question}
+      </AccordionTrigger>
+      <AccordionContent className="text-sm leading-relaxed text-muted-foreground">
+        {item.answer}
+      </AccordionContent>
+    </AccordionItem>
+  ))}
+</Accordion>
+```
+
+**Multiple items open:** Use `type="multiple"` on Accordion.
+
+**Install:** `npx shadcn@latest add accordion` (or component already at `src/components/ui/accordion.tsx`)
+
+## Rule
+
+When implementing web UI from a prompt:
+1. Match prompt intent to the component mapping above
+2. Use the exact import paths and patterns from this rule
+3. Preserve semantic styling (foreground, muted-foreground, card, border-border)
+4. Add accordion animations via `data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down` (already in AccordionContent)

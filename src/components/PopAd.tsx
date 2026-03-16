@@ -21,19 +21,23 @@ const PopAd = () => {
     const today = new Date().toISOString().slice(0, 10);
 
     const fetchActiveAd = async () => {
-      const { data } = await supabase
-        .from("pop_ads")
-        .select("id, title, image_url, link_url, festival_name, start_date, end_date")
-        .eq("is_active", true)
-        .lte("start_date", today)
-        .gte("end_date", today)
-        .order("sort_order", { ascending: true })
-        .limit(1)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("pop_ads")
+          .select("id, title, image_url, link_url, festival_name, start_date, end_date")
+          .eq("is_active", true)
+          .lte("start_date", today)
+          .gte("end_date", today)
+          .order("sort_order", { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-      if (data) {
-        const wasDismissed = sessionStorage.getItem(`popad-dismissed-${data.id}`);
-        if (!wasDismissed) setAd(data);
+        if (!error && data) {
+          const wasDismissed = sessionStorage.getItem(`popad-dismissed-${data.id}`);
+          if (!wasDismissed) setAd(data);
+        }
+      } catch {
+        // pop_ads table may not exist yet (404) - fail silently
       }
     };
 

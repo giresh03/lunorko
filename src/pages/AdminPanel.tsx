@@ -324,7 +324,10 @@ const AdminPanel = () => {
       if (res?.success === false) {
         throw new Error(res?.error || "Delete failed");
       }
-      toast({ title: "User and subscription removed", variant: "destructive" });
+      toast({
+        title: res?.message || "User and subscription removed",
+        variant: "destructive",
+      });
       setSelectedUser(null);
       setDeleteUserDialog(false);
       fetchAll();
