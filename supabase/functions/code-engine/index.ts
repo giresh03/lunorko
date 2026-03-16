@@ -578,7 +578,7 @@ Keep responses concise.${teachingHint}`;
 
     // ============= ACTION: explain-error (AI explanation for errors) =============
     if (action === "explain-error") {
-      const { error, code, language, domain, teachingMode } = body;
+      const { error: codeError, code, language, domain: actionDomain, teachingMode } = body as { error: string; code: string; language: string; domain: string; teachingMode: boolean };
       const selectedModel = "google/gemini-2.5-flash-lite";
       console.log(`[code-engine] explain-error teachingMode=${!!teachingMode}`);
 
