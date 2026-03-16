@@ -507,7 +507,7 @@ ${code}
 
       const lines = code.split("\n");
       const contextBefore = lines.slice(Math.max(0, cursorLine - 15), cursorLine + 1).join("\n");
-      const basePrompt = domainPrompts[domain] || `You are a coding mentor for ${domain}.`;
+      const basePrompt = domainPrompts[actionDomain || domain] || `You are a coding mentor for ${actionDomain || domain}.`;
       const teachingHint = teachingMode
         ? "\n\nTEACHING MODE: The user has made repeated errors. Provide step-by-step guidance, break concepts into small pieces, and suggest a simple exercise or next action."
         : "";
