@@ -10,15 +10,20 @@ Pre-defined UI patterns for web development prompts. When implementing component
 
 ## Adding New Components
 
-1. Create `docs/component-reference/<component-name>.md`
-2. Include: base (Radix/shadcn), style, installation, source code, usage examples
-3. Update `.cursor/rules/web-development.mdc` component mapping table
+1. **Copy the template**: `cp _template.md <component-name>.md`
+2. **Fill in** all `[PLACEHOLDERS]` in the new file
+3. **Update** `.cursor/rules/web-development.mdc` component mapping table
+4. **Update** the Current References table below
 
 ## Current References
 
 | Component | File | Keywords |
 |-----------|------|----------|
 | Accordion | [accordion.md](./accordion.md) | accordion, FAQ, expandable, collapsible |
+| Tabs | [tabs.md](./tabs.md) | tabs, tabbed interface, switch views |
+| Alert | [alert.md](./alert.md) | alert, callout, notice, banner, info box |
+| Alert Dialog | [alert-dialog.md](./alert-dialog.md) | confirm dialog, delete confirmation |
+| *(template)* | [_template.md](./_template.md) | Copy this to add new components |
 
 ## Theme
 

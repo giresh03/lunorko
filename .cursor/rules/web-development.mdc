@@ -20,7 +20,9 @@ When the prompt mentions these concepts, use the corresponding pattern:
 | Prompt keywords | Use component | Reference |
 |-----------------|---------------|-----------|
 | accordion, FAQ, expandable, collapsible sections, reveal content | Accordion | See accordion reference below |
-| tabs, tabbed interface | Tabs | @/components/ui/tabs |
+| tabs, tabbed interface, switch views, segmented content | Tabs | See tabs reference below |
+| alert, callout, notice, banner, info box, warning | Alert | docs/component-reference/alert.md |
+| confirm dialog, confirmation modal, delete confirmation | AlertDialog | docs/component-reference/alert-dialog.md |
 | cards, card layout | Card | @/components/ui/card |
 | dialog, modal | Dialog | @/components/ui/dialog |
 | dropdown, menu | DropdownMenu | @/components/ui/dropdown-menu |
@@ -73,10 +75,45 @@ import {
 
 **Install:** `npx shadcn@latest add accordion` (or component already at `src/components/ui/accordion.tsx`)
 
+## Tabs Reference (Tabbed Interface / Switch Views)
+
+**Import:**
+```tsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+```
+
+**Basic usage:**
+```tsx
+<Tabs defaultValue="tab1">
+  <TabsList>
+    <TabsTrigger value="tab1">Tab 1</TabsTrigger>
+    <TabsTrigger value="tab2">Tab 2</TabsTrigger>
+  </TabsList>
+  <TabsContent value="tab1">Content 1</TabsContent>
+  <TabsContent value="tab2">Content 2</TabsContent>
+</Tabs>
+```
+
+**Controlled with icons:**
+```tsx
+const [activeTab, setActiveTab] = useState("forum");
+<Tabs value={activeTab} onValueChange={setActiveTab}>
+  <TabsList>
+    <TabsTrigger value="forum" className="gap-1.5"><PenSquare className="h-4 w-4" /> Forum</TabsTrigger>
+    <TabsTrigger value="chat" className="gap-1.5"><MessageCircle className="h-4 w-4" /> Chat</TabsTrigger>
+  </TabsList>
+  <TabsContent value="forum">{/* ... */}</TabsContent>
+  <TabsContent value="chat">{/* ... */}</TabsContent>
+</Tabs>
+```
+
+**Full reference:** docs/component-reference/tabs.md
+
 ## Rule
 
 When implementing web UI from a prompt:
 1. Match prompt intent to the component mapping above
-2. Use the exact import paths and patterns from this rule
+2. Use the exact import paths and patterns from this rule or docs/component-reference/
 3. Preserve semantic styling (foreground, muted-foreground, card, border-border)
-4. Add accordion animations via `data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down` (already in AccordionContent)
+4. For Accordion: animations already in AccordionContent
+5. For Tabs: use TabsList/TabsTrigger/TabsContent; add icons with `className="gap-1.5"` on TabsTrigger
