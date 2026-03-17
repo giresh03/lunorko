@@ -1189,11 +1189,7 @@ ${jsCode}
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainId, model: selectedModel }),
-      });
+      const resp = await fetchCodeEngine({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainId, model: selectedModel });
       if (!resp.ok) return null;
       const data = await resp.json();
       return data.suggestion || null;
