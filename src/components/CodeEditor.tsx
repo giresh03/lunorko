@@ -348,11 +348,31 @@ interface IDEProps {
 }
 
 const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
+const AUTH_REQUIRED_ERROR = "AUTH_REQUIRED";
+
+function isAuthRequiredError(error: unknown) {
+  return error instanceof Error && error.message === AUTH_REQUIRED_ERROR;
+}
 
 async function getAuthHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const token = session?.access_token;
+  if (!token) throw new Error(AUTH_REQUIRED_ERROR);
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
+
+async function fetchCodeEngine(body: Record<string, unknown>) {
+  const resp = await fetch(CODE_ENGINE_URL, {
+    method: "POST",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (resp.status === 401) {
+    throw new Error(AUTH_REQUIRED_ERROR);
+  }
+
+  return resp;
 }
 
 const RESPONSIVE_CHECKLIST = [
