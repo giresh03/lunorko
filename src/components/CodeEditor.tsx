@@ -349,6 +349,12 @@ interface IDEProps {
 
 const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
 
+async function getAuthHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
+
 const RESPONSIVE_CHECKLIST = [
   { id: "safe-area", label: "Safe area insets handled", hint: "Use SafeAreaView or env(safe-area-inset-*) for notch/home indicator" },
   { id: "font-scale", label: "Dynamic font scaling supported", hint: "Use rem/sp units, avoid fixed px for text sizes" },
