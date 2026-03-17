@@ -348,11 +348,31 @@ interface IDEProps {
 }
 
 const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
+const AUTH_REQUIRED_ERROR = "AUTH_REQUIRED";
+
+function isAuthRequiredError(error: unknown) {
+  return error instanceof Error && error.message === AUTH_REQUIRED_ERROR;
+}
 
 async function getAuthHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const token = session?.access_token;
+  if (!token) throw new Error(AUTH_REQUIRED_ERROR);
   return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
+
+async function fetchCodeEngine(body: Record<string, unknown>) {
+  const resp = await fetch(CODE_ENGINE_URL, {
+    method: "POST",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+
+  if (resp.status === 401) {
+    throw new Error(AUTH_REQUIRED_ERROR);
+  }
+
+  return resp;
 }
 
 const RESPONSIVE_CHECKLIST = [
@@ -1042,11 +1062,7 @@ ${jsCode}
     if (!online) return;
     setAiAnalyzing(true);
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainId, teachingMode: isTeachingMode }),
-      });
+      const resp = await fetchCodeEngine({ action: "analyze-code", code, language, cursorLine, domain: domainId, teachingMode: isTeachingMode });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         if (import.meta.env.DEV) console.warn("[CodeEditor] analyze-code failed:", resp.status, err);
@@ -1064,7 +1080,9 @@ ${jsCode}
         });
       }
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[CodeEditor] analyze-code error:", e);
+      if (!isAuthRequiredError(e) && import.meta.env.DEV) {
+        console.warn("[CodeEditor] analyze-code error:", e);
+      }
     }
     setAiAnalyzing(false);
   }, [online, domainId]);
@@ -1073,11 +1091,7 @@ ${jsCode}
   const fetchAIExplainError = useCallback(async (error: string, code: string, language: string, isTeachingMode: boolean) => {
     if (!online) return;
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode }),
-      });
+      const resp = await fetchCodeEngine({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode });
       if (!resp.ok) {
         if (import.meta.env.DEV) console.warn("[CodeEditor] explain-error failed:", resp.status);
         return;
@@ -1089,7 +1103,9 @@ ${jsCode}
         diagramUrl: data.diagramUrl,
       });
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[CodeEditor] explain-error error:", e);
+      if (!isAuthRequiredError(e) && import.meta.env.DEV) {
+        console.warn("[CodeEditor] explain-error error:", e);
+      }
     }
   }, [online, domainId]);
 
@@ -1177,11 +1193,7 @@ ${jsCode}
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainId, model: selectedModel }),
-      });
+      const resp = await fetchCodeEngine({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainId, model: selectedModel });
       if (!resp.ok) return null;
       const data = await resp.json();
       return data.suggestion || null;
@@ -1245,12 +1257,13 @@ ${jsCode}
     };
 
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "generate-tests", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel }),
-      });
-      if (!resp.ok || !resp.body) { upsert("❌ Test generation failed."); setChatLoading(false); return; }
+      const resp = await fetchCodeEngine({ action: "generate-tests", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel });
+      if (!resp.ok || !resp.body) {
+        const err = await resp.json().catch(() => ({}));
+        upsert(`❌ ${err?.error || "Test generation failed."}`);
+        setChatLoading(false);
+        return;
+      }
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -1277,7 +1290,9 @@ ${jsCode}
           applyCodeToEditor(blocks[0].code, blocks[0].language, testFilename);
         }
       }
-    } catch { upsert("❌ Connection error."); }
+    } catch (e) {
+      upsert(isAuthRequiredError(e) ? "🔒 Please sign in to use AI test generation." : "❌ Connection error.");
+    }
     setChatLoading(false);
   }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor]);
 
@@ -1298,12 +1313,13 @@ ${jsCode}
     };
 
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "generate-docs", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel }),
-      });
-      if (!resp.ok || !resp.body) { upsert("❌ Doc generation failed."); setChatLoading(false); return; }
+      const resp = await fetchCodeEngine({ action: "generate-docs", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel });
+      if (!resp.ok || !resp.body) {
+        const err = await resp.json().catch(() => ({}));
+        upsert(`❌ ${err?.error || "Doc generation failed."}`);
+        setChatLoading(false);
+        return;
+      }
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -1330,7 +1346,9 @@ ${jsCode}
           applyCodeToEditor(blocks[0].code, blocks[0].language, docFilename);
         }
       }
-    } catch { upsert("❌ Connection error."); }
+    } catch (e) {
+      upsert(isAuthRequiredError(e) ? "🔒 Please sign in to use AI documentation generation." : "❌ Connection error.");
+    }
     setChatLoading(false);
   }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor]);
 
@@ -1384,11 +1402,7 @@ ${jsCode}
     setOutput([`$ Running ${activeTab.name}...`, `🤖 AI-simulated ${lang} runtime`]);
 
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "execute", code: activeTab.content, language: lang, domain: domainName }),
-      });
+      const resp = await fetchCodeEngine({ action: "execute", code: activeTab.content, language: lang, domain: domainName });
       const data = await resp.json();
       if (!resp.ok) {
         setOutput((p) => [...p, `❌ ${data?.error || "Execution failed"}`]);
@@ -1401,7 +1415,11 @@ ${jsCode}
         setOutput((p) => [...p, "✅ Done (no output)"]);
       }
     } catch (err: unknown) {
-      setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
+      if (isAuthRequiredError(err)) {
+        setOutput((p) => [...p, "🔒 Please sign in to run AI-powered execution."]);
+      } else {
+        setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
+      }
     }
     setIsRunning(false);
   }, [activeTab, domainName, fileTree, currentProjectName, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview]);
@@ -1457,12 +1475,13 @@ ${jsCode}
           }
           return { role: m.role, content: m.content };
         });
-        const resp = await fetch(CODE_ENGINE_URL, {
-          method: "POST",
-          headers: await getAuthHeaders(),
-          body: JSON.stringify({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel }),
-        });
-        if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
+        const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          upsert(`❌ ${err?.error || "Request failed."}`);
+          setChatLoading(false);
+          return;
+        }
         if (!resp.body) throw new Error("No body");
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
@@ -1484,7 +1503,13 @@ ${jsCode}
         }
         // Cache the response for offline use
         if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
-      } catch { upsert("❌ Connection error. Switching to offline mode."); }
+      } catch (e) {
+        upsert(
+          isAuthRequiredError(e)
+            ? "🔒 Please sign in to use the AI assistant."
+            : "❌ Connection error. Switching to offline mode."
+        );
+      }
     }
 
     // Auto-apply: extract code blocks, batch all file operations, then trigger preview
