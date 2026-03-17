@@ -1075,7 +1075,7 @@ ${jsCode}
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode }),
       });
       if (!resp.ok) {
