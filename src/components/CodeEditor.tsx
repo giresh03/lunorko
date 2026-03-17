@@ -1459,7 +1459,7 @@ ${jsCode}
         });
         const resp = await fetch(CODE_ENGINE_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+          headers: await getAuthHeaders(),
           body: JSON.stringify({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel }),
         });
         if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
