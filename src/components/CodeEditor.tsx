@@ -1290,7 +1290,9 @@ ${jsCode}
           applyCodeToEditor(blocks[0].code, blocks[0].language, testFilename);
         }
       }
-    } catch { upsert("❌ Connection error."); }
+    } catch (e) {
+      upsert(isAuthRequiredError(e) ? "🔒 Please sign in to use AI test generation." : "❌ Connection error.");
+    }
     setChatLoading(false);
   }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor]);
 
