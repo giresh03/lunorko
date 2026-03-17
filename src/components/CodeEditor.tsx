@@ -1384,11 +1384,7 @@ ${jsCode}
     setOutput([`$ Running ${activeTab.name}...`, `🤖 AI-simulated ${lang} runtime`]);
 
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "execute", code: activeTab.content, language: lang, domain: domainName }),
-      });
+      const resp = await fetchCodeEngine({ action: "execute", code: activeTab.content, language: lang, domain: domainName });
       const data = await resp.json();
       if (!resp.ok) {
         setOutput((p) => [...p, `❌ ${data?.error || "Execution failed"}`]);
