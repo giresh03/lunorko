@@ -270,12 +270,12 @@ Rules:
 - Ensure imports/paths are consistent and runnable
 
 Output contract (critical):
-- For file generation, output files in this exact format:
+- Return ONLY file blocks (no intro, no outro, no bullet lists, no explanations)
+- Use this exact format for every file:
   path/to/file.ext
   \`\`\`language
   // code
   \`\`\`
-- Do not use prose between file blocks unless explicitly asked
 - Keep file paths stable and unique so they can be auto-applied safely
 ${stackDirective}`;
 
