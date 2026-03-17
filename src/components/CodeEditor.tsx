@@ -1476,7 +1476,12 @@ ${jsCode}
           return { role: m.role, content: m.content };
         });
         const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel });
-        if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          upsert(`❌ ${err?.error || "Request failed."}`);
+          setChatLoading(false);
+          return;
+        }
         if (!resp.body) throw new Error("No body");
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
