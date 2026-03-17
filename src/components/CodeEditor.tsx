@@ -1062,11 +1062,7 @@ ${jsCode}
     if (!online) return;
     setAiAnalyzing(true);
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainId, teachingMode: isTeachingMode }),
-      });
+      const resp = await fetchCodeEngine({ action: "analyze-code", code, language, cursorLine, domain: domainId, teachingMode: isTeachingMode });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         if (import.meta.env.DEV) console.warn("[CodeEditor] analyze-code failed:", resp.status, err);
