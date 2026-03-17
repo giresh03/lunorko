@@ -60,14 +60,13 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     };
 
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
+      const resp = await fetch(CODE_ASSISTANT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          action: "generate",
           messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
           domain: domainId,
         }),
