@@ -15,7 +15,7 @@ interface CodeAssistantProps {
   onSendToEditor?: (code: string, language: string) => void;
 }
 
-const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
+const CODE_ASSISTANT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-assistant`;
 
 const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const domainId = useMemo(() => {
@@ -60,14 +60,13 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     };
 
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
+      const resp = await fetch(CODE_ASSISTANT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          action: "generate",
           messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
           domain: domainId,
         }),
