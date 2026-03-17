@@ -7,9 +7,88 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Pre-built component reference for web-development UI design (from docs/component-reference/)
+const WEB_COMPONENT_REFERENCE = `
+## Pre-built UI Components (USE THESE — Radix/shadcn radix-nova style)
+
+Design system: Radix UI + shadcn/ui. Styling: Tailwind with semantic tokens (foreground, muted-foreground, primary, border, card).
+
+### Component mapping — match prompt intent to component:
+| Prompt keywords | Component | Import from |
+| accordion, FAQ, expandable, collapsible | Accordion | @/components/ui/accordion |
+| tabs, tabbed interface, switch views | Tabs | @/components/ui/tabs |
+| alert, callout, notice, banner, warning | Alert | @/components/ui/alert |
+| confirm dialog, delete confirmation | AlertDialog | @/components/ui/alert-dialog |
+
+### Tabs (tabbed interface, switch views)
+\`\`\`tsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+
+<Tabs defaultValue="tab1">
+  <TabsList>
+    <TabsTrigger value="tab1">Tab 1</TabsTrigger>
+    <TabsTrigger value="tab2">Tab 2</TabsTrigger>
+  </TabsList>
+  <TabsContent value="tab1">Content 1</TabsContent>
+  <TabsContent value="tab2">Content 2</TabsContent>
+</Tabs>
+\`\`\`
+Controlled with icons: <TabsTrigger value="x" className="gap-1.5"><Icon className="h-4 w-4" /> Label</TabsTrigger>
+Full-width underline: <TabsList className="w-full justify-start border-b bg-transparent p-0 rounded-none">
+
+### Accordion (FAQ, expandable sections)
+\`\`\`tsx
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+
+<Accordion type="single" collapsible defaultValue="item-1">
+  <AccordionItem value="item-1">
+    <AccordionTrigger>Question?</AccordionTrigger>
+    <AccordionContent>Answer.</AccordionContent>
+  </AccordionItem>
+</Accordion>
+\`\`\`
+FAQ-style: AccordionItem with className="rounded-lg border border-border bg-card px-6"
+
+### Alert (callout, notice, banner)
+\`\`\`tsx
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { InfoIcon } from "lucide-react"
+
+<Alert>
+  <InfoIcon className="h-4 w-4" />
+  <AlertTitle>Heads up!</AlertTitle>
+  <AlertDescription>Message here.</AlertDescription>
+</Alert>
+\`\`\`
+Destructive: <Alert variant="destructive">
+
+### AlertDialog (confirm, delete confirmation)
+\`\`\`tsx
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+
+<AlertDialog>
+  <AlertDialogTrigger asChild><Button variant="outline">Delete</Button></AlertDialogTrigger>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+      <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancel</AlertDialogCancel>
+      <AlertDialogAction className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+\`\`\`
+
+RULE: When generating UI, match the user's intent to the component mapping above and use these exact patterns. Prefer lucide-react icons (InfoIcon, AlertCircle, ChevronDown, etc.).
+`;
+
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
-  "web-development": `You are Lunor.AI's expert Web Development tutor specializing in HTML, CSS, JavaScript, TypeScript, React, Next.js, Node.js, and modern full-stack patterns. Write clean, accessible, responsive code with imports, type annotations, and accessibility attributes. Explain "why" behind patterns like SSR vs CSR, hydration, and component composition.`,
+  "web-development": `You are Lunor.AI's expert Web Development tutor specializing in HTML, CSS, JavaScript, TypeScript, React, Next.js, Node.js, and modern full-stack patterns. Write clean, accessible, responsive code with imports, type annotations, and accessibility attributes. Explain "why" behind patterns like SSR vs CSR, hydration, and component composition.
+${WEB_COMPONENT_REFERENCE}`,
   "app-development": `You are Lunor.AI's expert Mobile App Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE code using ONLY vanilla HTML, CSS, and JavaScript.
 
 CRITICAL: NEVER use React, JSX, TSX, Vue, TypeScript, or any framework. Use ONLY:
@@ -198,15 +277,19 @@ ${code}
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Auth check
+  // Auth: allow anon key (unauthenticated) or valid user session
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
-  const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-  const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
-  if (authError || !authUser) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const isAnonKey = authHeader === `Bearer ${anonKey}`;
+  if (!isAnonKey) {
+    const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL")!, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !authUser) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
   }
 
   try {
@@ -255,6 +338,12 @@ serve(async (req) => {
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+        : domain === "web-development"
+        ? `
+- STACK: React + JSX + Tailwind. Use the pre-built components from the reference above (Tabs, Accordion, Alert, AlertDialog).
+- When user asks for UI (dashboard, settings, FAQ, tabs, alerts, confirm dialogs), output code using those exact component patterns.
+- Use relative imports: import { Tabs } from "./components/ui/tabs" (from App.jsx). When using a component, INCLUDE the component file in a separate fenced block (e.g. components/ui/tabs.jsx) so both the consumer and the component are added to the project.
+- Use lucide-react for icons. Files: App.jsx plus component files as needed.`
         : "";
       const systemPrompt = `${basePrompt}
 

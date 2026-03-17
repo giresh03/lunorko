@@ -62,8 +62,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
+      const token = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const resp = await fetch(CODE_ASSISTANT_URL, {
         method: "POST",
         headers: {
@@ -77,8 +76,12 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
       });
 
       if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ error: "Request failed" }));
-        upsert(`❌ ${err.error || "Something went wrong. Please try again."}`);
+        const err = await resp.json().catch(() => ({}));
+        let msg = err.error || "Something went wrong. Please try again.";
+        if (resp.status === 404) msg = `AI service not deployed. Deploy: supabase functions deploy code-engine --project-ref ${import.meta.env.VITE_SUPABASE_PROJECT_ID || "YOUR_PROJECT_REF"}`;
+        if (resp.status === 401) msg = "Please log in to use the AI assistant.";
+        if (resp.status === 503 && err.hint) msg = `${err.error} ${err.hint}`;
+        upsert(`❌ ${msg}`);
         setIsLoading(false);
         return;
       }

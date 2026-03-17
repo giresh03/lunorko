@@ -2,37 +2,43 @@
 
 ## Project mismatch
 
-Your app uses **lgtpgglphbcncrtaajsg** (from `.env`). Ensure functions are deployed to this project.
+Your app uses **byveaoqwuwyhaykgjufj** (from `.env`). Ensure functions are deployed to this project.
 
 ## Deploy code-engine (AI Assistant — fixes "Request failed" 404)
 
-The AI Assistant in Web Development, App Development, and other domains calls the `code-engine` Edge Function. If you see **"Request failed"** or **404** in the console, deploy it:
+The AI Assistant in Web Development, App Development, and other domains calls the `code-engine` Edge Function. If you see **"Request failed"** or **404** in the console:
 
-```bash
-npx supabase functions deploy code-engine --project-ref lgtpgglphbcncrtaajsg
-```
+1. **Authenticate** (if you get 403 Forbidden):
+   ```bash
+   supabase login
+   ```
 
-Or with Supabase CLI:
+2. **Deploy the function**:
+   ```bash
+   supabase functions deploy code-engine --project-ref byveaoqwuwyhaykgjufj
+   ```
 
-```bash
-supabase functions deploy code-engine --project-ref lgtpgglphbcncrtaajsg
-```
+3. **Set the AI API key** (required for AI to work):
+   ```bash
+   supabase secrets set LOVABLE_API_KEY=your_lovable_api_key --project-ref byveaoqwuwyhaykgjufj
+   ```
+   Get your key from [Lovable](https://lovable.dev) → Project Settings → API Keys.
 
 ## Deploy admin-dashboard function
 
 ```bash
-npx supabase functions deploy admin-dashboard --project-ref lgtpgglphbcncrtaajsg
+npx supabase functions deploy admin-dashboard --project-ref byveaoqwuwyhaykgjufj
 ```
 
 If you get 403 Forbidden:
 1. Run `supabase login` and authenticate
-2. Ensure your account has access to project lgtpgglphbcncrtaajsg
+2. Ensure your account has access to project byveaoqwuwyhaykgjufj
 3. Or deploy from Supabase Dashboard: Project → Edge Functions → admin-dashboard → Deploy
 
 ## Run migrations (for pop_ads, admin_resources, etc.)
 
 ```bash
-npx supabase db push --project-ref lgtpgglphbcncrtaajsg
+npx supabase db push --project-ref byveaoqwuwyhaykgjufj
 ```
 
 Or run migrations manually in Supabase Dashboard → SQL Editor.
@@ -40,4 +46,4 @@ Or run migrations manually in Supabase Dashboard → SQL Editor.
 ## Remove user manually (if admin panel fails)
 
 Use `scripts/delete-user-by-email.sql` in Supabase Dashboard → SQL Editor.
-Ensure you're in the correct project (lgtpgglphbcncrtaajsg).
+Ensure you're in the correct project (byveaoqwuwyhaykgjufj).

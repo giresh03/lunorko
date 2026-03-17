@@ -1085,7 +1085,7 @@ ${jsCode}
       }
     }
     setAiAnalyzing(false);
-  }, [online, domainId]);
+  }, [online, domainId, fetchCodeEngine]);
 
   // Fetch AI error explanation
   const fetchAIExplainError = useCallback(async (error: string, code: string, language: string, isTeachingMode: boolean) => {
@@ -1107,7 +1107,7 @@ ${jsCode}
         console.warn("[CodeEditor] explain-error error:", e);
       }
     }
-  }, [online, domainId]);
+  }, [online, domainId, fetchCodeEngine]);
 
   // Debounced AI analysis: 2s after typing stops (1.5s in teaching mode for faster feedback)
   useEffect(() => {
@@ -1198,7 +1198,7 @@ ${jsCode}
       const data = await resp.json();
       return data.suggestion || null;
     } catch { return null; }
-  }, [domainId, selectedModel]);
+  }, [domainId, selectedModel, fetchCodeEngine]);
 
   // Register Monaco inline completion provider
   useEffect(() => {
@@ -1294,7 +1294,7 @@ ${jsCode}
       upsert(isAuthRequiredError(e) ? "🔒 Please sign in to use AI test generation." : "❌ Connection error.");
     }
     setChatLoading(false);
-  }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor]);
+  }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor, fetchCodeEngine]);
 
   // -- AI-powered doc generation --
   const handleGenerateDocs = useCallback(async () => {
@@ -1350,7 +1350,7 @@ ${jsCode}
       upsert(isAuthRequiredError(e) ? "🔒 Please sign in to use AI documentation generation." : "❌ Connection error.");
     }
     setChatLoading(false);
-  }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor]);
+  }, [activeTab, chatLoading, domainName, selectedModel, applyCodeToEditor, fetchCodeEngine]);
 
   // -- Run Code --
   const handleRun = useCallback(async () => {
@@ -1422,7 +1422,7 @@ ${jsCode}
       }
     }
     setIsRunning(false);
-  }, [activeTab, domainName, fileTree, currentProjectName, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview]);
+  }, [activeTab, domainName, fileTree, currentProjectName, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, fetchCodeEngine]);
 
   const handleCopy = () => {
     if (activeTab) navigator.clipboard.writeText(activeTab.content);
@@ -1478,7 +1478,11 @@ ${jsCode}
         const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel });
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
-          upsert(`❌ ${err?.error || "Request failed."}`);
+          let msg = err?.error || "Request failed.";
+          if (resp.status === 404) msg = `AI service not deployed. Run: supabase functions deploy code-engine --project-ref ${import.meta.env.VITE_SUPABASE_PROJECT_ID || "YOUR_PROJECT_REF"}`;
+          if (resp.status === 401) msg = "Please log in to use the AI assistant.";
+          if (resp.status === 503 && err?.hint) msg = `${err.error} ${err.hint}`;
+          upsert(`❌ ${msg}`);
           setChatLoading(false);
           return;
         }
@@ -1643,7 +1647,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);

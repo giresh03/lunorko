@@ -68,6 +68,12 @@ export default function SandpackPreviewPanel({
             react: "^18.3.1",
             "react-dom": "^18.3.1",
             "lucide-react": "^0.462.0",
+            "@radix-ui/react-tabs": "^1.1.2",
+            "@radix-ui/react-accordion": "^1.2.2",
+            "@radix-ui/react-alert-dialog": "^1.1.4",
+            "class-variance-authority": "^0.7.1",
+            clsx: "^2.1.1",
+            "tailwind-merge": "^2.6.0",
           },
           entry: "/src/index.jsx",
         }}

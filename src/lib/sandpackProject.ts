@@ -135,7 +135,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   result["/src/index.jsx"] = mainContent;
   result["/src/App.jsx"] = appContent;
 
-  const existingPaths = new Set<string>(["/src/App.jsx", "/src/index.jsx"]);
+  // cn utility for Radix/shadcn components (Tailwind class merging)
+  result["/src/lib/utils.js"] = `import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+`;
+
+  const existingPaths = new Set<string>(["/src/App.jsx", "/src/index.jsx", "/src/lib/utils.js"]);
   const skipPaths = ["App.jsx", "App.tsx", "App.js", "App.ts", "index.jsx", "index.tsx", "main.jsx", "main.tsx"];
 
   for (const { path, content } of files) {

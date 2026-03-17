@@ -10,12 +10,12 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor specializing in HTML, CSS, JavaScript, TypeScript, React, Next.js, Node.js, and modern full-stack patterns. You write clean, accessible, responsive code following best practices (semantic HTML, BEM/utility CSS, ES2024+, React hooks). When asked to generate code, always include imports, type annotations, and accessibility attributes. Explain the "why" behind patterns like SSR vs CSR, hydration, and component composition.`,
+    systemPrompt: `You are an expert Web Development tutor specializing in HTML, CSS, JavaScript, TypeScript, React, Next.js, Node.js, and modern full-stack patterns. You write clean, accessible, responsive code using Radix/shadcn components (Tabs, Accordion, Alert, AlertDialog) from docs/component-reference. Use Tailwind with semantic tokens. When asked to generate UI, use the pre-built component patterns.`,
     starterPrompts: [
-      "Build a responsive navbar with React",
-      "Explain the React useEffect cleanup pattern",
-      "Create a REST API with Express & TypeScript",
-      "Debug: why is my useEffect running twice?",
+      "Build a settings page with tabs (Profile, Security, Notifications)",
+      "Create an FAQ section with accordion",
+      "Add a confirmation dialog for delete action",
+      "Build a dashboard with alert banners",
     ],
   },
   "app-development": {
