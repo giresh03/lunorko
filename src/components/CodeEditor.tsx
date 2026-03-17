@@ -1253,11 +1253,7 @@ ${jsCode}
     };
 
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "generate-tests", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel }),
-      });
+      const resp = await fetchCodeEngine({ action: "generate-tests", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel });
       if (!resp.ok || !resp.body) { upsert("❌ Test generation failed."); setChatLoading(false); return; }
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
