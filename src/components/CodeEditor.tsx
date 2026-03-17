@@ -1415,7 +1415,11 @@ ${jsCode}
         setOutput((p) => [...p, "✅ Done (no output)"]);
       }
     } catch (err: unknown) {
-      setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
+      if (isAuthRequiredError(err)) {
+        setOutput((p) => [...p, "🔒 Please sign in to run AI-powered execution."]);
+      } else {
+        setOutput((p) => [...p, `❌ ${err instanceof Error ? err.message : String(err)}`]);
+      }
     }
     setIsRunning(false);
   }, [activeTab, domainName, fileTree, currentProjectName, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview]);
