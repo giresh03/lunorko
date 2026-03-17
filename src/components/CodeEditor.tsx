@@ -1103,7 +1103,9 @@ ${jsCode}
         diagramUrl: data.diagramUrl,
       });
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[CodeEditor] explain-error error:", e);
+      if (!isAuthRequiredError(e) && import.meta.env.DEV) {
+        console.warn("[CodeEditor] explain-error error:", e);
+      }
     }
   }, [online, domainId]);
 
