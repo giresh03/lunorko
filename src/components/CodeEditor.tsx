@@ -1089,11 +1089,7 @@ ${jsCode}
   const fetchAIExplainError = useCallback(async (error: string, code: string, language: string, isTeachingMode: boolean) => {
     if (!online) return;
     try {
-      const resp = await fetch(CODE_ENGINE_URL, {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode }),
-      });
+      const resp = await fetchCodeEngine({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode });
       if (!resp.ok) {
         if (import.meta.env.DEV) console.warn("[CodeEditor] explain-error failed:", resp.status);
         return;
