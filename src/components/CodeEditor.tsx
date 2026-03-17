@@ -1314,7 +1314,12 @@ ${jsCode}
 
     try {
       const resp = await fetchCodeEngine({ action: "generate-docs", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel });
-      if (!resp.ok || !resp.body) { upsert("❌ Doc generation failed."); setChatLoading(false); return; }
+      if (!resp.ok || !resp.body) {
+        const err = await resp.json().catch(() => ({}));
+        upsert(`❌ ${err?.error || "Doc generation failed."}`);
+        setChatLoading(false);
+        return;
+      }
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
