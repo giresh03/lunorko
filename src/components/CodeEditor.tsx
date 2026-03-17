@@ -1503,7 +1503,13 @@ ${jsCode}
         }
         // Cache the response for offline use
         if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
-      } catch { upsert("❌ Connection error. Switching to offline mode."); }
+      } catch (e) {
+        upsert(
+          isAuthRequiredError(e)
+            ? "🔒 Please sign in to use the AI assistant."
+            : "❌ Connection error. Switching to offline mode."
+        );
+      }
     }
 
     // Auto-apply: extract code blocks, batch all file operations, then trigger preview
