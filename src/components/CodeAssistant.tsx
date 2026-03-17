@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
 import { domains } from "@/lib/domains";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
