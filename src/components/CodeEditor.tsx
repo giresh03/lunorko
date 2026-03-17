@@ -1453,11 +1453,7 @@ ${jsCode}
           }
           return { role: m.role, content: m.content };
         });
-        const resp = await fetch(CODE_ENGINE_URL, {
-          method: "POST",
-          headers: await getAuthHeaders(),
-          body: JSON.stringify({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel }),
-        });
+        const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel });
         if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
         if (!resp.body) throw new Error("No body");
         const reader = resp.body.getReader();
