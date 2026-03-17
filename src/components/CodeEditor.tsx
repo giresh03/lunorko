@@ -349,6 +349,12 @@ interface IDEProps {
 
 const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
 
+async function getAuthHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+}
+
 const RESPONSIVE_CHECKLIST = [
   { id: "safe-area", label: "Safe area insets handled", hint: "Use SafeAreaView or env(safe-area-inset-*) for notch/home indicator" },
   { id: "font-scale", label: "Dynamic font scaling supported", hint: "Use rem/sp units, avoid fixed px for text sizes" },
@@ -1038,7 +1044,7 @@ ${jsCode}
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: "analyze-code", code, language, cursorLine, domain: domainId, teachingMode: isTeachingMode }),
       });
       if (!resp.ok) {
@@ -1069,7 +1075,7 @@ ${jsCode}
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode }),
       });
       if (!resp.ok) {
@@ -1173,7 +1179,7 @@ ${jsCode}
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: "autocomplete", code, language, cursorLine: line, cursorColumn: column, domain: domainId, model: selectedModel }),
       });
       if (!resp.ok) return null;
@@ -1241,7 +1247,7 @@ ${jsCode}
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: "generate-tests", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel }),
       });
       if (!resp.ok || !resp.body) { upsert("❌ Test generation failed."); setChatLoading(false); return; }
@@ -1294,7 +1300,7 @@ ${jsCode}
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: "generate-docs", code: activeTab.content, language: activeTab.language, filename: activeTab.name, domain: domainName, model: selectedModel }),
       });
       if (!resp.ok || !resp.body) { upsert("❌ Doc generation failed."); setChatLoading(false); return; }
@@ -1380,7 +1386,7 @@ ${jsCode}
     try {
       const resp = await fetch(CODE_ENGINE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ action: "execute", code: activeTab.content, language: lang, domain: domainName }),
       });
       const data = await resp.json();
@@ -1453,7 +1459,7 @@ ${jsCode}
         });
         const resp = await fetch(CODE_ENGINE_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+          headers: await getAuthHeaders(),
           body: JSON.stringify({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel }),
         });
         if (!resp.ok) { upsert("❌ Request failed."); setChatLoading(false); return; }
