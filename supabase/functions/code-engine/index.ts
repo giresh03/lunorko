@@ -259,17 +259,24 @@ serve(async (req) => {
       const systemPrompt = `${basePrompt}
 
 Rules:
-- Always use markdown formatting with code blocks and syntax highlighting
+- Always use markdown formatting with fenced code blocks and syntax highlighting
 - Be concise but thorough
 - When generating code, include comments explaining key parts
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity
-- When generating full files, specify the filename in a comment at the top
 - Prefer modern production stack patterns (component architecture, clean state management, reusable UI)
 - Add subtle motion/micro-interactions using CSS transitions/animations when relevant
 - Favor visually polished output (spacing, typography hierarchy, color harmony, responsive layout)
-- Prefer file paths in fenced blocks (e.g., "index.html" before the code block)
 - Ensure imports/paths are consistent and runnable
+
+Output contract (critical):
+- For file generation, output files in this exact format:
+  path/to/file.ext
+  \`\`\`language
+  // code
+  \`\`\`
+- Do not use prose between file blocks unless explicitly asked
+- Keep file paths stable and unique so they can be auto-applied safely
 ${stackDirective}`;
 
       const response = await fetch(LOVABLE_AI_URL, {
