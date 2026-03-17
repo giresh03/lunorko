@@ -1080,7 +1080,9 @@ ${jsCode}
         });
       }
     } catch (e) {
-      if (import.meta.env.DEV) console.warn("[CodeEditor] analyze-code error:", e);
+      if (!isAuthRequiredError(e) && import.meta.env.DEV) {
+        console.warn("[CodeEditor] analyze-code error:", e);
+      }
     }
     setAiAnalyzing(false);
   }, [online, domainId]);
