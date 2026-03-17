@@ -15,7 +15,7 @@ interface CodeAssistantProps {
   onSendToEditor?: (code: string, language: string) => void;
 }
 
-const CODE_ENGINE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-engine`;
+const CODE_ASSISTANT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-assistant`;
 
 const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const domainId = useMemo(() => {
