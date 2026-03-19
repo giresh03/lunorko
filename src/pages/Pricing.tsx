@@ -1,12 +1,8 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Check, X, Crown, Zap, Rocket, Star, Loader2, Coins } from "lucide-react";
+import { Check, X, Crown, Zap, Rocket, Star, Loader2, Coins, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { domains } from "@/lib/domains";
@@ -14,6 +10,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+declare global {
+  interface Window {
+    Razorpay: new (options: {
+      key: string;
+      amount: number;
+      currency: string;
+      order_id: string;
+      name: string;
+      description: string;
+      handler: (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
+    }) => void;
+  }
+}
 
 const allFeatures = [
   "Credits / month",
@@ -126,50 +136,89 @@ const Pricing = () => {
   const selectedDomainId = searchParams.get("domain") || "web-development";
   const selectedDomain = domains.find((d) => d.id === selectedDomainId);
   const { user } = useAuth();
-  const { getPlanForDomain, loading: subLoading } = useSubscription();
-
-  const [payDialog, setPayDialog] = useState<typeof plans[0] | null>(null);
-  const [utrNumber, setUtrNumber] = useState("");
+  const { getPlanForDomain, refetch } = useSubscription();
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubscribe = (plan: typeof plans[0]) => {
-    if (!user) {
-      toast.error("Please sign in first");
-      return;
-    }
-    if (plan.id === "free") return;
-    setPayDialog(plan);
-    setUtrNumber("");
-  };
+  const loadRazorpayScript = (): Promise<void> =>
+    new Promise((resolve) => {
+      if (typeof window !== "undefined" && (window as any).Razorpay) {
+        resolve();
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve();
+      document.body.appendChild(script);
+    });
 
-  const handleSubmitUTR = async () => {
-    if (!payDialog || !user) return;
-    if (!utrNumber.trim()) {
-      toast.error("Please enter the UTR number");
-      return;
-    }
+  const handleSubscribe = useCallback(
+    async (plan: typeof plans[0]) => {
+      if (!user) {
+        toast.error("Please sign in first");
+        return;
+      }
+      if (plan.id === "free") return;
 
-    setSubmitting(true);
-    try {
-      const { error } = await supabase.from("payment_requests" as any).insert({
-        user_id: user.id,
-        plan_id: payDialog.id,
-        domain_id: selectedDomainId,
-        amount: payDialog.amountPaise,
-        utr_number: utrNumber.trim(),
-      } as any);
+      setSubmitting(true);
+      try {
+        const { data: orderData, error: orderError } = await supabase.functions.invoke("create-razorpay-order", {
+          body: { plan_id: plan.id, amount: plan.amountPaise, domain_id: selectedDomainId },
+        });
 
-      if (error) throw error;
-      toast.success("Payment request submitted! You'll get access once the admin verifies your payment.");
-      setPayDialog(null);
-      setUtrNumber("");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to submit payment request");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+        if (orderError) throw orderError;
+        const { order_id, key_id } = orderData as { order_id: string; key_id: string };
+        if (!order_id || !key_id) throw new Error("Invalid order response");
+
+        await loadRazorpayScript();
+
+        const rzp = new (window as any).Razorpay({
+          key: key_id,
+          amount: plan.amountPaise,
+          currency: "INR",
+          order_id,
+          name: "Lunor.AI",
+          description: `${plan.name} Plan - ${selectedDomain?.name || "All domains"}`,
+          prefill: { email: user.email || undefined },
+          modal: { ondismiss: () => setSubmitting(false) },
+          handler: async (res: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+            try {
+              const { data: verifyData, error: verifyError } = await supabase.functions.invoke("verify-razorpay-payment", {
+                body: {
+                  razorpay_payment_id: res.razorpay_payment_id,
+                  razorpay_order_id: res.razorpay_order_id,
+                  razorpay_signature: res.razorpay_signature,
+                  plan_id: plan.id,
+                  amount: plan.amountPaise,
+                  domain_id: selectedDomainId,
+                },
+              });
+              if (verifyError) throw verifyError;
+              toast.success("Payment successful! Your subscription is now active.");
+              refetch();
+            } catch (err: any) {
+              console.error(err);
+              toast.error(err.message || "Payment verification failed");
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        });
+
+        rzp.on("payment.failed", () => {
+          toast.error("Payment failed or was cancelled");
+          setSubmitting(false);
+        });
+
+        rzp.open();
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err.message || "Failed to start payment");
+        setSubmitting(false);
+      }
+    },
+    [user, selectedDomainId, selectedDomain, refetch]
+  );
 
   const currentPlan = user ? getPlanForDomain(selectedDomainId) : "free";
 
@@ -257,10 +306,19 @@ const Pricing = () => {
                   <Button
                     className="w-full"
                     variant={p.popular ? "default" : "outline"}
-                    disabled={!user}
+                    disabled={!user || submitting}
                     onClick={() => handleSubscribe(p)}
                   >
-                    {!user ? "Sign in to subscribe" : `Subscribe ₹${p.price}/mo`}
+                    {submitting ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+                    ) : !user ? (
+                      "Sign in to subscribe"
+                    ) : (
+                      <>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Subscribe ₹{p.price}/mo
+                      </>
+                    )}
                   </Button>
                 )}
               </div>
@@ -306,58 +364,6 @@ const Pricing = () => {
           </div>
         </div>
       </main>
-
-      {/* UPI Payment Dialog */}
-      <Dialog open={!!payDialog} onOpenChange={(open) => !open && setPayDialog(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-center">
-              Pay ₹{payDialog?.price} for {payDialog?.name} Plan
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex flex-col items-center gap-4 py-4">
-            <p className="text-sm text-muted-foreground text-center">
-              Scan the QR code below using any UPI app (PhonePe, GPay, Paytm, etc.)
-            </p>
-
-            <div className="rounded-xl border border-border p-2 bg-white">
-              <img
-                src="/images/upi-qr.jpeg"
-                alt="UPI QR Code"
-                className="w-64 h-auto rounded-lg"
-              />
-            </div>
-
-            <div className="w-full space-y-3 mt-2">
-              <div>
-                <label className="text-sm font-medium text-foreground mb-1 block">
-                  Enter UTR / Transaction ID after payment
-                </label>
-                <Input
-                  placeholder="e.g. 412345678901"
-                  value={utrNumber}
-                  onChange={(e) => setUtrNumber(e.target.value)}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Your access will be activated once the admin verifies your payment.
-              </p>
-              <Button
-                className="w-full"
-                disabled={submitting || !utrNumber.trim()}
-                onClick={handleSubmitUTR}
-              >
-                {submitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
-                ) : (
-                  "Submit Payment"
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Footer />
     </div>

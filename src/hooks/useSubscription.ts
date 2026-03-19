@@ -20,42 +20,43 @@ export const useSubscription = () => {
     loading: boolean;
   }>({ subscriptions: [], isAdmin: false, loading: true });
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!user) {
       setState({ subscriptions: [], isAdmin: false, loading: false });
       return;
     }
 
-    let cancelled = false;
-    const fetchData = async () => {
-      const [{ data: roleData }, { data: subData }] = await Promise.all([
-        supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("role", "admin")
-          .maybeSingle(),
-        supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("status", "active")
-          .gte("expires_at", new Date().toISOString())
-          .order("expires_at", { ascending: false }),
-      ]);
+    setState((s) => ({ ...s, loading: true }));
+    const [{ data: roleData }, { data: subData }] = await Promise.all([
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle(),
+      supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .gte("expires_at", new Date().toISOString())
+        .order("expires_at", { ascending: false }),
+    ]);
 
-      if (!cancelled) {
-        setState({
-          isAdmin: !!roleData,
-          subscriptions: (subData as Subscription[]) || [],
-          loading: false,
-        });
-      }
-    };
-
-    fetchData();
-    return () => { cancelled = true; };
+    setState({
+      isAdmin: !!roleData,
+      subscriptions: (subData as Subscription[]) || [],
+      loading: false,
+    });
   }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setState({ subscriptions: [], isAdmin: false, loading: false });
+      return;
+    }
+    fetchData();
+  }, [user, fetchData]);
 
   const { subscriptions, isAdmin, loading } = state;
 
@@ -94,5 +95,6 @@ export const useSubscription = () => {
     hasEditorAccess,
     hasEditorAccessForDomain,
     getPlanForDomain,
+    refetch: fetchData,
   };
 };

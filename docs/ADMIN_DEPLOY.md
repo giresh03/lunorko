@@ -24,6 +24,21 @@ The AI Assistant in Web Development, App Development, and other domains calls th
    ```
    Get your key from [Lovable](https://lovable.dev) → Project Settings → API Keys.
 
+## Razorpay payment gateway
+
+1. **Deploy Razorpay edge functions**:
+   ```bash
+   npx supabase functions deploy create-razorpay-order --project-ref byveaoqwuwyhaykgjufj
+   npx supabase functions deploy verify-razorpay-payment --project-ref byveaoqwuwyhaykgjufj
+   ```
+
+2. **Set Razorpay secrets** (required for payments to work):
+   ```bash
+   supabase secrets set RAZORPAY_KEY_ID=rzp_live_xxx --project-ref byveaoqwuwyhaykgjufj
+   supabase secrets set RAZORPAY_KEY_SECRET=your_secret --project-ref byveaoqwuwyhaykgjufj
+   ```
+   Get these from [Razorpay Dashboard](https://dashboard.razorpay.com) → Settings → API Keys.
+
 ## Deploy admin-dashboard function
 
 ```bash
