@@ -65,8 +65,8 @@ const plans = [
   {
     id: "pro",
     name: "Pro",
-    price: 9,
-    amountPaise: 900,
+    price: 50,
+    amountPaise: 5000,
     icon: Star,
     credits: 60,
     color: "from-primary/20 to-primary/5",

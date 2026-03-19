@@ -13,7 +13,7 @@ interface FeatureGateProps {
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  pro: "Pro (₹9/mo)",
+  pro: "Pro (₹50/mo)",
   premium: "Premium (₹100/mo)",
   professional: "Professional (₹150/mo)",
 };
