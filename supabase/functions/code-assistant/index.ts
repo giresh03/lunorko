@@ -22,10 +22,13 @@ serve(async (req) => {
 
   try {
     const { messages, domain } = await req.json();
+    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("GOOGLE_AI_API_KEY or LOVABLE_API_KEY is not configured");
 
-    console.log(`[code-assistant] domain=${domain}, messages=${messages.length}`);
+    const useGoogleAI = !!GOOGLE_AI_API_KEY;
+    console.log(`[code-assistant] domain=${domain}, messages=${messages.length}, provider=${useGoogleAI ? "google" : "lovable"}`);
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
@@ -77,6 +80,83 @@ Rules:
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
     }
 
+    if (useGoogleAI) {
+      // Google AI API: convert messages to contents + systemInstruction
+      const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+      for (const m of messages) {
+        if (m.role === "system") continue; // handled by systemInstruction
+        const role = m.role === "assistant" ? "model" : "user";
+        contents.push({ role, parts: [{ text: m.content }] });
+      }
+      if (contents.length === 0) contents.push({ role: "user", parts: [{ text: "Hello" }] });
+
+      const googleUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY!)}&alt=sse`;
+      const googleResp = await fetch(googleUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+        }),
+      });
+
+      if (!googleResp.ok) {
+        const text = await googleResp.text();
+        console.error(`[code-assistant] Google AI error: ${googleResp.status}`, text);
+        return new Response(JSON.stringify({ error: "AI service error" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Transform Google SSE stream to OpenAI format for frontend compatibility
+      let buffer = "";
+      const decoder = new TextDecoder();
+      const reader = googleResp.body!.getReader();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                const json = line.slice(6).trim();
+                if (!json) continue;
+                try {
+                  const parsed = JSON.parse(json);
+                  const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                  if (textPart) {
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: textPart } }] })}\n\n`));
+                  }
+                } catch {}
+              }
+            }
+            // Flush remaining buffer
+            if (buffer.trim().startsWith("data: ")) {
+              const json = buffer.slice(6).trim();
+              try {
+                const parsed = JSON.parse(json);
+                const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (textPart) {
+                  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: textPart } }] })}\n\n`));
+                }
+              } catch {}
+            }
+          } finally {
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
+    // Lovable gateway (fallback)
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {

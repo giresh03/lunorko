@@ -120,7 +120,45 @@ RULES:
 const NATIVE_LANGUAGES = new Set(["javascript", "typescript"]);
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash";
 const DEFAULT_MODEL = "google/gemini-3-flash-preview";
+
+async function callAINonStream(
+  systemContent: string,
+  userContent: string,
+  apiKey: string,
+  useGoogle: boolean
+): Promise<string> {
+  if (useGoogle) {
+    const url = `${GOOGLE_AI_URL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemContent }] },
+        contents: [{ role: "user", parts: [{ text: userContent }] }],
+      }),
+    });
+    if (!resp.ok) throw new Error(`AI error: ${resp.status}`);
+    const data = await resp.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  }
+  const resp = await fetch(LOVABLE_AI_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.0-flash",
+      messages: [
+        { role: "system", content: systemContent },
+        { role: "user", content: userContent },
+      ],
+      stream: false,
+    }),
+  });
+  if (!resp.ok) throw new Error(`AI error: ${resp.status}`);
+  const data = await resp.json();
+  return data.choices?.[0]?.message?.content || "";
+}
 
 function normalizeLovableModel(requested?: string): string {
   const m = (requested || "").toLowerCase();
@@ -222,8 +260,10 @@ async function simulateWithAI(
   code: string,
   language: string,
   domain: string,
-  apiKey: string
+  apiKey: string,
+  useGoogle: boolean
 ): Promise<string[]> {
+  const systemContent = `You are a precise ${language} code execution simulator for the ${domain} domain. Output ONLY what the code would print — nothing else.`;
   const simulationPrompt = `You are a ${language} runtime simulator. Given the following ${language} code, predict and display the exact output that would be produced if this code were executed in a standard ${language} environment.
 
 Rules:
@@ -241,32 +281,45 @@ ${code}
 \`\`\``;
 
   try {
-    const response = await fetch(LOVABLE_AI_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        messages: [
-          { role: "system", content: `You are a precise ${language} code execution simulator for the ${domain} domain. Output ONLY what the code would print — nothing else.` },
-          { role: "user", content: simulationPrompt },
-        ],
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.error(`[code-engine] AI simulation error: ${response.status}`, text);
-      return [`⚙️ ${language} simulation unavailable. Status: ${response.status}`];
+    let content: string;
+    if (useGoogle) {
+      const url = `${GOOGLE_AI_URL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemContent }] },
+          contents: [{ role: "user", parts: [{ text: simulationPrompt }] }],
+        }),
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error(`[code-engine] Google AI simulation error: ${resp.status}`, text);
+        return [`⚙️ ${language} simulation unavailable. Status: ${resp.status}`];
+      }
+      const data = await resp.json();
+      content = data.candidates?.[0]?.content?.parts?.[0]?.text || "✅ Code executed successfully (no output)";
+    } else {
+      const resp = await fetch(LOVABLE_AI_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: DEFAULT_MODEL,
+          messages: [
+            { role: "system", content: systemContent },
+            { role: "user", content: simulationPrompt },
+          ],
+          stream: false,
+        }),
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error(`[code-engine] AI simulation error: ${resp.status}`, text);
+        return [`⚙️ ${language} simulation unavailable. Status: ${resp.status}`];
+      }
+      const data = await resp.json();
+      content = data.choices?.[0]?.message?.content || "✅ Code executed successfully (no output)";
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "✅ Code executed successfully (no output)";
-    
-    // Split into lines for consistent output format
     return content.split("\n").filter((line: string) => line !== undefined);
   } catch (err) {
     console.error("[code-engine] AI simulation error:", err);
@@ -312,12 +365,14 @@ serve(async (req) => {
     const rawDomain = (body.domain as string) || "web-development";
     const domain = typeof rawDomain === "string" ? rawDomain.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "web-development" : "web-development";
 
+    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
+    const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
+    if (!apiKey) {
       return new Response(
         JSON.stringify({
-          error: "LOVABLE_API_KEY is not configured",
-          hint: "Set the Edge Function secret: npx supabase secrets set LOVABLE_API_KEY=...",
+          error: "GOOGLE_AI_API_KEY or LOVABLE_API_KEY is not configured",
+          hint: "Set: npx supabase secrets set GOOGLE_AI_API_KEY=... or LOVABLE_API_KEY=...",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -367,6 +422,65 @@ Output contract (critical):
   \`\`\`
 - Keep file paths stable and unique so they can be auto-applied safely
 ${stackDirective}`;
+
+      if (GOOGLE_AI_API_KEY) {
+        const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+        for (const m of messages) {
+          if (m.role === "system") continue;
+          contents.push({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] });
+        }
+        if (contents.length === 0) contents.push({ role: "user", parts: [{ text: "Hello" }] });
+        const googleUrl = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
+        const googleResp = await fetch(googleUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents,
+          }),
+        });
+        if (!googleResp.ok) {
+          const text = await googleResp.text();
+          console.error(`[code-engine] Google AI error: ${googleResp.status}`, text);
+          return new Response(JSON.stringify({ error: "AI service error" }), {
+            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        let buf = "";
+        const dec = new TextDecoder();
+        const rd = googleResp.body!.getReader();
+        const stream = new ReadableStream({
+          async start(ctrl) {
+            try {
+              while (true) {
+                const { done, value } = await rd.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n");
+                buf = lines.pop() || "";
+                for (const line of lines) {
+                  if (!line.startsWith("data: ")) continue;
+                  const j = line.slice(6).trim();
+                  if (!j) continue;
+                  try {
+                    const p = JSON.parse(j);
+                    const t = p.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (t) ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`));
+                  } catch {}
+                }
+              }
+              if (buf.trim().startsWith("data: ")) {
+                try {
+                  const p = JSON.parse(buf.slice(6).trim());
+                  const t = p.candidates?.[0]?.content?.parts?.[0]?.text;
+                  if (t) ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`));
+                } catch {}
+              }
+            } finally { ctrl.close(); }
+          },
+        });
+        return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+      }
 
       const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
@@ -436,7 +550,7 @@ ${stackDirective}`;
         output = executeNatively(code);
       } else {
         // AI-simulated execution for Python, SQL, Solidity, C++, etc.
-        output = await simulateWithAI(code, language, domain || "general", LOVABLE_API_KEY);
+        output = await simulateWithAI(code, language, domain || "general", apiKey, !!GOOGLE_AI_API_KEY);
       }
 
       return new Response(
@@ -490,6 +604,49 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
+      if (GOOGLE_AI_API_KEY) {
+        const url = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: `You are an expert test engineer. Generate thorough, production-quality tests. Use markdown code blocks with syntax highlighting.` }] },
+            contents: [{ role: "user", parts: [{ text: testPrompt }] }],
+          }),
+        });
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Test generation failed" }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        let buf = "";
+        const dec = new TextDecoder();
+        const rd = resp.body!.getReader();
+        const stream = new ReadableStream({
+          async start(ctrl) {
+            try {
+              while (true) {
+                const { done, value } = await rd.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n");
+                buf = lines.pop() || "";
+                for (const line of lines) {
+                  if (!line.startsWith("data: ")) continue;
+                  const j = line.slice(6).trim();
+                  if (!j) continue;
+                  try {
+                    const p = JSON.parse(j);
+                    const t = p.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (t) ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`));
+                  } catch {}
+                }
+              }
+            } finally { ctrl.close(); }
+          },
+        });
+        return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+      }
       const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -502,7 +659,6 @@ ${code}
           stream: true,
         }),
       });
-
       if (!response.ok) {
         const text = await response.text();
         console.error(`[code-engine] test gen error: ${response.status}`, text);
@@ -532,6 +688,49 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
+      if (GOOGLE_AI_API_KEY) {
+        const url = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: `You are a technical documentation expert. Write clear, comprehensive docs with examples.` }] },
+            contents: [{ role: "user", parts: [{ text: docsPrompt }] }],
+          }),
+        });
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Documentation generation failed" }), {
+            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        let buf = "";
+        const dec = new TextDecoder();
+        const rd = resp.body!.getReader();
+        const stream = new ReadableStream({
+          async start(ctrl) {
+            try {
+              while (true) {
+                const { done, value } = await rd.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n");
+                buf = lines.pop() || "";
+                for (const line of lines) {
+                  if (!line.startsWith("data: ")) continue;
+                  const j = line.slice(6).trim();
+                  if (!j) continue;
+                  try {
+                    const p = JSON.parse(j);
+                    const t = p.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (t) ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`));
+                  } catch {}
+                }
+              }
+            } finally { ctrl.close(); }
+          },
+        });
+        return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+      }
       const response = await fetch(LOVABLE_AI_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
@@ -544,7 +743,6 @@ ${code}
           stream: true,
         }),
       });
-
       if (!response.ok) {
         const text = await response.text();
         console.error(`[code-engine] docs gen error: ${response.status}`, text);
@@ -565,34 +763,23 @@ ${code}
       const contextBefore = lines.slice(Math.max(0, cursorLine - 20), cursorLine + 1).join("\n");
       const contextAfter = lines.slice(cursorLine + 1, cursorLine + 5).join("\n");
 
-      const response = await fetch(LOVABLE_AI_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            { role: "system", content: `You are an intelligent code autocomplete engine. Given code context, predict the next 1-3 lines of code the developer would write. Return ONLY the completion text — no markdown, no explanation, no code fences. Just the raw code to insert.` },
-            { role: "user", content: `Language: ${language}\n\nCode before cursor:\n${contextBefore}\n\nCode after cursor:\n${contextAfter}\n\nComplete the code at the cursor position:` },
-          ],
-          stream: false,
-          max_tokens: 150,
-        }),
-      });
-
-      if (!response.ok) {
+      try {
+        const content = await callAINonStream(
+          `You are an intelligent code autocomplete engine. Given code context, predict the next 1-3 lines of code the developer would write. Return ONLY the completion text — no markdown, no explanation, no code fences. Just the raw code to insert.`,
+          `Language: ${language}\n\nCode before cursor:\n${contextBefore}\n\nCode after cursor:\n${contextAfter}\n\nComplete the code at the cursor position:`,
+          apiKey,
+          !!GOOGLE_AI_API_KEY
+        );
+        const suggestion = content.trim();
+        const cleaned = suggestion.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
+        return new Response(JSON.stringify({ suggestion: cleaned }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch {
         return new Response(JSON.stringify({ suggestion: "" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      const data = await response.json();
-      const suggestion = data.choices?.[0]?.message?.content?.trim() || "";
-      // Clean up: remove markdown code fences if the model accidentally adds them
-      const cleaned = suggestion.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
-
-      return new Response(JSON.stringify({ suggestion: cleaned }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     // ============= ACTION: analyze-code (real-time AI guidance) =============
@@ -627,28 +814,19 @@ Respond in JSON only:
 If you detect an obvious error (unclosed tag, syntax mistake), set hasError: true and explain in suggestion.
 Keep responses concise.${teachingHint}`;
 
-      const response = await fetch(LOVABLE_AI_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            { role: "system", content: basePrompt + " Respond ONLY with valid JSON. No markdown, no explanation outside JSON." },
-            { role: "user", content: analyzePrompt },
-          ],
-          stream: false,
-          max_tokens: 300,
-        }),
-      });
-
-      if (!response.ok) {
+      let content = "{}";
+      try {
+        content = (await callAINonStream(
+          basePrompt + " Respond ONLY with valid JSON. No markdown, no explanation outside JSON.",
+          analyzePrompt,
+          apiKey,
+          !!GOOGLE_AI_API_KEY
+        )).trim() || "{}";
+      } catch {
         return new Response(JSON.stringify({ intent: "", suggestion: "", nextLine: null, hasError: false }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content?.trim() || "{}";
       let parsed: { intent?: string; suggestion?: string; nextLine?: string | null; hasError?: boolean; concept?: string } = {};
       try {
         parsed = JSON.parse(content.replace(/```json\n?|\n?```/g, "")) || {};
@@ -699,29 +877,20 @@ Respond in JSON:
   "concept": "Brief concept name for diagram (e.g. 'HTML closing tags', 'Flexbox layout')"
 }${teachingHint}`;
 
-      const response = await fetch(LOVABLE_AI_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            { role: "system", content: basePrompt + " Respond ONLY with valid JSON." },
-            { role: "user", content: explainPrompt },
-          ],
-          stream: false,
-          max_tokens: 400,
-        }),
-      });
-
-      if (!response.ok) {
+      let content = "{}";
+      try {
+        content = (await callAINonStream(
+          basePrompt + " Respond ONLY with valid JSON.",
+          explainPrompt,
+          apiKey,
+          !!GOOGLE_AI_API_KEY
+        )).trim() || "{}";
+      } catch {
         return new Response(
           JSON.stringify({ explanation: "Could not get AI explanation.", fix: "", concept: "" }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content?.trim() || "{}";
       let parsed: { explanation?: string; fix?: string; concept?: string } = {};
       try {
         parsed = JSON.parse(content.replace(/```json\n?|\n?```/g, "")) || {};

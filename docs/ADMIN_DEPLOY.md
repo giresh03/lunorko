@@ -18,11 +18,15 @@ The AI Assistant in Web Development, App Development, and other domains calls th
    supabase functions deploy code-engine --project-ref byveaoqwuwyhaykgjufj
    ```
 
-3. **Set the AI API key** (required for AI to work):
-   ```bash
-   supabase secrets set LOVABLE_API_KEY=your_lovable_api_key --project-ref byveaoqwuwyhaykgjufj
-   ```
-   Get your key from [Lovable](https://lovable.dev) → Project Settings → API Keys.
+3. **Set the AI API key** (required for AI to work). Use either:
+   - **Google AI** (recommended): Get key from [Google AI Studio](https://aistudio.google.com/apikey)
+     ```bash
+     supabase secrets set GOOGLE_AI_API_KEY=your_google_ai_api_key --project-ref byveaoqwuwyhaykgjufj
+     ```
+   - **Lovable** (fallback): Get key from [Lovable](https://lovable.dev) → Project Settings → API Keys
+     ```bash
+     supabase secrets set LOVABLE_API_KEY=your_lovable_api_key --project-ref byveaoqwuwyhaykgjufj
+     ```
 
 ## Razorpay payment gateway
 
