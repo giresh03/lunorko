@@ -368,6 +368,9 @@ serve(async (req) => {
     const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "unknown";
+
     if (!apiKey) {
       return new Response(
         JSON.stringify({
@@ -375,6 +378,18 @@ serve(async (req) => {
           hint: "Set: supabase secrets set GEMINI_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Diagnostic: action=ping returns provider status (helps debug 402)
+    if (action === "ping") {
+      return new Response(
+        JSON.stringify({
+          provider: GOOGLE_AI_API_KEY ? "gemini" : "lovable",
+          projectRef,
+          hint: GOOGLE_AI_API_KEY ? "Gemini is configured." : "Set GEMINI_API_KEY in Supabase secrets to avoid 402. Get key: https://aistudio.google.com/apikey",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

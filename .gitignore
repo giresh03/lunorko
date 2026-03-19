@@ -28,3 +28,7 @@ supabase/.temp/
 
 # Generated / scaffolded project output
 my-mern-app/
+
+# Environment (keep .env.local and variants private)
+.env.local
+.env.*.local
