@@ -385,19 +385,19 @@ serve(async (req) => {
     if (action === "ping") {
       return new Response(
         JSON.stringify({
-          provider: GOOGLE_AI_API_KEY ? "gemini" : "lovable",
+          provider: LOVABLE_API_KEY ? "lovable" : "gemini",
           projectRef,
-          hint: GOOGLE_AI_API_KEY ? "Gemini is configured." : "Set GEMINI_API_KEY in Supabase secrets to avoid 402. Get key: https://aistudio.google.com/apikey",
+          hint: LOVABLE_API_KEY ? "Lovable AI Gateway is configured." : "Using Gemini fallback.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Log which provider is used (helps debug 402 issues)
-    if (GOOGLE_AI_API_KEY) {
-      console.log(`[code-engine] Using Gemini/Google AI (key present)`);
+    // Log which provider is used
+    if (LOVABLE_API_KEY) {
+      console.log(`[code-engine] Using Lovable AI Gateway (preferred)`);
     } else {
-      console.log(`[code-engine] Using Lovable (GEMINI_API_KEY not set - add it to avoid 402)`);
+      console.log(`[code-engine] Using Gemini/Google AI (fallback - LOVABLE_API_KEY not set)`);
     }
 
     // ============= ACTION: generate (AI code generation with streaming) =============
