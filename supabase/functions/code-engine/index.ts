@@ -792,7 +792,7 @@ ${code}
           `You are an intelligent code autocomplete engine. Given code context, predict the next 1-3 lines of code the developer would write. Return ONLY the completion text — no markdown, no explanation, no code fences. Just the raw code to insert.`,
           `Language: ${language}\n\nCode before cursor:\n${contextBefore}\n\nCode after cursor:\n${contextAfter}\n\nComplete the code at the cursor position:`,
           apiKey,
-          !!GOOGLE_AI_API_KEY
+          !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY
         );
         const suggestion = content.trim();
         const cleaned = suggestion.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
