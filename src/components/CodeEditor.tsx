@@ -1351,6 +1351,7 @@ ${jsCode}
           let msg = err?.error || "Request failed.";
           if (resp.status === 404) msg = `AI service not deployed. Run: supabase functions deploy code-engine --project-ref ${import.meta.env.VITE_SUPABASE_PROJECT_ID || "YOUR_PROJECT_REF"}`;
           if (resp.status === 401) msg = "Please log in to use the AI assistant.";
+          if (resp.status === 402) msg = `AI credits exhausted. If you're on a deployed preview (e.g. Lovable), set VITE_SUPABASE_URL to your project (byveaoqwuwyhaykgjufj) in the deployment env. Locally: ensure GEMINI_API_KEY is set: supabase secrets set GEMINI_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj`;
           if (resp.status === 503 && err?.hint) msg = `${err.error} ${err.hint}`;
           upsert(`❌ ${msg}`);
           setChatLoading(false);

@@ -4,7 +4,18 @@
 
 Your app uses **byveaoqwuwyhaykgjufj** (from `.env`). Ensure functions are deployed to this project.
 
-**If you get "AI credits exhausted" (402):** Your deployment may use a different Supabase project (e.g. Lovable's). Add `GEMINI_API_KEY` in Supabase Dashboard → Project Settings → Edge Functions → Secrets for the project your deployed app uses.
+### Fix "AI credits exhausted" (402)
+
+1. **Local dev**: Ensure `.env` has `VITE_SUPABASE_URL=https://byveaoqwuwyhaykgjufj.supabase.co`. Then set the Gemini key:
+   ```bash
+   supabase secrets set GEMINI_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj
+   supabase functions deploy code-engine --project-ref byveaoqwuwyhaykgjufj
+   ```
+
+2. **Deployed on Lovable**: Lovable may use a different Supabase project. In Lovable → Project Settings → Environment Variables, add:
+   - `VITE_SUPABASE_URL` = `https://byveaoqwuwyhaykgjufj.supabase.co`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = your anon key from Supabase Dashboard → API
+   Then redeploy. This makes the deployed app call your project (where `GEMINI_API_KEY` is set).
 
 ## Deploy code-engine (AI Assistant — fixes "Request failed" 404)
 
