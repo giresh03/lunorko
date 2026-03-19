@@ -712,7 +712,7 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
-      if (GOOGLE_AI_API_KEY) {
+      if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const url = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
         const resp = await fetch(url, {
           method: "POST",
