@@ -2104,8 +2104,8 @@ ${jsCode}
               const allFilesForPreview = collectFiles(fileTree);
               const filesListForPreview = Object.entries(allFilesForPreview).map(([path, content]) => ({ path, content }));
               const isReactProjectPreview = hasJSX(filesListForPreview);
-              const isAppOrWebDomain = domainId === "app-development" || domainId === "web-development";
-              const showSandpackPreview = isAppOrWebDomain && isReactProjectPreview;
+              const isAppDomainOnly = domainId === "app-development";
+              const showSandpackPreview = isAppDomainOnly && isReactProjectPreview;
               return (
               <div className={`flex flex-col border-l border-border overflow-hidden ${previewFullscreen ? "fixed inset-0 z-50 w-full h-full border-l-0" : "w-1/2"}`}>
                 <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0 gap-1">
