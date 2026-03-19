@@ -907,7 +907,7 @@ Respond in JSON:
           basePrompt + " Respond ONLY with valid JSON.",
           explainPrompt,
           apiKey,
-          !!GOOGLE_AI_API_KEY
+          !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY
         )).trim() || "{}";
       } catch {
         return new Response(
