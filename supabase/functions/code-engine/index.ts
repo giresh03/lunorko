@@ -574,7 +574,7 @@ ${stackDirective}`;
         output = executeNatively(code);
       } else {
         // AI-simulated execution for Python, SQL, Solidity, C++, etc.
-        output = await simulateWithAI(code, language, domain || "general", apiKey, !!GOOGLE_AI_API_KEY);
+        output = await simulateWithAI(code, language, domain || "general", apiKey, !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY);
       }
 
       return new Response(
