@@ -43,20 +43,45 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan_id, amount, domain_id } = await req.json();
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json();
 
-    if (!domain_id) {
-      return new Response(JSON.stringify({ error: "Missing domain_id" }), { status: 400, headers: corsHeaders });
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return new Response(JSON.stringify({ error: "Missing razorpay_order_id, razorpay_payment_id, or razorpay_signature" }), { status: 400, headers: corsHeaders });
     }
 
+    const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
     const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
-    if (!RAZORPAY_KEY_SECRET) {
+    if (!RAZORPAY_KEY_SECRET || !RAZORPAY_KEY_ID) {
       return new Response(JSON.stringify({ error: "Razorpay not configured" }), { status: 500, headers: corsHeaders });
     }
 
     const isValid = await verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, RAZORPAY_KEY_SECRET);
     if (!isValid) {
       return new Response(JSON.stringify({ error: "Invalid payment signature" }), { status: 400, headers: corsHeaders });
+    }
+
+    // Fetch order from Razorpay to validate plan_id, amount, domain_id (never trust client)
+    const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${razorpay_order_id}`, {
+      headers: {
+        Authorization: "Basic " + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`),
+      },
+    });
+    if (!orderRes.ok) {
+      const errText = await orderRes.text();
+      console.error("Razorpay order fetch error:", errText);
+      return new Response(JSON.stringify({ error: "Invalid order" }), { status: 400, headers: corsHeaders });
+    }
+    const order = await orderRes.json();
+    const notes = order.notes || {};
+    const plan_id = notes.plan_id;
+    const domain_id = notes.domain_id;
+    const amount = order.amount; // in paise, from Razorpay
+
+    if (!plan_id || !domain_id) {
+      return new Response(JSON.stringify({ error: "Order missing plan or domain" }), { status: 400, headers: corsHeaders });
+    }
+    if (notes.user_id !== userId) {
+      return new Response(JSON.stringify({ error: "Order does not belong to this user" }), { status: 403, headers: corsHeaders });
     }
 
     // Use service role to insert subscription

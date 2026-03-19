@@ -188,9 +188,6 @@ const Pricing = () => {
                   razorpay_payment_id: res.razorpay_payment_id,
                   razorpay_order_id: res.razorpay_order_id,
                   razorpay_signature: res.razorpay_signature,
-                  plan_id: plan.id,
-                  amount: plan.amountPaise,
-                  domain_id: selectedDomainId,
                 },
               });
               if (verifyError) throw verifyError;
