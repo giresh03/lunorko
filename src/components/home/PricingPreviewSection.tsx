@@ -66,7 +66,7 @@ const PricingPreviewSection = () => (
             </div>
             <h3 className="text-lg font-semibold text-foreground">Pro</h3>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="text-4xl font-bold text-foreground">₹50</span>
+              <span className="text-4xl font-bold text-foreground">₹9</span>
               <span className="text-sm text-muted-foreground">/month</span>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">For serious learners & job seekers</p>
