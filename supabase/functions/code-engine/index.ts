@@ -844,7 +844,7 @@ Keep responses concise.${teachingHint}`;
           basePrompt + " Respond ONLY with valid JSON. No markdown, no explanation outside JSON.",
           analyzePrompt,
           apiKey,
-          !!GOOGLE_AI_API_KEY
+          !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY
         )).trim() || "{}";
       } catch {
         return new Response(JSON.stringify({ intent: "", suggestion: "", nextLine: null, hasError: false }), {
