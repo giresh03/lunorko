@@ -430,10 +430,12 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: React + JSX + Tailwind. Use the pre-built components from the reference above (Tabs, Accordion, Alert, AlertDialog).
-- When user asks for UI (dashboard, settings, FAQ, tabs, alerts, confirm dialogs), output code using those exact component patterns.
-- Use relative imports: import { Tabs } from "./components/ui/tabs" (from App.jsx). When using a component, INCLUDE the component file in a separate fenced block (e.g. components/ui/tabs.jsx) so both the consumer and the component are added to the project.
-- Use lucide-react for icons. Files: App.jsx plus component files as needed.`
+- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
+- Return exactly 3 files: index.html, styles.css, script.js
+- index.html: <link href="styles.css"> and <script src="script.js"></script>
+- Add modern CSS animations (transitions, keyframes, hover effects, gradients)
+- Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION">
+- Use responsive design with flexbox/grid and media queries`
         : "";
       const systemPrompt = `${basePrompt}
 
