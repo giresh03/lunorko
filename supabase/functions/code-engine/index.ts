@@ -445,7 +445,7 @@ Output contract (critical):
 - Keep file paths stable and unique so they can be auto-applied safely
 ${stackDirective}`;
 
-      if (GOOGLE_AI_API_KEY) {
+      if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
         for (const m of messages) {
           if (m.role === "system") continue;
