@@ -19,8 +19,6 @@ import {
   findCachedAIResponse, isOnline, getOfflineStatus, setOfflineMode,
   type CachedSnippet,
 } from "@/lib/offlineCache";
-import { detectErrors } from "@/lib/codeErrorDetector";
-import { AIModalPopup } from "@/components/editor/AIModalPopup";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
@@ -499,13 +497,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const monacoEditorRef = useRef<any>(null);
   const ghostDisposableRef = useRef<any>(null);
 
-  // AI real-time assistant state
-  const [aiSuggestion, setAiSuggestion] = useState<{ intent: string; suggestion: string; nextLine: string | null; hasError: boolean; diagramUrl?: string } | null>(null);
-  const [aiExplanation, setAiExplanation] = useState<{ explanation: string; fix: string; diagramUrl?: string } | null>(null);
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
-  const [repeatedErrorCount, setRepeatedErrorCount] = useState(0);
-  const lastErrorKeyRef = useRef<string>("");
-  const aiAnalysisTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // New file/folder input
   const [newItemParent, setNewItemParent] = useState<string | null>(null);
@@ -521,7 +512,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   useImperativeHandle(ref, () => ({
     setExternalCode: (code: string, lang: string) => {
       const id = `untitled-${Date.now()}`;
-      const name = `untitled.${lang === "typescript" ? "ts" : lang === "python" ? "py" : "js"}`;
+      const ext = LANG_EXT_MAP[lang] || (lang === "typescript" ? "ts" : lang === "python" ? "py" : lang === "html" ? "html" : lang === "css" ? "css" : "js");
+      const name = `untitled.${ext}`;
       const tab: OpenTab = { id, name, language: lang, content: code, isModified: true };
       setOpenTabs((prev) => [...prev, tab]);
       setActiveTabId(id);
@@ -1041,120 +1033,6 @@ ${jsCode}
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
 
-  // Play subtle error sound when mistake detected
-  const playErrorSound = useCallback(() => {
-    try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      osc.frequency.value = 400;
-      osc.type = "sine";
-      const gain = ctx.createGain();
-      gain.gain.value = 0.08;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.08);
-    } catch {}
-  }, []);
-
-  // Fetch AI analysis (intent, suggestion, next line)
-  const fetchAIAnalysis = useCallback(async (code: string, language: string, cursorLine: number, isTeachingMode: boolean) => {
-    if (!online) return;
-    setAiAnalyzing(true);
-    try {
-      const resp = await fetchCodeEngine({ action: "analyze-code", code, language, cursorLine, domain: domainId, teachingMode: isTeachingMode });
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        if (import.meta.env.DEV) console.warn("[CodeEditor] analyze-code failed:", resp.status, err);
-        setAiAnalyzing(false);
-        return;
-      }
-      const data = await resp.json();
-      if (data.intent || data.suggestion) {
-        setAiSuggestion({
-          intent: data.intent || "",
-          suggestion: data.suggestion || "",
-          nextLine: data.nextLine || null,
-          hasError: !!data.hasError,
-          diagramUrl: data.diagramUrl,
-        });
-      }
-    } catch (e) {
-      if (!isAuthRequiredError(e) && import.meta.env.DEV) {
-        console.warn("[CodeEditor] analyze-code error:", e);
-      }
-    }
-    setAiAnalyzing(false);
-  }, [online, domainId, fetchCodeEngine]);
-
-  // Fetch AI error explanation
-  const fetchAIExplainError = useCallback(async (error: string, code: string, language: string, isTeachingMode: boolean) => {
-    if (!online) return;
-    try {
-      const resp = await fetchCodeEngine({ action: "explain-error", error, code: code.slice(0, 800), language, domain: domainId, teachingMode: isTeachingMode });
-      if (!resp.ok) {
-        if (import.meta.env.DEV) console.warn("[CodeEditor] explain-error failed:", resp.status);
-        return;
-      }
-      const data = await resp.json();
-      setAiExplanation({
-        explanation: data.explanation || "",
-        fix: data.fix || "",
-        diagramUrl: data.diagramUrl,
-      });
-    } catch (e) {
-      if (!isAuthRequiredError(e) && import.meta.env.DEV) {
-        console.warn("[CodeEditor] explain-error error:", e);
-      }
-    }
-  }, [online, domainId, fetchCodeEngine]);
-
-  // Debounced AI analysis: 2s after typing stops (1.5s in teaching mode for faster feedback)
-  useEffect(() => {
-    if (!activeTab || !online || chatLoading) return;
-    const code = activeTab.content;
-    if (code.length < 5) return;
-    if (aiAnalysisTimerRef.current) clearTimeout(aiAnalysisTimerRef.current);
-    const delay = repeatedErrorCount >= 1 ? 1500 : 2000;
-    aiAnalysisTimerRef.current = setTimeout(() => {
-      const editor = monacoEditorRef.current;
-      const cursorLine = editor?.getPosition()?.lineNumber ?? 1;
-      fetchAIAnalysis(code, activeTab.language, cursorLine - 1, repeatedErrorCount >= 1);
-      aiAnalysisTimerRef.current = null;
-    }, delay);
-    return () => {
-      if (aiAnalysisTimerRef.current) clearTimeout(aiAnalysisTimerRef.current);
-    };
-  }, [activeTab?.content, activeTab?.language, activeTab?.id, online, chatLoading, fetchAIAnalysis, repeatedErrorCount]);
-
-  // Error detection: when mistake occurs, highlight + sound + AI explanation
-  useEffect(() => {
-    if (!activeTab) return;
-    const err = detectErrors(activeTab.content, activeTab.language);
-    if (err) {
-      const key = `${err.message}-${err.line ?? 0}`;
-      if (lastErrorKeyRef.current !== key) {
-        lastErrorKeyRef.current = key;
-        setRepeatedErrorCount((c) => c + 1);
-        setAiSuggestion(null);
-        playErrorSound();
-        fetchAIExplainError(err.message, activeTab.content, activeTab.language, repeatedErrorCount >= 0);
-      }
-    } else {
-      lastErrorKeyRef.current = "";
-    }
-  }, [activeTab?.content, activeTab?.language, activeTab?.id, playErrorSound, fetchAIExplainError, repeatedErrorCount]);
-
-  // Insert code at cursor (for AI suggestion)
-  const insertCodeAtCursor = useCallback((code: string) => {
-    const editor = monacoEditorRef.current;
-    if (!editor || !activeTab) return;
-    const pos = editor.getPosition();
-    if (!pos) return;
-    editor.executeEdits("ai-insert", [{ range: { startLineNumber: pos.lineNumber, startColumn: pos.column, endLineNumber: pos.lineNumber, endColumn: pos.column }, text: code }]);
-    setAiSuggestion(null);
-  }, [activeTab]);
-
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
     const activeLanguage = activeTab?.language;
@@ -1181,14 +1059,6 @@ ${jsCode}
       setActiveTabId(newId);
     }
   }, [activeTabId, activeTab, updateNode, addChild]);
-
-  // Apply fix to editor (replaces or inserts)
-  const applyFixToEditor = useCallback((code: string) => {
-    applyCodeToEditor(code, activeTab?.language || "javascript");
-    setAiExplanation(null);
-  }, [activeTab?.language, applyCodeToEditor]);
-
-  const teachingMode = repeatedErrorCount >= 1;
 
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
@@ -1885,24 +1755,6 @@ ${jsCode}
     <div className="flex flex-col h-screen w-full overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.text }}>
       {newProjectDialog}
 
-      {/* Centered AI modal for suggestions and error explanations (error takes priority) */}
-      {aiExplanation ? (
-        <AIModalPopup
-          type="error"
-          explanation={aiExplanation}
-          onInsertCode={applyFixToEditor}
-          onDismiss={() => setAiExplanation(null)}
-          themeColors={currentTheme.uiColors}
-        />
-      ) : aiSuggestion ? (
-        <AIModalPopup
-          type="suggestion"
-          suggestion={aiSuggestion}
-          onInsertCode={insertCodeAtCursor}
-          onDismiss={() => setAiSuggestion(null)}
-          themeColors={currentTheme.uiColors}
-        />
-      ) : null}
 
       {/* Title bar with File menu */}
       <div className="flex items-center justify-between h-9 border-b px-3 shrink-0 select-none" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
@@ -2084,19 +1936,10 @@ ${jsCode}
                     The AI assistant analyzes your code in real time. When you pause typing for 2 seconds or write incorrect code, it will:
                   </p>
                   <ul className="list-disc list-inside space-y-1" style={{ color: currentTheme.uiColors.muted }}>
-                    <li>Explain what you&apos;re building</li>
-                    <li>Suggest the next line of code</li>
-                    <li>Show error explanations with diagrams</li>
-                    <li>Offer &quot;Insert suggested code&quot; to apply fixes</li>
+                    <li>Generate code from your prompts</li>
+                    <li>Debug and explain concepts</li>
+                    <li>Send code to the editor</li>
                   </ul>
-                  {teachingMode && (
-                    <div className="rounded-lg p-2 border" style={{ backgroundColor: currentTheme.uiColors.accent + "10", borderColor: currentTheme.uiColors.accent + "40" }}>
-                      <p className="text-[10px] font-medium" style={{ color: currentTheme.uiColors.accent }}>Teaching Mode Active</p>
-                      <p className="text-[10px] mt-1" style={{ color: currentTheme.uiColors.muted }}>
-                        You&apos;ve made similar errors a few times. The AI will provide step-by-step guidance and small exercises to help you learn.
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             ) : sidebarTab === "snippets" ? (
@@ -2560,12 +2403,6 @@ ${jsCode}
             <div className="flex items-center gap-2 px-3 py-2 border-b shrink-0" style={{ borderColor: currentTheme.uiColors.border }}>
               <Sparkles className="h-4 w-4" style={{ color: currentTheme.uiColors.accent }} />
               <span className="text-xs font-semibold" style={{ color: currentTheme.uiColors.text }}>AI Assistant</span>
-              {teachingMode && (
-                <span className="rounded-sm px-1.5 py-0.5 text-[9px] font-medium" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>Teaching Mode</span>
-              )}
-              {aiAnalyzing && (
-                <Loader2 className="h-3 w-3 animate-spin" style={{ color: currentTheme.uiColors.accent }} />
-              )}
               <div className="flex-1" />
               <button onClick={handleClearChat} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="Clear chat">
                 <Trash2 className="h-3 w-3" />

@@ -10,12 +10,12 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor specializing in HTML, CSS, JavaScript, TypeScript, React, Next.js, Node.js, and modern full-stack patterns. You write clean, accessible, responsive code using Radix/shadcn components (Tabs, Accordion, Alert, AlertDialog) from docs/component-reference. Use Tailwind with semantic tokens. When asked to generate UI, use the pre-built component patterns.`,
+    systemPrompt: `You are an expert Web Development tutor. You MUST output ONLY plain HTML, CSS, and JavaScript — NO React, TypeScript, JSX, or any framework. Generate complete, standalone HTML files with embedded <style> and <script> tags that run directly in a browser. Use only vanilla HTML, CSS, and JavaScript. No imports, exports, or module syntax. When you output code, wrap it in a markdown code block with language "html" so it can be rendered in the preview. Always produce runnable output that displays the result visually.`,
     starterPrompts: [
-      "Build a settings page with tabs (Profile, Security, Notifications)",
-      "Create an FAQ section with accordion",
-      "Add a confirmation dialog for delete action",
-      "Build a dashboard with alert banners",
+      "Build a simple counter with HTML, CSS, and JavaScript",
+      "Create a todo list with add/remove functionality",
+      "Make a login form with validation",
+      "Build a calculator with basic operations",
     ],
   },
   "app-development": {
