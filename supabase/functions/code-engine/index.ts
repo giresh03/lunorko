@@ -532,7 +532,7 @@ ${stackDirective}`;
         }
         if (status === 402) {
           return new Response(JSON.stringify({
-            error: "AI credits exhausted. Set GOOGLE_AI_API_KEY in Supabase secrets for a free alternative (get key from aistudio.google.com/apikey).",
+            error: "AI credits exhausted. Please try again later or contact support.",
           }), {
             status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
