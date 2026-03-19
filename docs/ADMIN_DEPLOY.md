@@ -4,6 +4,8 @@
 
 Your app uses **byveaoqwuwyhaykgjufj** (from `.env`). Ensure functions are deployed to this project.
 
+**If you get "AI credits exhausted" (402):** Your deployment may use a different Supabase project (e.g. Lovable's). Add `GEMINI_API_KEY` in Supabase Dashboard → Project Settings → Edge Functions → Secrets for the project your deployed app uses.
+
 ## Deploy code-engine (AI Assistant — fixes "Request failed" 404)
 
 The AI Assistant in Web Development, App Development, and other domains calls the `code-engine` Edge Function. If you see **"Request failed"** or **404** in the console:

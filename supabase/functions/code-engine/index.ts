@@ -371,11 +371,18 @@ serve(async (req) => {
     if (!apiKey) {
       return new Response(
         JSON.stringify({
-          error: "GOOGLE_AI_API_KEY or LOVABLE_API_KEY is not configured",
-          hint: "Set: npx supabase secrets set GOOGLE_AI_API_KEY=... or LOVABLE_API_KEY=...",
+          error: "GEMINI_API_KEY or LOVABLE_API_KEY is not configured",
+          hint: "Set: supabase secrets set GEMINI_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Log which provider is used (helps debug 402 issues)
+    if (GOOGLE_AI_API_KEY) {
+      console.log(`[code-engine] Using Gemini/Google AI (key present)`);
+    } else {
+      console.log(`[code-engine] Using Lovable (GEMINI_API_KEY not set - add it to avoid 402)`);
     }
 
     // ============= ACTION: generate (AI code generation with streaming) =============
