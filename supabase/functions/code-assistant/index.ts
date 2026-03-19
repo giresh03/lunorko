@@ -22,7 +22,7 @@ serve(async (req) => {
 
   try {
     const { messages, domain } = await req.json();
-    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+    const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
     if (!apiKey) throw new Error("GOOGLE_AI_API_KEY or LOVABLE_API_KEY is not configured");
@@ -184,7 +184,9 @@ REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No R
         });
       }
       if (status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
+        return new Response(JSON.stringify({
+          error: "AI credits exhausted. Set GOOGLE_AI_API_KEY in Supabase secrets for a free alternative (get key from aistudio.google.com/apikey).",
+        }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

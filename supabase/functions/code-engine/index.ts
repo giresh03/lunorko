@@ -365,7 +365,7 @@ serve(async (req) => {
     const rawDomain = (body.domain as string) || "web-development";
     const domain = typeof rawDomain === "string" ? rawDomain.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "web-development" : "web-development";
 
-    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+    const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
     if (!apiKey) {
@@ -509,7 +509,9 @@ ${stackDirective}`;
           });
         }
         if (status === 402) {
-          return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
+          return new Response(JSON.stringify({
+            error: "AI credits exhausted. Set GOOGLE_AI_API_KEY in Supabase secrets for a free alternative (get key from aistudio.google.com/apikey).",
+          }), {
             status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }

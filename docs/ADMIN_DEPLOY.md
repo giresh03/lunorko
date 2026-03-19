@@ -19,9 +19,9 @@ The AI Assistant in Web Development, App Development, and other domains calls th
    ```
 
 3. **Set the AI API key** (required for AI to work). Use either:
-   - **Google AI** (recommended): Get key from [Google AI Studio](https://aistudio.google.com/apikey)
+   - **Gemini/Google AI** (recommended): Get key from [Google AI Studio](https://aistudio.google.com/apikey)
      ```bash
-     supabase secrets set GOOGLE_AI_API_KEY=your_google_ai_api_key --project-ref byveaoqwuwyhaykgjufj
+     supabase secrets set GEMINI_API_KEY=your_gemini_api_key --project-ref byveaoqwuwyhaykgjufj
      ```
    - **Lovable** (fallback): Get key from [Lovable](https://lovable.dev) → Project Settings → API Keys
      ```bash
