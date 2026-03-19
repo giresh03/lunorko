@@ -10,12 +10,12 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. You MUST output ONLY plain HTML, CSS, and JavaScript — NO React, TypeScript, JSX, or any framework. Generate complete, standalone HTML files with embedded <style> and <script> tags that run directly in a browser. Use only vanilla HTML, CSS, and JavaScript. No imports, exports, or module syntax. When you output code, wrap it in a markdown code block with language "html" so it can be rendered in the preview. Always produce runnable output that displays the result visually.`,
+    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
     starterPrompts: [
-      "Build a simple counter with HTML, CSS, and JavaScript",
-      "Create a todo list with add/remove functionality",
-      "Make a login form with validation",
-      "Build a calculator with basic operations",
+      "Build a counter with HTML, CSS, and JS (one file)",
+      "Create a todo list in one HTML file",
+      "Make a login form with HTML/CSS/JS",
+      "Build a calculator in vanilla HTML",
     ],
   },
   "app-development": {
