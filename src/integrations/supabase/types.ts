@@ -77,6 +77,51 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_resources: {
+        Row: {
+          created_at: string
+          description: string | null
+          domain_id: string
+          duration: string | null
+          id: string
+          is_active: boolean
+          resource_type: string
+          sort_order: number
+          source: string | null
+          thumbnail: string | null
+          title: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          domain_id: string
+          duration?: string | null
+          id?: string
+          is_active?: boolean
+          resource_type?: string
+          sort_order?: number
+          source?: string | null
+          thumbnail?: string | null
+          title: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          domain_id?: string
+          duration?: string | null
+          id?: string
+          is_active?: boolean
+          resource_type?: string
+          sort_order?: number
+          source?: string | null
+          thumbnail?: string | null
+          title?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           created_at: string
@@ -580,6 +625,45 @@ export type Database = {
           status?: string
           user_id?: string
           utr_number?: string
+        }
+        Relationships: []
+      }
+      pop_ads: {
+        Row: {
+          created_at: string
+          end_date: string
+          festival_name: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          link_url: string | null
+          sort_order: number
+          start_date: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          festival_name?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          link_url?: string | null
+          sort_order?: number
+          start_date: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          festival_name?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          link_url?: string | null
+          sort_order?: number
+          start_date?: string
+          title?: string
         }
         Relationships: []
       }

@@ -365,9 +365,9 @@ serve(async (req) => {
     const rawDomain = (body.domain as string) || "web-development";
     const domain = typeof rawDomain === "string" ? rawDomain.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "web-development" : "web-development";
 
-    const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
+    const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
+    const apiKey = LOVABLE_API_KEY || GOOGLE_AI_API_KEY;
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "unknown";
 
@@ -385,19 +385,19 @@ serve(async (req) => {
     if (action === "ping") {
       return new Response(
         JSON.stringify({
-          provider: GOOGLE_AI_API_KEY ? "gemini" : "lovable",
+          provider: LOVABLE_API_KEY ? "lovable" : "gemini",
           projectRef,
-          hint: GOOGLE_AI_API_KEY ? "Gemini is configured." : "Set GEMINI_API_KEY in Supabase secrets to avoid 402. Get key: https://aistudio.google.com/apikey",
+          hint: LOVABLE_API_KEY ? "Lovable AI Gateway is configured." : "Using Gemini fallback.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Log which provider is used (helps debug 402 issues)
-    if (GOOGLE_AI_API_KEY) {
-      console.log(`[code-engine] Using Gemini/Google AI (key present)`);
+    // Log which provider is used
+    if (LOVABLE_API_KEY) {
+      console.log(`[code-engine] Using Lovable AI Gateway (preferred)`);
     } else {
-      console.log(`[code-engine] Using Lovable (GEMINI_API_KEY not set - add it to avoid 402)`);
+      console.log(`[code-engine] Using Gemini/Google AI (fallback - LOVABLE_API_KEY not set)`);
     }
 
     // ============= ACTION: generate (AI code generation with streaming) =============
@@ -445,7 +445,7 @@ Output contract (critical):
 - Keep file paths stable and unique so they can be auto-applied safely
 ${stackDirective}`;
 
-      if (GOOGLE_AI_API_KEY) {
+      if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
         for (const m of messages) {
           if (m.role === "system") continue;
@@ -532,7 +532,7 @@ ${stackDirective}`;
         }
         if (status === 402) {
           return new Response(JSON.stringify({
-            error: "AI credits exhausted. Set GOOGLE_AI_API_KEY in Supabase secrets for a free alternative (get key from aistudio.google.com/apikey).",
+            error: "AI credits exhausted. Please try again later or contact support.",
           }), {
             status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -574,7 +574,7 @@ ${stackDirective}`;
         output = executeNatively(code);
       } else {
         // AI-simulated execution for Python, SQL, Solidity, C++, etc.
-        output = await simulateWithAI(code, language, domain || "general", apiKey, !!GOOGLE_AI_API_KEY);
+        output = await simulateWithAI(code, language, domain || "general", apiKey, !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY);
       }
 
       return new Response(
@@ -628,7 +628,7 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
-      if (GOOGLE_AI_API_KEY) {
+      if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const url = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
         const resp = await fetch(url, {
           method: "POST",
@@ -712,7 +712,7 @@ File: ${filename || "unknown"}
 ${code}
 \`\`\``;
 
-      if (GOOGLE_AI_API_KEY) {
+      if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const url = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
         const resp = await fetch(url, {
           method: "POST",
@@ -792,7 +792,7 @@ ${code}
           `You are an intelligent code autocomplete engine. Given code context, predict the next 1-3 lines of code the developer would write. Return ONLY the completion text — no markdown, no explanation, no code fences. Just the raw code to insert.`,
           `Language: ${language}\n\nCode before cursor:\n${contextBefore}\n\nCode after cursor:\n${contextAfter}\n\nComplete the code at the cursor position:`,
           apiKey,
-          !!GOOGLE_AI_API_KEY
+          !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY
         );
         const suggestion = content.trim();
         const cleaned = suggestion.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
@@ -844,7 +844,7 @@ Keep responses concise.${teachingHint}`;
           basePrompt + " Respond ONLY with valid JSON. No markdown, no explanation outside JSON.",
           analyzePrompt,
           apiKey,
-          !!GOOGLE_AI_API_KEY
+          !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY
         )).trim() || "{}";
       } catch {
         return new Response(JSON.stringify({ intent: "", suggestion: "", nextLine: null, hasError: false }), {
@@ -907,7 +907,7 @@ Respond in JSON:
           basePrompt + " Respond ONLY with valid JSON.",
           explainPrompt,
           apiKey,
-          !!GOOGLE_AI_API_KEY
+          !LOVABLE_API_KEY && !!GOOGLE_AI_API_KEY
         )).trim() || "{}";
       } catch {
         return new Response(
