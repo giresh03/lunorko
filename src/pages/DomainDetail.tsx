@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
   CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
-  TrendingUp, Zap, Bookmark, CalendarDays
+  TrendingUp, Zap, Bookmark, CalendarDays, Sparkles,
 } from "lucide-react";
 import VideoLearningHub from "@/components/VideoLearningHub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
+import WebDevAiStudio from "@/components/web-dev/WebDevAiStudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -373,6 +374,14 @@ const DomainDetail = () => {
             >
               <Maximize2 className="mr-2 h-4 w-4" /> Code Editor
             </TabsTrigger>
+            {domainId === "web-development" && (
+              <TabsTrigger
+                value="ai-studio"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3"
+              >
+                <Sparkles className="mr-2 h-4 w-4" /> AI Studio
+              </TabsTrigger>
+            )}
             <TabsTrigger
               value="videos"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3"
@@ -504,6 +513,22 @@ const DomainDetail = () => {
               </div>
             </div>
           </TabsContent>
+
+          {/* Web Dev — AI Studio (embedded Cursor-style workspace) */}
+          {domainId === "web-development" && (
+            <TabsContent value="ai-studio" className="mt-0">
+              {hasEditorAccess ? (
+                <WebDevAiStudio
+                  domainLabel={domain.name}
+                  onRequestFullscreen={() => setIsFullscreenIDE(true)}
+                />
+              ) : (
+                <div className="rounded-xl border border-border bg-card">
+                  <EditorPaywall domainId={domainId!} domainName={domain.name} />
+                </div>
+              )}
+            </TabsContent>
+          )}
 
           {/* Code Editor Tab */}
           <TabsContent value="editor">
