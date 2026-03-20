@@ -198,13 +198,16 @@ CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, TypeScript, or any framework.
 - script.js
 
 RULES:
-1. **HTML only** — semantic HTML5, no JSX or React.
+1. **HTML only** — semantic HTML5, no JSX or React. No import statements. No components.
 2. **CSS only** — styles.css with modern animations (transitions, keyframes, hover effects, gradients).
-3. **Vanilla JS only** — plain JavaScript, no import/export, no modules, no require.
+3. **Vanilla JS only** — plain JavaScript, no import/export, no modules, no require, no npm packages.
 4. **Include images** — use <img src="https://image.pollinations.ai/prompt/DESCRIPTION"> with URL-encoded descriptions.
 5. **Responsive** — mobile-first, use media queries, flexbox/grid, readable fonts (14px+).
 6. **Visually rich** — gradients, cards, shadows, smooth transitions, modern design patterns.
-7. **Always produce working UI** — the preview runs directly in HTML; no build step.`,
+7. **Always produce working UI** — the preview runs directly in HTML; no build step.
+8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
+
+${WEB_COMPONENT_REFERENCE}`,
   "app-development": `You are Lunor.AI's expert Mobile App Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE code using ONLY vanilla HTML, CSS, and JavaScript.
 
 CRITICAL: NEVER use React, JSX, TSX, Vue, TypeScript, or any framework. Use ONLY:
