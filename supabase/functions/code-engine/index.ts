@@ -7,82 +7,185 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Pre-built component reference for web-development UI design (from docs/component-reference/)
+// Pre-built component reference — vanilla HTML/CSS/JS equivalents of shadcn/Radix components
 const WEB_COMPONENT_REFERENCE = `
-## Pre-built UI Components (USE THESE — Radix/shadcn radix-nova style)
+## UI Component Library (vanilla HTML/CSS/JS — NO React/JSX)
 
-Design system: Radix UI + shadcn/ui. Styling: Tailwind with semantic tokens (foreground, muted-foreground, primary, border, card).
-
-### Component mapping — match prompt intent to component:
-| Prompt keywords | Component | Import from |
-| accordion, FAQ, expandable, collapsible | Accordion | @/components/ui/accordion |
-| tabs, tabbed interface, switch views | Tabs | @/components/ui/tabs |
-| alert, callout, notice, banner, warning | Alert | @/components/ui/alert |
-| confirm dialog, delete confirmation | AlertDialog | @/components/ui/alert-dialog |
+When the user asks for these UI patterns, use the vanilla HTML/CSS/JS implementations below. NEVER use React, JSX, or any framework.
 
 ### Tabs (tabbed interface, switch views)
-\`\`\`tsx
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-
-<Tabs defaultValue="tab1">
-  <TabsList>
-    <TabsTrigger value="tab1">Tab 1</TabsTrigger>
-    <TabsTrigger value="tab2">Tab 2</TabsTrigger>
-  </TabsList>
-  <TabsContent value="tab1">Content 1</TabsContent>
-  <TabsContent value="tab2">Content 2</TabsContent>
-</Tabs>
+\`\`\`html
+<div class="tabs">
+  <div class="tabs-list" role="tablist">
+    <button class="tab-trigger active" role="tab" data-tab="tab1" aria-selected="true">Tab 1</button>
+    <button class="tab-trigger" role="tab" data-tab="tab2" aria-selected="false">Tab 2</button>
+  </div>
+  <div class="tab-content active" id="tab1" role="tabpanel">Content 1</div>
+  <div class="tab-content" id="tab2" role="tabpanel">Content 2</div>
+</div>
 \`\`\`
-Controlled with icons: <TabsTrigger value="x" className="gap-1.5"><Icon className="h-4 w-4" /> Label</TabsTrigger>
-Full-width underline: <TabsList className="w-full justify-start border-b bg-transparent p-0 rounded-none">
-
-### Accordion (FAQ, expandable sections)
-\`\`\`tsx
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-
-<Accordion type="single" collapsible defaultValue="item-1">
-  <AccordionItem value="item-1">
-    <AccordionTrigger>Question?</AccordionTrigger>
-    <AccordionContent>Answer.</AccordionContent>
-  </AccordionItem>
-</Accordion>
+\`\`\`css
+.tabs-list { display: inline-flex; height: 40px; align-items: center; justify-content: center; border-radius: 8px; background: #f1f5f9; padding: 4px; gap: 2px; }
+.tab-trigger { padding: 6px 12px; border: none; background: transparent; border-radius: 6px; font-size: 14px; font-weight: 500; color: #64748b; cursor: pointer; transition: all 0.2s; }
+.tab-trigger:hover { color: #334155; }
+.tab-trigger.active { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.tab-content { display: none; margin-top: 8px; padding: 16px; animation: fadeIn 0.2s ease; }
+.tab-content.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 \`\`\`
-FAQ-style: AccordionItem with className="rounded-lg border border-border bg-card px-6"
-
-### Alert (callout, notice, banner)
-\`\`\`tsx
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { InfoIcon } from "lucide-react"
-
-<Alert>
-  <InfoIcon className="h-4 w-4" />
-  <AlertTitle>Heads up!</AlertTitle>
-  <AlertDescription>Message here.</AlertDescription>
-</Alert>
-\`\`\`
-Destructive: <Alert variant="destructive">
-
-### AlertDialog (confirm, delete confirmation)
-\`\`\`tsx
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-
-<AlertDialog>
-  <AlertDialogTrigger asChild><Button variant="outline">Delete</Button></AlertDialogTrigger>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-      <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>Cancel</AlertDialogCancel>
-      <AlertDialogAction className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+\`\`\`js
+document.querySelectorAll('.tab-trigger').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabId = btn.dataset.tab;
+    btn.closest('.tabs').querySelectorAll('.tab-trigger').forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected','false'); });
+    btn.closest('.tabs').querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active'); btn.setAttribute('aria-selected','true');
+    document.getElementById(tabId).classList.add('active');
+  });
+});
 \`\`\`
 
-RULE: When generating UI, match the user's intent to the component mapping above and use these exact patterns. Prefer lucide-react icons (InfoIcon, AlertCircle, ChevronDown, etc.).
+### Accordion (FAQ, expandable, collapsible)
+\`\`\`html
+<div class="accordion">
+  <div class="accordion-item">
+    <button class="accordion-trigger" aria-expanded="false">
+      <span>Question here?</span>
+      <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="accordion-content"><p>Answer here.</p></div>
+  </div>
+</div>
+\`\`\`
+\`\`\`css
+.accordion { display: flex; flex-direction: column; gap: 8px; }
+.accordion-item { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fff; }
+.accordion-trigger { display: flex; width: 100%; justify-content: space-between; align-items: center; padding: 16px 20px; border: none; background: transparent; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left; color: #0f172a; transition: background 0.2s; }
+.accordion-trigger:hover { background: #f8fafc; }
+.accordion-trigger .chevron { transition: transform 0.3s ease; }
+.accordion-trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+.accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; padding: 0 20px; }
+.accordion-content.open { max-height: 500px; padding: 0 20px 16px; }
+.accordion-content p { color: #64748b; font-size: 14px; line-height: 1.6; margin: 0; }
+\`\`\`
+\`\`\`js
+document.querySelectorAll('.accordion-trigger').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const content = btn.nextElementSibling;
+    const isOpen = btn.getAttribute('aria-expanded') === 'true';
+    // Close all others (single mode)
+    btn.closest('.accordion').querySelectorAll('.accordion-trigger').forEach(t => { t.setAttribute('aria-expanded','false'); t.nextElementSibling.classList.remove('open'); });
+    if (!isOpen) { btn.setAttribute('aria-expanded','true'); content.classList.add('open'); }
+  });
+});
+\`\`\`
+
+### Alert / Callout / Banner
+\`\`\`html
+<div class="alert alert-info" role="alert">
+  <svg class="alert-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  <div><strong class="alert-title">Heads up!</strong><p class="alert-desc">This is an informational message.</p></div>
+</div>
+\`\`\`
+\`\`\`css
+.alert { display: flex; gap: 12px; padding: 16px; border-radius: 12px; border: 1px solid; font-size: 14px; }
+.alert-info { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+.alert-warning { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.alert-error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.alert-success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.alert-icon { flex-shrink: 0; margin-top: 2px; }
+.alert-title { font-weight: 600; margin-bottom: 4px; display: block; }
+.alert-desc { margin: 0; opacity: 0.9; }
+\`\`\`
+
+### Confirm Dialog / Modal
+\`\`\`html
+<div class="dialog-overlay" id="confirmDialog" style="display:none;">
+  <div class="dialog-content" role="alertdialog">
+    <h3 class="dialog-title">Are you sure?</h3>
+    <p class="dialog-desc">This action cannot be undone.</p>
+    <div class="dialog-footer">
+      <button class="btn btn-outline" onclick="closeDialog()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmAction()">Delete</button>
+    </div>
+  </div>
+</div>
+\`\`\`
+\`\`\`css
+.dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s; }
+.dialog-content { background: #fff; border-radius: 16px; padding: 24px; max-width: 420px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.15); animation: slideUp 0.3s ease; }
+.dialog-title { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+.dialog-desc { margin: 0 0 20px; color: #64748b; font-size: 14px; }
+.dialog-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.btn-outline { background: transparent; border: 1px solid #e2e8f0; color: #334155; }
+.btn-outline:hover { background: #f1f5f9; }
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+\`\`\`
+\`\`\`js
+function openDialog() { document.getElementById('confirmDialog').style.display = 'flex'; }
+function closeDialog() { document.getElementById('confirmDialog').style.display = 'none'; }
+function confirmAction() { closeDialog(); /* handle action */ }
+// Close on overlay click
+document.getElementById('confirmDialog')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeDialog(); });
+\`\`\`
+
+### Card
+\`\`\`html
+<div class="card">
+  <div class="card-header"><h3 class="card-title">Title</h3><p class="card-desc">Description</p></div>
+  <div class="card-content"><p>Content here</p></div>
+  <div class="card-footer"><button class="btn btn-primary">Action</button></div>
+</div>
+\`\`\`
+\`\`\`css
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; transition: box-shadow 0.2s; }
+.card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.card-header { padding: 24px 24px 0; }
+.card-title { margin: 0; font-size: 20px; font-weight: 600; }
+.card-desc { margin: 4px 0 0; color: #64748b; font-size: 14px; }
+.card-content { padding: 16px 24px; }
+.card-footer { padding: 0 24px 24px; display: flex; gap: 8px; }
+.btn-primary { background: #3b82f6; color: #fff; padding: 8px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+.btn-primary:hover { background: #2563eb; }
+\`\`\`
+
+### Dropdown Menu
+\`\`\`html
+<div class="dropdown">
+  <button class="dropdown-trigger" onclick="toggleDropdown(this)">Menu ▾</button>
+  <div class="dropdown-menu">
+    <button class="dropdown-item">Option 1</button>
+    <button class="dropdown-item">Option 2</button>
+    <div class="dropdown-separator"></div>
+    <button class="dropdown-item danger">Delete</button>
+  </div>
+</div>
+\`\`\`
+\`\`\`css
+.dropdown { position: relative; display: inline-block; }
+.dropdown-trigger { padding: 8px 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; transition: border-color 0.2s; }
+.dropdown-trigger:hover { border-color: #94a3b8; }
+.dropdown-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 180px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 4px; z-index: 50; animation: fadeIn 0.15s; }
+.dropdown-menu.open { display: block; }
+.dropdown-item { display: block; width: 100%; padding: 8px 12px; border: none; background: transparent; text-align: left; font-size: 14px; border-radius: 6px; cursor: pointer; color: #334155; transition: background 0.15s; }
+.dropdown-item:hover { background: #f1f5f9; }
+.dropdown-item.danger { color: #ef4444; }
+.dropdown-item.danger:hover { background: #fef2f2; }
+.dropdown-separator { height: 1px; background: #e2e8f0; margin: 4px 0; }
+\`\`\`
+\`\`\`js
+function toggleDropdown(btn) {
+  const menu = btn.nextElementSibling;
+  document.querySelectorAll('.dropdown-menu.open').forEach(m => { if (m !== menu) m.classList.remove('open'); });
+  menu.classList.toggle('open');
+}
+document.addEventListener('click', e => { if (!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open')); });
+\`\`\`
+
+RULE: When generating UI for web-development, ALWAYS use these vanilla HTML/CSS/JS patterns. NEVER output React, JSX, TSX, or any component imports. Match prompt intent (FAQ → accordion, tabbed → tabs, confirm → dialog, etc.) and use these exact patterns as the base.
 `;
 
 // Domain-specific system prompts for AI code generation
