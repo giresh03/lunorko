@@ -328,11 +328,179 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 })();
 \`\`\`
 
+### 6. Wavy Background (animated sine waves — great for hero sections, music, creative sites)
+\`\`\`html
+<canvas id="wavyBg" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
+\`\`\`
+\`\`\`js
+(function(){
+  const c=document.getElementById('wavyBg'),ctx=c.getContext('2d');
+  let w,h; function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;} window.addEventListener('resize',resize); resize();
+  const colors=['#38bdf8','#818cf8','#c084fc','#e879f9','#22d3ee'];
+  let nt=0;
+  // Simple noise-like function using multiple sine waves
+  function wave(x,i,t){return Math.sin(x/800+t+i)*50+Math.sin(x/400+t*1.3+i*2)*30+Math.sin(x/200+t*0.7+i*3)*15;}
+  function draw(){
+    ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.globalAlpha=0.5; ctx.fillRect(0,0,w,h); ctx.globalAlpha=1;
+    ctx.filter='blur(8px)';
+    nt+=0.002;
+    for(let i=0;i<5;i++){
+      ctx.beginPath(); ctx.lineWidth=50; ctx.strokeStyle=colors[i%colors.length];
+      for(let x=0;x<w;x+=5){const y=wave(x,0.3*i,nt); ctx.lineTo(x,y+h*0.5);}
+      ctx.stroke(); ctx.closePath();
+    }
+    ctx.filter='none';
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+\`\`\`
+
+### 7. Gradient Animation (animated multi-color blending blobs — great for hero sections, CTA, premium brands)
+\`\`\`html
+<div id="gradAnim" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(40deg,rgb(108,0,162),rgb(0,17,82));">
+  <svg style="display:none"><defs><filter id="gooey"><feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -8" result="goo"/><feBlend in="SourceGraphic" in2="goo"/></filter></defs></svg>
+  <div class="grad-container"></div>
+</div>
+\`\`\`
+\`\`\`css
+.grad-container{position:absolute;inset:0;filter:url(#gooey) blur(40px);}
+.grad-blob{position:absolute;width:80%;height:80%;top:calc(50% - 40%);left:calc(50% - 40%);border-radius:50%;mix-blend-mode:hard-light;opacity:1;}
+.grad-blob:nth-child(1){background:radial-gradient(circle at center,rgba(18,113,255,1) 0,rgba(18,113,255,0) 50%);animation:gradMove1 12s ease infinite;}
+.grad-blob:nth-child(2){background:radial-gradient(circle at center,rgba(221,74,255,0.8) 0,rgba(221,74,255,0) 50%);transform-origin:calc(50% - 400px);animation:gradMove2 10s ease infinite reverse;}
+.grad-blob:nth-child(3){background:radial-gradient(circle at center,rgba(100,220,255,0.8) 0,rgba(100,220,255,0) 50%);transform-origin:calc(50% + 400px);animation:gradMove3 14s ease infinite;}
+.grad-blob:nth-child(4){background:radial-gradient(circle at center,rgba(200,50,50,0.8) 0,rgba(200,50,50,0) 50%);opacity:0.7;animation:gradMove4 8s ease infinite reverse;}
+.grad-blob:nth-child(5){background:radial-gradient(circle at center,rgba(180,180,50,0.8) 0,rgba(180,180,50,0) 50%);transform-origin:calc(50% - 800px) calc(50% + 800px);animation:gradMove5 16s ease infinite;}
+@keyframes gradMove1{0%{transform:translate(0,0);}33%{transform:translate(30px,-50px);}66%{transform:translate(-20px,20px);}100%{transform:translate(0,0);}}
+@keyframes gradMove2{0%{transform:translate(0,0) rotate(0deg);}50%{transform:translate(-40px,30px) rotate(180deg);}100%{transform:translate(0,0) rotate(360deg);}}
+@keyframes gradMove3{0%{transform:translate(0,0) rotate(0deg);}50%{transform:translate(40px,-30px) rotate(-180deg);}100%{transform:translate(0,0) rotate(0deg);}}
+@keyframes gradMove4{0%{transform:translate(0,0) scale(1);}50%{transform:translate(20px,40px) scale(1.1);}100%{transform:translate(0,0) scale(1);}}
+@keyframes gradMove5{0%{transform:translate(0,0) rotate(0deg);}50%{transform:translate(-30px,-20px) rotate(180deg);}100%{transform:translate(0,0) rotate(360deg);}}
+\`\`\`
+\`\`\`js
+(function(){
+  const container=document.querySelector('.grad-container');
+  for(let i=0;i<5;i++){const b=document.createElement('div');b.className='grad-blob';container.appendChild(b);}
+  // Mouse-interactive blob
+  const mouseBlob=document.createElement('div');
+  mouseBlob.className='grad-blob';
+  mouseBlob.style.cssText='background:radial-gradient(circle at center,rgba(140,100,255,0.8) 0,rgba(140,100,255,0) 50%);width:100%;height:100%;top:-50%;left:-50%;opacity:0.7;';
+  container.appendChild(mouseBlob);
+  let curX=0,curY=0,tgX=0,tgY=0;
+  document.addEventListener('mousemove',e=>{const r=container.getBoundingClientRect();tgX=e.clientX-r.left;tgY=e.clientY-r.top;});
+  function move(){curX+=(tgX-curX)/20;curY+=(tgY-curY)/20;mouseBlob.style.transform='translate('+Math.round(curX)+'px,'+Math.round(curY)+'px)';requestAnimationFrame(move);}
+  move();
+})();
+\`\`\`
+
+### 8. Dotted Glow Background (shimmering dot grid — great for cards, product showcases, fintech)
+\`\`\`html
+<canvas id="dottedGlow" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
+\`\`\`
+\`\`\`js
+(function(){
+  const c=document.getElementById('dottedGlow'),ctx=c.getContext('2d');
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  let w,h; function resize(){w=c.clientWidth;h=c.clientHeight;c.width=w*dpr;c.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);regenDots();} window.addEventListener('resize',resize);
+  c.style.width='100%';c.style.height='100%';
+  const gap=12,radius=2,opacity=0.6;
+  let dots=[];
+  function regenDots(){dots=[];const cols=Math.ceil(w/gap)+2,rows=Math.ceil(h/gap)+2;for(let i=-1;i<cols;i++)for(let j=-1;j<rows;j++){const x=i*gap+(j%2===0?0:gap*0.5),y=j*gap;dots.push({x,y,phase:Math.random()*Math.PI*2,speed:0.4+Math.random()*0.9});}}
+  resize();
+  function draw(now){
+    ctx.clearRect(0,0,w,h);ctx.globalAlpha=opacity;
+    const time=now/1000;
+    for(let i=0;i<dots.length;i++){const d=dots[i];const mod=(time*d.speed+d.phase)%2;const lin=mod<1?mod:2-mod;const a=0.25+0.55*lin;
+      if(a>0.6){ctx.shadowColor='rgba(0,170,255,0.85)';ctx.shadowBlur=6*((a-0.6)/0.4);}else{ctx.shadowColor='transparent';ctx.shadowBlur=0;}
+      ctx.globalAlpha=a*opacity;ctx.fillStyle='rgba(150,150,150,0.7)';ctx.beginPath();ctx.arc(d.x,d.y,radius,0,Math.PI*2);ctx.fill();}
+    ctx.shadowBlur=0;requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+\`\`\`
+
+### 9. Background Ripple Grid (clickable grid ripple — great for hero sections, interactive CTA)
+\`\`\`html
+<div id="rippleGrid" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;overflow:hidden;"></div>
+\`\`\`
+\`\`\`css
+#rippleGrid{display:grid;pointer-events:auto;}
+.ripple-cell{border:0.5px solid rgba(200,200,200,0.15);opacity:0.3;transition:opacity 0.15s;background:rgba(240,240,240,0.03);}
+.ripple-cell:hover{opacity:0.7;}
+.ripple-cell.active{animation:cellRipple var(--duration,400ms) ease var(--delay,0ms) 1;}
+@keyframes cellRipple{0%{opacity:0.3;transform:scale(1);}30%{opacity:0.9;background:rgba(99,102,241,0.2);transform:scale(1.05);}100%{opacity:0.3;transform:scale(1);}}
+\`\`\`
+\`\`\`js
+(function(){
+  const g=document.getElementById('rippleGrid');
+  const cellSize=56,cols=Math.ceil(window.innerWidth/cellSize),rows=Math.ceil(window.innerHeight/cellSize);
+  g.style.gridTemplateColumns='repeat('+cols+','+cellSize+'px)';g.style.gridTemplateRows='repeat('+rows+','+cellSize+'px)';
+  const cells=[];
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const cell=document.createElement('div');cell.className='ripple-cell';cell.dataset.row=r;cell.dataset.col=c;g.appendChild(cell);cells.push(cell);}
+  g.addEventListener('click',e=>{const cell=e.target;if(!cell.classList.contains('ripple-cell'))return;
+    const cr=+cell.dataset.row,cc=+cell.dataset.col;
+    cells.forEach(cl=>{cl.classList.remove('active');void cl.offsetWidth;const dr=+cl.dataset.row,dc=+cl.dataset.col;const dist=Math.hypot(cr-dr,cc-dc);cl.style.setProperty('--delay',Math.max(0,dist*55)+'ms');cl.style.setProperty('--duration',(200+dist*80)+'ms');cl.classList.add('active');});
+  });
+})();
+\`\`\`
+
+### 10. Parallax Floating Images (mouse-driven depth — great for portfolios, agencies, product showcases)
+\`\`\`html
+<div id="parallaxImages" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden;"></div>
+\`\`\`
+\`\`\`js
+(function(){
+  const container=document.getElementById('parallaxImages');
+  const positions=[
+    {top:'8%',left:'4%',depth:0.3},{top:'8%',right:'4%',depth:0.35},
+    {top:'38%',left:'6%',depth:0.9},{top:'38%',right:'6%',depth:0.85},
+    {top:'68%',left:'4%',depth:0.4},{top:'68%',right:'4%',depth:0.45}
+  ];
+  const images=[
+    'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=320&h=240&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=320&h=240&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=320&h=240&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=320&h=240&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=320&h=240&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85f1d7?w=320&h=240&fit=crop&q=80'
+  ];
+  let mouseX=0,mouseY=0;const maxOff=40;
+  document.addEventListener('mousemove',e=>{mouseX=(e.clientX/window.innerWidth-0.5)*2;mouseY=(e.clientY/window.innerHeight-0.5)*2;});
+  positions.forEach((p,i)=>{
+    const el=document.createElement('div');
+    el.style.cssText='position:absolute;opacity:0;transition:transform 0.3s ease-out;';
+    if(p.left)el.style.left=p.left; if(p.right)el.style.right=p.right; el.style.top=p.top;
+    const img=document.createElement('img');img.src=images[i%images.length];img.alt='';img.loading='lazy';
+    img.style.cssText='width:200px;height:150px;object-fit:cover;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);border:1px solid rgba(255,255,255,0.1);';
+    el.appendChild(img);container.appendChild(el);
+    setTimeout(()=>{el.style.opacity='1';el.style.transition='opacity 0.8s ease, transform 0.3s ease-out';},200+i*150);
+    el._depth=p.depth;el._el=el;
+  });
+  const els=container.children;
+  function animate(){
+    for(let i=0;i<els.length;i++){const el=els[i];if(!el._depth)continue;
+      const dx=mouseX*maxOff*el._depth,dy=mouseY*maxOff*el._depth;
+      el.style.transform='translate('+dx+'px,'+dy+'px)';}
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+\`\`\`
+
+### 11. Scales / Line Pattern (repeating diagonal lines — great for decorative borders, minimalist designs)
+\`\`\`html
+<div id="scalesBg" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:0.08;"></div>
+\`\`\`
+\`\`\`css
+#scalesBg{background:repeating-linear-gradient(315deg,currentColor 0,currentColor 1px,transparent 0,transparent 50%);background-size:10px 10px;color:#fff;}
+\`\`\`
+
 ### Usage Rules:
 - **ALWAYS** use one of these effects when the prompt mentions: modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, startup.
 - The background canvas/div should be **position:fixed; z-index:0** and all content should be **position:relative; z-index:1** or higher.
-- Match the effect to the topic: tech→particles or pixel grid, creative→aurora, dark theme→starfield, SaaS→floating orbs.
+- Match the effect to the topic: tech→particles or pixel grid, creative→aurora or wavy, dark theme→starfield, SaaS→floating orbs or gradient animation, product showcase→parallax images or dotted glow, interactive→ripple grid, minimalist→scales pattern.
 - The effect should be SUBTLE — it enhances the design, not overwhelms it.
+- You can COMBINE effects: e.g. scales pattern + aurora blobs, or dotted glow + gradient animation for extra premium feel.
 `;
 
 // Domain-specific system prompts for AI code generation
