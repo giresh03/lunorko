@@ -188,6 +188,153 @@ document.addEventListener('click', e => { if (!e.target.closest('.dropdown')) do
 RULE: When generating UI for web-development, ALWAYS use these vanilla HTML/CSS/JS patterns. NEVER output React, JSX, TSX, or any component imports. Match prompt intent (FAQ → accordion, tabbed → tabs, confirm → dialog, etc.) and use these exact patterns as the base.
 `;
 
+// Advanced background effects library — vanilla Canvas/CSS animations for modern/advanced projects
+const BACKGROUND_EFFECTS_LIBRARY = `
+## Advanced Background Effects Library (vanilla HTML/CSS/JS — NO React)
+
+When the user asks for an "advanced", "modern", "stunning", "premium", "creative", or "portfolio" project, ALWAYS include one of these animated background effects. Pick the most appropriate one for the context.
+
+### 1. Particle Field (floating connected dots — great for tech, SaaS, portfolios)
+\`\`\`html
+<canvas id="particleCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
+\`\`\`
+\`\`\`js
+(function(){
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  let w, h, particles = [];
+  function resize(){ w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+  const COUNT = 80, MAX_DIST = 120;
+  for(let i=0;i<COUNT;i++) particles.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,r:Math.random()*2+1});
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+    particles.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0||p.x>w) p.vx*=-1;
+      if(p.y<0||p.y>h) p.vy*=-1;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(100,150,255,0.5)'; ctx.fill();
+    });
+    for(let i=0;i<COUNT;i++) for(let j=i+1;j<COUNT;j++){
+      const dx=particles[i].x-particles[j].x, dy=particles[i].y-particles[j].y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if(dist<MAX_DIST){ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);ctx.strokeStyle='rgba(100,150,255,'+(1-dist/MAX_DIST)*0.15+')';ctx.stroke();}
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+\`\`\`
+
+### 2. Gradient Mesh Aurora (smooth color waves — great for landing pages, creative sites)
+\`\`\`html
+<div id="aurora-bg" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden;">
+  <div class="aurora-blob aurora-1"></div>
+  <div class="aurora-blob aurora-2"></div>
+  <div class="aurora-blob aurora-3"></div>
+</div>
+\`\`\`
+\`\`\`css
+.aurora-blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:0.4;animation:auroraFloat 8s ease-in-out infinite alternate;}
+.aurora-1{width:600px;height:600px;background:radial-gradient(circle,#6366f1,transparent 70%);top:-10%;left:-5%;animation-delay:0s;}
+.aurora-2{width:500px;height:500px;background:radial-gradient(circle,#06b6d4,transparent 70%);top:30%;right:-10%;animation-delay:-3s;animation-duration:10s;}
+.aurora-3{width:550px;height:550px;background:radial-gradient(circle,#8b5cf6,transparent 70%);bottom:-15%;left:30%;animation-delay:-5s;animation-duration:12s;}
+@keyframes auroraFloat{0%{transform:translate(0,0) scale(1);}50%{transform:translate(40px,-30px) scale(1.1);}100%{transform:translate(-20px,20px) scale(0.95);}
+}
+\`\`\`
+
+### 3. Pixel Grid Effect (animated canvas grid — great for tech, gaming, retro sites)
+\`\`\`html
+<canvas id="pixelGrid" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
+\`\`\`
+\`\`\`js
+(function(){
+  const c=document.getElementById('pixelGrid'),ctx=c.getContext('2d');
+  let w,h; function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;} window.addEventListener('resize',resize); resize();
+  const cols=60,rows=40,cellW=w/cols,cellH=h/rows;
+  const grid=Array.from({length:rows},()=>Array.from({length:cols},()=>({brightness:Math.random()*0.15,target:Math.random()*0.15,speed:0.002+Math.random()*0.005})));
+  let mouse={x:-1,y:-1}; document.addEventListener('mousemove',e=>{mouse.x=e.clientX;mouse.y=e.clientY;});
+  function draw(){
+    ctx.fillStyle='#0a0a0f'; ctx.fillRect(0,0,w,h);
+    for(let r=0;r<rows;r++) for(let cl=0;cl<cols;cl++){
+      const cell=grid[r][cl];
+      const cx=cl*cellW+cellW/2, cy=r*cellH+cellH/2;
+      const dx=mouse.x-cx,dy=mouse.y-cy,dist=Math.sqrt(dx*dx+dy*dy);
+      const mouseBright=dist<150?0.4*(1-dist/150):0;
+      cell.brightness+=(cell.target-cell.brightness)*cell.speed*16;
+      if(Math.random()<0.005) cell.target=Math.random()*0.2;
+      const b=Math.min(1,cell.brightness+mouseBright);
+      ctx.fillStyle='rgba(99,102,241,'+b+')';
+      ctx.fillRect(cl*cellW+1,r*cellH+1,cellW-2,cellH-2);
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+\`\`\`
+
+### 4. Floating Orbs with Glow (glassmorphism-ready — great for SaaS, dashboards, fintech)
+\`\`\`html
+<div id="orbs-bg" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden;background:#030712;"></div>
+\`\`\`
+\`\`\`js
+(function(){
+  const container=document.getElementById('orbs-bg');
+  const orbs=[
+    {size:400,color:'rgba(99,102,241,0.15)',x:20,y:30,dx:0.3,dy:0.2},
+    {size:350,color:'rgba(6,182,212,0.12)',x:60,y:60,dx:-0.2,dy:0.15},
+    {size:300,color:'rgba(139,92,246,0.1)',x:80,y:20,dx:0.15,dy:-0.25},
+    {size:250,color:'rgba(236,72,153,0.08)',x:40,y:80,dx:-0.1,dy:-0.2}
+  ];
+  orbs.forEach(o=>{
+    const el=document.createElement('div');
+    el.style.cssText='position:absolute;border-radius:50%;filter:blur(60px);transition:transform 0.1s linear;width:'+o.size+'px;height:'+o.size+'px;background:radial-gradient(circle,'+o.color+',transparent 70%);left:'+o.x+'%;top:'+o.y+'%;';
+    container.appendChild(el); o.el=el;
+  });
+  function animate(){
+    orbs.forEach(o=>{
+      o.x+=o.dx*0.05; o.y+=o.dy*0.05;
+      if(o.x<-10||o.x>100) o.dx*=-1;
+      if(o.y<-10||o.y>100) o.dy*=-1;
+      o.el.style.left=o.x+'%'; o.el.style.top=o.y+'%';
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+\`\`\`
+
+### 5. Starfield / Space Effect (great for dark-themed sites, portfolios, gaming)
+\`\`\`html
+<canvas id="starfield" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
+\`\`\`
+\`\`\`js
+(function(){
+  const c=document.getElementById('starfield'),ctx=c.getContext('2d');
+  let w,h; function resize(){w=c.width=window.innerWidth;h=c.height=window.innerHeight;} window.addEventListener('resize',resize); resize();
+  const stars=Array.from({length:200},()=>({x:Math.random()*w-w/2,y:Math.random()*h-h/2,z:Math.random()*1000}));
+  function draw(){
+    ctx.fillStyle='rgba(3,7,18,0.2)'; ctx.fillRect(0,0,w,h);
+    stars.forEach(s=>{
+      s.z-=2; if(s.z<=0){s.z=1000;s.x=Math.random()*w-w/2;s.y=Math.random()*h-h/2;}
+      const sx=s.x/s.z*400+w/2, sy=s.y/s.z*400+h/2, r=Math.max(0,(1-s.z/1000)*2.5);
+      ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,255,'+(1-s.z/1000)+')'; ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+\`\`\`
+
+### Usage Rules:
+- **ALWAYS** use one of these effects when the prompt mentions: modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, startup.
+- The background canvas/div should be **position:fixed; z-index:0** and all content should be **position:relative; z-index:1** or higher.
+- Match the effect to the topic: tech→particles or pixel grid, creative→aurora, dark theme→starfield, SaaS→floating orbs.
+- The effect should be SUBTLE — it enhances the design, not overwhelms it.
+`;
+
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
@@ -226,8 +373,11 @@ RULES:
 7. **Always produce working UI** — the preview runs directly in HTML; no build step.
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
+10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
 
-${WEB_COMPONENT_REFERENCE}`,
+${WEB_COMPONENT_REFERENCE}
+
+${BACKGROUND_EFFECTS_LIBRARY}`,
   "app-development": `You are Lunor.AI's expert Mobile App Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE code using ONLY vanilla HTML, CSS, and JavaScript.
 
 CRITICAL: NEVER use React, JSX, TSX, Vue, TypeScript, or any framework. Use ONLY:
