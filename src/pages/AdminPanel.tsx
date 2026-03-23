@@ -5,8 +5,9 @@ import {
   LayoutDashboard, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
   CheckCircle, XCircle, Receipt, Video, Megaphone,
-  MessageSquare, Ban, UserPlus
+  MessageSquare, Ban, UserPlus, Trophy,
 } from "lucide-react";
+import AdminHackathonsSection from "@/components/admin/AdminHackathonsSection";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -402,6 +403,7 @@ const AdminPanel = () => {
             <TabsTrigger value="pop-ads"><Megaphone className="mr-2 h-4 w-4" /> Pop Ads</TabsTrigger>
             <TabsTrigger value="community"><MessageSquare className="mr-2 h-4 w-4" /> Community</TabsTrigger>
             <TabsTrigger value="guidelines"><Shield className="mr-2 h-4 w-4" /> Guidelines</TabsTrigger>
+            <TabsTrigger value="hackathons"><Trophy className="mr-2 h-4 w-4" /> Hackathons</TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -966,6 +968,11 @@ const AdminPanel = () => {
                 </TableBody>
               </Table>
             </div>
+          </TabsContent>
+
+          {/* Hackathons & marketplace */}
+          <TabsContent value="hackathons">
+            <AdminHackathonsSection callAdmin={callAdmin} />
           </TabsContent>
 
           {/* Guidelines */}

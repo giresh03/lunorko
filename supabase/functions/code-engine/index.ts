@@ -120,8 +120,135 @@ RULES:
 const NATIVE_LANGUAGES = new Set(["javascript", "typescript"]);
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash";
 const DEFAULT_MODEL = "google/gemini-3-flash-preview";
+
+function parseGoogleErrorBody(text: string): string {
+  try {
+    const j = JSON.parse(text);
+    const msg = j.error?.message || j.error?.status || j.message;
+    if (typeof msg === "string" && msg.length > 0) return msg.slice(0, 800);
+  } catch {
+    /* ignore */
+  }
+  return text.slice(0, 500);
+}
+
+/** Ordered list: optional GEMINI_MODEL secret first, then stable fallbacks (404 / wrong model id). */
+function geminiModelCandidates(): string[] {
+  const preferred = (Deno.env.get("GEMINI_MODEL") || "").trim();
+  const fallbacks = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-8b",
+  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  if (preferred) {
+    seen.add(preferred);
+    out.push(preferred);
+  }
+  for (const m of fallbacks) {
+    if (!seen.has(m)) {
+      seen.add(m);
+      out.push(m);
+    }
+  }
+  return out;
+}
+
+function shouldRetryGeminiWithNextModel(status: number, detail: string): boolean {
+  if (status === 404) return true;
+  const d = detail.toLowerCase();
+  if (status === 400 && (d.includes("not found") || d.includes("does not exist") || d.includes("unknown model") || d.includes("invalid model"))) {
+    return true;
+  }
+  return false;
+}
+
+type GeminiJsonPayload = Record<string, unknown>;
+
+/** Try streamGenerateContent across models until one returns OK. */
+async function geminiStreamGenerate(
+  apiKey: string,
+  payload: GeminiJsonPayload
+): Promise<{ response: Response; model: string } | { error: Response }> {
+  let lastText = "";
+  let lastStatus = 500;
+  let lastModel = "";
+  for (const model of geminiModelCandidates()) {
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${encodeURIComponent(apiKey)}&alt=sse`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (resp.ok) return { response: resp, model };
+    lastText = await resp.text();
+    lastStatus = resp.status;
+    lastModel = model;
+    const detail = parseGoogleErrorBody(lastText);
+    console.error(`[code-engine] Gemini stream model=${model} status=${resp.status}`, detail);
+    if (!shouldRetryGeminiWithNextModel(resp.status, detail)) {
+      return {
+        error: new Response(
+          JSON.stringify({
+            error: "AI service error",
+            detail,
+            status: resp.status,
+            model,
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        ),
+      };
+    }
+  }
+  return {
+    error: new Response(
+      JSON.stringify({
+        error: "AI service error",
+        detail: parseGoogleErrorBody(lastText),
+        status: lastStatus,
+        model: lastModel,
+        hint: "Check GEMINI_API_KEY, enable Generative Language API, or set GEMINI_MODEL (e.g. gemini-1.5-flash).",
+      }),
+      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    ),
+  };
+}
+
+/** Try generateContent (non-stream) across models. */
+async function geminiGenerateContent(
+  apiKey: string,
+  payload: GeminiJsonPayload
+): Promise<{ data: unknown; model: string } | { error: string; status: number; model: string }> {
+  let lastText = "";
+  let lastStatus = 500;
+  let lastModel = "";
+  for (const model of geminiModelCandidates()) {
+    const url =
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      return { data, model };
+    }
+    lastText = await resp.text();
+    lastStatus = resp.status;
+    lastModel = model;
+    const detail = parseGoogleErrorBody(lastText);
+    if (!shouldRetryGeminiWithNextModel(resp.status, detail)) {
+      return { error: detail, status: resp.status, model };
+    }
+    console.error(`[code-engine] Gemini generate model=${model} status=${resp.status}`, detail);
+  }
+  return { error: parseGoogleErrorBody(lastText), status: lastStatus, model: lastModel };
+}
 
 async function callAINonStream(
   systemContent: string,
@@ -130,24 +257,21 @@ async function callAINonStream(
   useGoogle: boolean
 ): Promise<string> {
   if (useGoogle) {
-    const url = `${GOOGLE_AI_URL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemContent }] },
-        contents: [{ role: "user", parts: [{ text: userContent }] }],
-      }),
+    const result = await geminiGenerateContent(apiKey, {
+      systemInstruction: { parts: [{ text: systemContent }] },
+      contents: [{ role: "user", parts: [{ text: userContent }] }],
     });
-    if (!resp.ok) throw new Error(`AI error: ${resp.status}`);
-    const data = await resp.json();
+    if ("error" in result) throw new Error(`AI error: ${result.status} ${result.error}`);
+    const data = result.data as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   }
   const resp = await fetch(LOVABLE_AI_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.0-flash",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: systemContent },
         { role: "user", content: userContent },
@@ -283,21 +407,17 @@ ${code}
   try {
     let content: string;
     if (useGoogle) {
-      const url = `${GOOGLE_AI_URL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemContent }] },
-          contents: [{ role: "user", parts: [{ text: simulationPrompt }] }],
-        }),
+      const g = await geminiGenerateContent(apiKey, {
+        systemInstruction: { parts: [{ text: systemContent }] },
+        contents: [{ role: "user", parts: [{ text: simulationPrompt }] }],
       });
-      if (!resp.ok) {
-        const text = await resp.text();
-        console.error(`[code-engine] Google AI simulation error: ${resp.status}`, text);
-        return [`⚙️ ${language} simulation unavailable. Status: ${resp.status}`];
+      if ("error" in g) {
+        console.error(`[code-engine] Google AI simulation error:`, g.status, g.error);
+        return [`⚙️ ${language} simulation unavailable. ${g.error}`];
       }
-      const data = await resp.json();
+      const data = g.data as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
       content = data.candidates?.[0]?.content?.parts?.[0]?.text || "✅ Code executed successfully (no output)";
     } else {
       const resp = await fetch(LOVABLE_AI_URL, {
@@ -452,22 +572,14 @@ ${stackDirective}`;
           contents.push({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] });
         }
         if (contents.length === 0) contents.push({ role: "user", parts: [{ text: "Hello" }] });
-        const googleUrl = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
-        const googleResp = await fetch(googleUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents,
-          }),
+        const streamTry = await geminiStreamGenerate(GOOGLE_AI_API_KEY, {
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: { maxOutputTokens: 8192, temperature: 0.2 },
         });
-        if (!googleResp.ok) {
-          const text = await googleResp.text();
-          console.error(`[code-engine] Google AI error: ${googleResp.status}`, text);
-          return new Response(JSON.stringify({ error: "AI service error" }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        if ("error" in streamTry) return streamTry.error;
+        const googleResp = streamTry.response;
+        console.log(`[code-engine] Gemini generate stream ok model=${streamTry.model}`);
         let buf = "";
         const dec = new TextDecoder();
         const rd = googleResp.body!.getReader();
@@ -629,20 +741,17 @@ ${code}
 \`\`\``;
 
       if (GOOGLE_AI_API_KEY) {
-        const url = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: `You are an expert test engineer. Generate thorough, production-quality tests. Use markdown code blocks with syntax highlighting.` }] },
-            contents: [{ role: "user", parts: [{ text: testPrompt }] }],
-          }),
+        const streamTry = await geminiStreamGenerate(GOOGLE_AI_API_KEY, {
+          systemInstruction: {
+            parts: [{
+              text: `You are an expert test engineer. Generate thorough, production-quality tests. Use markdown code blocks with syntax highlighting.`,
+            }],
+          },
+          contents: [{ role: "user", parts: [{ text: testPrompt }] }],
+          generationConfig: { maxOutputTokens: 8192, temperature: 0.2 },
         });
-        if (!resp.ok) {
-          return new Response(JSON.stringify({ error: "Test generation failed" }), {
-            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        if ("error" in streamTry) return streamTry.error;
+        const resp = streamTry.response;
         let buf = "";
         const dec = new TextDecoder();
         const rd = resp.body!.getReader();
@@ -713,20 +822,17 @@ ${code}
 \`\`\``;
 
       if (GOOGLE_AI_API_KEY) {
-        const url = `${GOOGLE_AI_URL}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY)}&alt=sse`;
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: `You are a technical documentation expert. Write clear, comprehensive docs with examples.` }] },
-            contents: [{ role: "user", parts: [{ text: docsPrompt }] }],
-          }),
+        const streamTry = await geminiStreamGenerate(GOOGLE_AI_API_KEY, {
+          systemInstruction: {
+            parts: [{
+              text: `You are a technical documentation expert. Write clear, comprehensive docs with examples.`,
+            }],
+          },
+          contents: [{ role: "user", parts: [{ text: docsPrompt }] }],
+          generationConfig: { maxOutputTokens: 8192, temperature: 0.2 },
         });
-        if (!resp.ok) {
-          return new Response(JSON.stringify({ error: "Documentation generation failed" }), {
-            status: resp.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+        if ("error" in streamTry) return streamTry.error;
+        const resp = streamTry.response;
         let buf = "";
         const dec = new TextDecoder();
         const rd = resp.body!.getReader();

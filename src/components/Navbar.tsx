@@ -28,6 +28,7 @@ const GoogleIcon = () => (
 const navLinks = [
   { to: "/", label: "Home" },
   { to: "/domains", label: "Domains" },
+  { to: "/hackathons", label: "Hackathons" },
   { to: "/community", label: "Community" },
   { to: "/projects", label: "Projects" },
   { to: "/visual-builder", label: "Visual Builder" },

@@ -24,6 +24,7 @@ import PromoVideo from "./pages/PromoVideo";
 import ProjectBuilder from "./pages/ProjectBuilder";
 import AIVideoInterview from "./pages/AIVideoInterview";
 import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
+import Hackathons from "./pages/Hackathons";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
 
@@ -55,6 +56,7 @@ const AppContent = () => {
         <Route path="/projects" element={<ProjectBuilder />} />
         <Route path="/ai-interview" element={<AIVideoInterview />} />
         <Route path="/visual-builder" element={<VisualBuilderPage />} />
+        <Route path="/hackathons" element={<Hackathons />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

@@ -16,7 +16,7 @@ async function verifySignature(orderId: string, paymentId: string, signature: st
     ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
-  const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
   return hex === signature;
 }
 
@@ -60,7 +60,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid payment signature" }), { status: 400, headers: corsHeaders });
     }
 
-    // Fetch order from Razorpay to validate plan_id, amount, domain_id (never trust client)
     const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${razorpay_order_id}`, {
       headers: {
         Authorization: "Basic " + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`),
@@ -73,22 +72,62 @@ serve(async (req) => {
     }
     const order = await orderRes.json();
     const notes = order.notes || {};
-    const plan_id = notes.plan_id;
-    const domain_id = notes.domain_id;
-    const amount = order.amount; // in paise, from Razorpay
 
-    if (!plan_id || !domain_id) {
-      return new Response(JSON.stringify({ error: "Order missing plan or domain" }), { status: 400, headers: corsHeaders });
-    }
     if (notes.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Order does not belong to this user" }), { status: 403, headers: corsHeaders });
     }
 
-    // Use service role to insert subscription
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    const amount = order.amount;
+
+    if (notes.purchase_type === "hackathon_project") {
+      const projectId = notes.hackathon_project_id;
+      if (!projectId) {
+        return new Response(JSON.stringify({ error: "Order missing project" }), { status: 400, headers: corsHeaders });
+      }
+
+      const { data: proj } = await adminClient
+        .from("hackathon_projects")
+        .select("id, price_paise, is_active")
+        .eq("id", projectId)
+        .maybeSingle();
+
+      if (!proj || !proj.is_active || proj.price_paise !== amount) {
+        return new Response(JSON.stringify({ error: "Invalid project or amount mismatch" }), { status: 400, headers: corsHeaders });
+      }
+
+      const { error: insErr } = await adminClient.from("hackathon_purchases").insert({
+        user_id: userId,
+        project_id: projectId,
+        amount_paise: amount,
+        razorpay_order_id,
+        razorpay_payment_id,
+      });
+
+      if (insErr) {
+        if (insErr.code === "23505") {
+          return new Response(JSON.stringify({ error: "Already purchased", success: false }), { status: 409, headers: corsHeaders });
+        }
+        console.error("hackathon_purchases insert:", insErr);
+        return new Response(JSON.stringify({ error: "Failed to record purchase" }), { status: 500, headers: corsHeaders });
+      }
+
+      return new Response(JSON.stringify({ success: true, purchase_type: "hackathon_project", project_id: projectId }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Subscription (default)
+    const plan_id = notes.plan_id;
+    const domain_id = notes.domain_id;
+
+    if (!plan_id || !domain_id) {
+      return new Response(JSON.stringify({ error: "Order missing plan or domain" }), { status: 400, headers: corsHeaders });
+    }
 
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + 1);
@@ -110,7 +149,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Failed to save subscription" }), { status: 500, headers: corsHeaders });
     }
 
-    return new Response(JSON.stringify({ success: true, plan_id, domain_id }), {
+    return new Response(JSON.stringify({ success: true, plan_id, domain_id, purchase_type: "subscription" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

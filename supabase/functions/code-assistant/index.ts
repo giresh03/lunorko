@@ -90,23 +90,86 @@ REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No R
       }
       if (contents.length === 0) contents.push({ role: "user", parts: [{ text: "Hello" }] });
 
-      const googleUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY!)}&alt=sse`;
-      const googleResp = await fetch(googleUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents,
-        }),
-      });
-
-      if (!googleResp.ok) {
-        const text = await googleResp.text();
-        console.error(`[code-assistant] Google AI error: ${googleResp.status}`, text);
-        return new Response(JSON.stringify({ error: "AI service error" }), {
-          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      const preferred = (Deno.env.get("GEMINI_MODEL") || "").trim();
+      const fallbacks = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
+      const models: string[] = [];
+      const seen = new Set<string>();
+      if (preferred) {
+        seen.add(preferred);
+        models.push(preferred);
       }
+      for (const m of fallbacks) {
+        if (!seen.has(m)) {
+          seen.add(m);
+          models.push(m);
+        }
+      }
+
+      const payload = {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { maxOutputTokens: 8192, temperature: 0.3 },
+      };
+
+      let googleResp: Response | null = null;
+      let usedModel = "";
+      let lastText = "";
+      let lastStatus = 500;
+
+      for (const geminiModel of models) {
+        const googleUrl =
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?key=${encodeURIComponent(GOOGLE_AI_API_KEY!)}&alt=sse`;
+        const resp = await fetch(googleUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (resp.ok) {
+          googleResp = resp;
+          usedModel = geminiModel;
+          break;
+        }
+        lastText = await resp.text();
+        lastStatus = resp.status;
+        let detail = lastText.slice(0, 500);
+        try {
+          const j = JSON.parse(lastText);
+          if (typeof j.error?.message === "string") detail = j.error.message.slice(0, 800);
+        } catch {
+          /* ignore */
+        }
+        const retry =
+          resp.status === 404 ||
+          (resp.status === 400 &&
+            /not found|does not exist|unknown model|invalid model/i.test(detail));
+        console.error(`[code-assistant] Gemini ${geminiModel} -> ${resp.status}`, detail);
+        if (!retry) {
+          return new Response(
+            JSON.stringify({ error: "AI service error", detail, model: geminiModel }),
+            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+
+      if (!googleResp) {
+        let detail = lastText.slice(0, 500);
+        try {
+          const j = JSON.parse(lastText);
+          if (typeof j.error?.message === "string") detail = j.error.message.slice(0, 800);
+        } catch {
+          /* ignore */
+        }
+        return new Response(
+          JSON.stringify({
+            error: "AI service error",
+            detail,
+            status: lastStatus,
+            hint: "Set GEMINI_MODEL or verify GEMINI_API_KEY / API enablement.",
+          }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log(`[code-assistant] Gemini ok model=${usedModel}`);
 
       // Transform Google SSE stream to OpenAI format for frontend compatibility
       let buffer = "";

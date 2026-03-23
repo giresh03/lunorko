@@ -192,6 +192,115 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      if (action === "add-hackathon") {
+        const { id: _i, action: _a, ...rest } = body as Record<string, unknown>;
+        const insertData = {
+          title: rest.title,
+          description: rest.description ?? null,
+          location_label: rest.location_label ?? null,
+          is_online: rest.is_online === true,
+          start_date: rest.start_date ? String(rest.start_date) : null,
+          end_date: rest.end_date ? String(rest.end_date) : null,
+          registration_url: rest.registration_url ?? null,
+          website_url: rest.website_url ?? null,
+          banner_image_url: rest.banner_image_url ?? null,
+          sort_order: Number(rest.sort_order) || 0,
+          is_active: rest.is_active !== false,
+          updated_at: new Date().toISOString(),
+        };
+        const { error } = await adminClient.from("hackathons").insert(insertData);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "update-hackathon") {
+        const { id, action: _a, ...updates } = body as Record<string, unknown>;
+        const { error } = await adminClient.from("hackathons").update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        }).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "delete-hackathon") {
+        const id = (body as { id: string }).id;
+        await adminClient.from("hackathon_projects").update({ hackathon_id: null }).eq("hackathon_id", id);
+        const { error } = await adminClient.from("hackathons").delete().eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "add-hackathon-project") {
+        const { id: _i, action: _a, deliverable_url, access_instructions, hackathon_id, ...proj } = body as Record<string, unknown>;
+        const hid = hackathon_id && String(hackathon_id).trim() ? hackathon_id : null;
+        const insertProject = {
+          hackathon_id: hid,
+          title: proj.title,
+          description: proj.description ?? null,
+          team_winner_name: proj.team_winner_name ?? null,
+          price_paise: Math.round(Number(proj.price_paise) || 0),
+          preview_image_url: proj.preview_image_url ?? null,
+          tech_stack: proj.tech_stack ?? null,
+          sort_order: Number(proj.sort_order) || 0,
+          is_active: proj.is_active !== false,
+          updated_at: new Date().toISOString(),
+        };
+        if (!insertProject.title || insertProject.price_paise <= 0) {
+          return new Response(JSON.stringify({ error: "title and positive price_paise required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const { data: row, error } = await adminClient.from("hackathon_projects").insert(insertProject).select("id").single();
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const pid = row?.id;
+        if (pid && (deliverable_url || access_instructions)) {
+          await adminClient.from("hackathon_project_deliverables").upsert({
+            project_id: pid,
+            deliverable_url: deliverable_url ? String(deliverable_url) : null,
+            access_instructions: access_instructions ? String(access_instructions) : null,
+            updated_at: new Date().toISOString(),
+          });
+        }
+        return new Response(JSON.stringify({ success: true, id: pid }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "update-hackathon-project") {
+        const { id, action: _a, deliverable_url, access_instructions, hackathon_id, ...proj } = body as Record<string, unknown>;
+        const hid = hackathon_id !== undefined
+          ? (hackathon_id && String(hackathon_id).trim() ? hackathon_id : null)
+          : undefined;
+        const updates: Record<string, unknown> = {
+          ...proj,
+          updated_at: new Date().toISOString(),
+        };
+        if (proj.price_paise !== undefined) updates.price_paise = Math.round(Number(proj.price_paise) || 0);
+        if (proj.sort_order !== undefined) updates.sort_order = Number(proj.sort_order) || 0;
+        if (hid !== undefined) updates.hackathon_id = hid;
+        delete updates.deliverable_url;
+        delete updates.access_instructions;
+        delete updates.hackathons;
+        delete updates.action;
+        delete updates.id;
+        const { error } = await adminClient.from("hackathon_projects").update(updates).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (deliverable_url !== undefined || access_instructions !== undefined) {
+          await adminClient.from("hackathon_project_deliverables").upsert({
+            project_id: id as string,
+            deliverable_url: deliverable_url != null ? String(deliverable_url) : null,
+            access_instructions: access_instructions != null ? String(access_instructions) : null,
+            updated_at: new Date().toISOString(),
+          });
+        }
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "delete-hackathon-project") {
+        const id = (body as { id: string }).id;
+        const { count } = await adminClient.from("hackathon_purchases").select("*", { count: "exact", head: true }).eq("project_id", id);
+        if (count && count > 0) {
+          return new Response(JSON.stringify({ error: "Cannot delete: purchases exist. Set is_active to false instead." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        await adminClient.from("hackathon_project_deliverables").delete().eq("project_id", id);
+        const { error } = await adminClient.from("hackathon_projects").delete().eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (action === "set-user-role") {
         const { user_id, role } = body as { user_id: string; role: string };
         await adminClient.from("user_roles").delete().eq("user_id", user_id);
@@ -220,6 +329,7 @@ serve(async (req) => {
           // 2. Delete user data in order
           await adminClient.from("payment_requests").delete().eq("user_id", user_id);
           await adminClient.from("subscriptions").delete().eq("user_id", user_id);
+          await adminClient.from("hackathon_purchases").delete().eq("user_id", user_id);
           // 3. Try auth delete
           const { error: delErr } = await adminClient.auth.admin.deleteUser(user_id);
           if (delErr) {
@@ -399,6 +509,78 @@ serve(async (req) => {
         console.error("community_guidelines:", e);
         return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+    }
+
+    if (action === "hackathons") {
+      const { data, error } = await adminClient.from("hackathons").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+      if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "hackathon-projects") {
+      const { data: projects, error } = await adminClient
+        .from("hackathon_projects")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+      if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const { data: hackRows } = await adminClient.from("hackathons").select("id, title");
+      const hTitle: Record<string, string> = {};
+      (hackRows || []).forEach((h: { id: string; title: string }) => { hTitle[h.id] = h.title; });
+      const { data: dels } = await adminClient.from("hackathon_project_deliverables").select("project_id, deliverable_url, access_instructions");
+      const delMap: Record<string, { deliverable_url: string | null; access_instructions: string | null }> = {};
+      (dels || []).forEach((d: { project_id: string; deliverable_url: string | null; access_instructions: string | null }) => {
+        delMap[d.project_id] = { deliverable_url: d.deliverable_url, access_instructions: d.access_instructions };
+      });
+      const enriched = (projects || []).map((p: { id: string; hackathon_id: string | null }) => ({
+        ...p,
+        hackathons: p.hackathon_id && hTitle[p.hackathon_id] ? { id: p.hackathon_id, title: hTitle[p.hackathon_id] } : null,
+        deliverable_url: delMap[p.id]?.deliverable_url ?? "",
+        access_instructions: delMap[p.id]?.access_instructions ?? "",
+      }));
+      return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "hackathon-purchases") {
+      const { data: purchases } = await adminClient.from("hackathon_purchases").select("*").order("created_at", { ascending: false }).limit(500);
+      const pList = purchases || [];
+      const projectIds = [...new Set(pList.map((p: { project_id: string }) => p.project_id))];
+      const userIds = [...new Set(pList.map((p: { user_id: string }) => p.user_id))];
+      const projMap: Record<string, string> = {};
+      if (projectIds.length) {
+        const { data: pr } = await adminClient.from("hackathon_projects").select("id, title").in("id", projectIds);
+        (pr || []).forEach((x: { id: string; title: string }) => { projMap[x.id] = x.title; });
+      }
+      const emailMap: Record<string, string> = {};
+      if (userIds.length) {
+        const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+        (authUsers || []).forEach((au: { id: string; email?: string }) => { emailMap[au.id] = au.email || ""; });
+      }
+      const enriched = pList.map((p: { project_id: string; user_id: string }) => ({
+        ...p,
+        project_title: projMap[p.project_id] || "—",
+        email: emailMap[p.user_id] || "—",
+      }));
+      return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "hackathon-project-stats") {
+      const { data: projects } = await adminClient.from("hackathon_projects").select("id, title, price_paise, is_active");
+      const stats: { project_id: string; title: string; price_paise: number; is_active: boolean; purchase_count: number; revenue_paise: number }[] = [];
+      for (const pr of projects || []) {
+        const { data: buys } = await adminClient.from("hackathon_purchases").select("amount_paise").eq("project_id", pr.id);
+        const purchase_count = (buys || []).length;
+        const revenue_paise = (buys || []).reduce((s: number, b: { amount_paise: number }) => s + (b.amount_paise || 0), 0);
+        stats.push({
+          project_id: pr.id,
+          title: pr.title,
+          price_paise: pr.price_paise,
+          is_active: pr.is_active,
+          purchase_count,
+          revenue_paise,
+        });
+      }
+      return new Response(JSON.stringify(stats), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: `Unknown action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

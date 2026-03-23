@@ -36,6 +36,10 @@ The AI Assistant in Web Development, App Development, and other domains calls th
      ```bash
      supabase secrets set GEMINI_API_KEY=your_gemini_api_key --project-ref byveaoqwuwyhaykgjufj
      ```
+   - Optional: override model (default `gemini-2.5-flash`; older `gemini-2.0-flash` is deprecated):
+     ```bash
+     supabase secrets set GEMINI_MODEL=gemini-2.5-flash --project-ref byveaoqwuwyhaykgjufj
+     ```
    - **Lovable** (fallback): Get key from [Lovable](https://lovable.dev) → Project Settings → API Keys
      ```bash
      supabase secrets set LOVABLE_API_KEY=your_lovable_api_key --project-ref byveaoqwuwyhaykgjufj
