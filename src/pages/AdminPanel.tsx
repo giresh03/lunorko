@@ -627,7 +627,7 @@ const AdminPanel = () => {
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="rounded-xl border border-border bg-card overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -677,7 +677,7 @@ const AdminPanel = () => {
 
           {/* Subscriptions */}
           <TabsContent value="subscriptions">
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -710,7 +710,7 @@ const AdminPanel = () => {
 
           {/* Payment Requests */}
           <TabsContent value="payment-requests">
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -831,7 +831,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -896,7 +896,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -932,7 +932,7 @@ const AdminPanel = () => {
 
           {/* Community Moderation */}
           <TabsContent value="community">
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <h3 className="text-lg font-bold text-foreground p-4 flex items-center gap-2"><MessageSquare className="h-5 w-5" /> Community Posts Moderation</h3>
               <Table>
                 <TableHeader>
@@ -997,7 +997,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
