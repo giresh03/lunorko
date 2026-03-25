@@ -368,10 +368,10 @@ const AdminPanel = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Stats Cards */}
         {stats && (
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-8">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5 mb-6 sm:mb-8">
             {[
               { label: "Site Visitors", value: stats.totalVisitors, icon: Eye, color: "text-cyan-400" },
               { label: "Registered Users", value: stats.totalUsers, icon: Users, color: "text-blue-400" },
