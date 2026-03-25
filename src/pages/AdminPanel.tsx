@@ -351,18 +351,18 @@ const AdminPanel = () => {
     <div className="min-h-screen bg-background">
       {/* Admin Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <Shield className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-bold text-foreground">Lunor.AI Admin</h1>
-            <Badge variant="outline" className="text-xs">Admin Panel</Badge>
+        <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+            <h1 className="text-sm sm:text-lg font-bold text-foreground truncate">Lunor.AI Admin</h1>
+            <Badge variant="outline" className="text-xs hidden sm:inline-flex">Admin Panel</Badge>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/"><ArrowLeft className="mr-1 h-4 w-4" /> Back to Site</Link>
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+            <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3 text-xs sm:text-sm" asChild>
+              <Link to="/"><ArrowLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Back to Site</span><span className="sm:hidden">Back</span></Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="mr-1 h-4 w-4" /> Sign Out
+            <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3 text-xs sm:text-sm" onClick={signOut}>
+              <LogOut className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
