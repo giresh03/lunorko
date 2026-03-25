@@ -234,12 +234,30 @@ const Navbar = () => {
               {!loading && (
                 user ? (
                   <>
-                    <Link to="/dashboard" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50" onClick={() => setOpen(false)}>
-                      Dashboard
+                    <Link to="/dashboard" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <LayoutDashboard className="h-4 w-4" /> Dashboard
                     </Link>
-                    <Link to="/ai-interview" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50" onClick={() => setOpen(false)}>
-                      AI Interview
+                    <Link to="/skill-radar" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <Radar className="h-4 w-4" /> Skill Radar
                     </Link>
+                    <Link to="/resume-builder" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <FileText className="h-4 w-4" /> Resume Builder
+                    </Link>
+                    <Link to="/ai-interview" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <Video className="h-4 w-4" /> AI Interview
+                    </Link>
+                    <Link to="/pricing" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <CreditCard className="h-4 w-4" /> Subscription
+                    </Link>
+                    {isAdmin && (
+                      <>
+                        <div className="h-px bg-border my-1" />
+                        <Link to="/admin" className="text-sm text-primary font-medium py-2 px-3 rounded-lg hover:bg-primary/10 flex items-center gap-2" onClick={() => setOpen(false)}>
+                          <Shield className="h-4 w-4" /> Admin Panel
+                        </Link>
+                      </>
+                    )}
+                    <div className="h-px bg-border my-1" />
                     <span className="text-sm text-muted-foreground py-2 px-3">
                       {user.user_metadata?.display_name || user.email?.split("@")[0]}
                     </span>
