@@ -620,7 +620,7 @@ const AdminPanel = () => {
                           </TableRow>
                         ))}
                       </TableBody>
-                    </Table>
+                    </Table></div>
                   ) : (
                     <p className="text-sm text-muted-foreground">No subscription history</p>
                   )}
