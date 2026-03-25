@@ -393,16 +393,18 @@ const AdminPanel = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="overview"><LayoutDashboard className="mr-2 h-4 w-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" /> Users</TabsTrigger>
-            <TabsTrigger value="subscriptions"><CreditCard className="mr-2 h-4 w-4" /> Subscriptions</TabsTrigger>
-            <TabsTrigger value="payment-requests"><Receipt className="mr-2 h-4 w-4" /> Payment Requests{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
-            <TabsTrigger value="resources"><Video className="mr-2 h-4 w-4" /> Resources</TabsTrigger>
-            <TabsTrigger value="pop-ads"><Megaphone className="mr-2 h-4 w-4" /> Pop Ads</TabsTrigger>
-            <TabsTrigger value="community"><MessageSquare className="mr-2 h-4 w-4" /> Community</TabsTrigger>
-            <TabsTrigger value="guidelines"><Shield className="mr-2 h-4 w-4" /> Guidelines</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6">
+            <TabsList className="inline-flex w-max sm:w-auto">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3"><LayoutDashboard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Overview</span><span className="sm:hidden">Stats</span></TabsTrigger>
+              <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3"><Users className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Users</TabsTrigger>
+              <TabsTrigger value="subscriptions" className="text-xs sm:text-sm px-2 sm:px-3"><CreditCard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Subscriptions</span><span className="sm:hidden">Subs</span></TabsTrigger>
+              <TabsTrigger value="payment-requests" className="text-xs sm:text-sm px-2 sm:px-3"><Receipt className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Payments</span><span className="sm:hidden">Pay</span>{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
+              <TabsTrigger value="resources" className="text-xs sm:text-sm px-2 sm:px-3"><Video className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Resources</span><span className="sm:hidden">Res</span></TabsTrigger>
+              <TabsTrigger value="pop-ads" className="text-xs sm:text-sm px-2 sm:px-3"><Megaphone className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Ads</TabsTrigger>
+              <TabsTrigger value="community" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Community</span><span className="sm:hidden">Com</span></TabsTrigger>
+              <TabsTrigger value="guidelines" className="text-xs sm:text-sm px-2 sm:px-3"><Shield className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Guidelines</span><span className="sm:hidden">Rules</span></TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Overview */}
           <TabsContent value="overview">
