@@ -379,12 +379,12 @@ const AdminPanel = () => {
               { label: "Revenue (₹)", value: `₹${Number(stats.totalRevenue ?? 0).toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
               { label: "Bookings", value: stats.totalBookings, icon: Calendar, color: "text-pink-400" },
             ].map((s, i) => (
-              <div key={i} className="rounded-xl border border-border bg-card p-5 hover:border-primary/20 transition-all">
-                <div className="flex items-center gap-3">
-                  <s.icon className={`h-5 w-5 ${s.color}`} />
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider">{s.label}</p>
-                    <p className="text-2xl font-bold text-foreground">{s.value}</p>
+              <div key={i} className="rounded-xl border border-border bg-card p-3 sm:p-5 hover:border-primary/20 transition-all">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <s.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${s.color} shrink-0`} />
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider truncate">{s.label}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-foreground">{s.value}</p>
                   </div>
                 </div>
               </div>
