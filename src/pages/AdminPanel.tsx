@@ -351,27 +351,27 @@ const AdminPanel = () => {
     <div className="min-h-screen bg-background">
       {/* Admin Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <Shield className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-bold text-foreground">Lunor.AI Admin</h1>
-            <Badge variant="outline" className="text-xs">Admin Panel</Badge>
+        <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+            <h1 className="text-sm sm:text-lg font-bold text-foreground truncate">Lunor.AI Admin</h1>
+            <Badge variant="outline" className="text-xs hidden sm:inline-flex">Admin Panel</Badge>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/"><ArrowLeft className="mr-1 h-4 w-4" /> Back to Site</Link>
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+            <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3 text-xs sm:text-sm" asChild>
+              <Link to="/"><ArrowLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Back to Site</span><span className="sm:hidden">Back</span></Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="mr-1 h-4 w-4" /> Sign Out
+            <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3 text-xs sm:text-sm" onClick={signOut}>
+              <LogOut className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Stats Cards */}
         {stats && (
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mb-8">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5 mb-6 sm:mb-8">
             {[
               { label: "Site Visitors", value: stats.totalVisitors, icon: Eye, color: "text-cyan-400" },
               { label: "Registered Users", value: stats.totalUsers, icon: Users, color: "text-blue-400" },
@@ -379,12 +379,12 @@ const AdminPanel = () => {
               { label: "Revenue (₹)", value: `₹${Number(stats.totalRevenue ?? 0).toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
               { label: "Bookings", value: stats.totalBookings, icon: Calendar, color: "text-pink-400" },
             ].map((s, i) => (
-              <div key={i} className="rounded-xl border border-border bg-card p-5 hover:border-primary/20 transition-all">
-                <div className="flex items-center gap-3">
-                  <s.icon className={`h-5 w-5 ${s.color}`} />
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider">{s.label}</p>
-                    <p className="text-2xl font-bold text-foreground">{s.value}</p>
+              <div key={i} className="rounded-xl border border-border bg-card p-3 sm:p-5 hover:border-primary/20 transition-all">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <s.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${s.color} shrink-0`} />
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider truncate">{s.label}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-foreground">{s.value}</p>
                   </div>
                 </div>
               </div>
@@ -393,16 +393,18 @@ const AdminPanel = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="overview"><LayoutDashboard className="mr-2 h-4 w-4" /> Overview</TabsTrigger>
-            <TabsTrigger value="users"><Users className="mr-2 h-4 w-4" /> Users</TabsTrigger>
-            <TabsTrigger value="subscriptions"><CreditCard className="mr-2 h-4 w-4" /> Subscriptions</TabsTrigger>
-            <TabsTrigger value="payment-requests"><Receipt className="mr-2 h-4 w-4" /> Payment Requests{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
-            <TabsTrigger value="resources"><Video className="mr-2 h-4 w-4" /> Resources</TabsTrigger>
-            <TabsTrigger value="pop-ads"><Megaphone className="mr-2 h-4 w-4" /> Pop Ads</TabsTrigger>
-            <TabsTrigger value="community"><MessageSquare className="mr-2 h-4 w-4" /> Community</TabsTrigger>
-            <TabsTrigger value="guidelines"><Shield className="mr-2 h-4 w-4" /> Guidelines</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6">
+            <TabsList className="inline-flex w-max sm:w-auto">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3"><LayoutDashboard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Overview</span><span className="sm:hidden">Stats</span></TabsTrigger>
+              <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3"><Users className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Users</TabsTrigger>
+              <TabsTrigger value="subscriptions" className="text-xs sm:text-sm px-2 sm:px-3"><CreditCard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Subscriptions</span><span className="sm:hidden">Subs</span></TabsTrigger>
+              <TabsTrigger value="payment-requests" className="text-xs sm:text-sm px-2 sm:px-3"><Receipt className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Payments</span><span className="sm:hidden">Pay</span>{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
+              <TabsTrigger value="resources" className="text-xs sm:text-sm px-2 sm:px-3"><Video className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Resources</span><span className="sm:hidden">Res</span></TabsTrigger>
+              <TabsTrigger value="pop-ads" className="text-xs sm:text-sm px-2 sm:px-3"><Megaphone className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Ads</TabsTrigger>
+              <TabsTrigger value="community" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Community</span><span className="sm:hidden">Com</span></TabsTrigger>
+              <TabsTrigger value="guidelines" className="text-xs sm:text-sm px-2 sm:px-3"><Shield className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Guidelines</span><span className="sm:hidden">Rules</span></TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Overview */}
           <TabsContent value="overview">
@@ -593,7 +595,7 @@ const AdminPanel = () => {
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><CreditCard className="h-5 w-5" /> Subscription History</h3>
                   {(selectedUser.subscriptions || []).length > 0 ? (
-                    <Table>
+                    <div className="overflow-x-auto"><Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Plan</TableHead>
@@ -618,14 +620,14 @@ const AdminPanel = () => {
                           </TableRow>
                         ))}
                       </TableBody>
-                    </Table>
+                    </Table></div>
                   ) : (
                     <p className="text-sm text-muted-foreground">No subscription history</p>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
+              <div className="rounded-xl border border-border bg-card overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -675,7 +677,7 @@ const AdminPanel = () => {
 
           {/* Subscriptions */}
           <TabsContent value="subscriptions">
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -708,7 +710,7 @@ const AdminPanel = () => {
 
           {/* Payment Requests */}
           <TabsContent value="payment-requests">
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -829,7 +831,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -894,7 +896,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -930,7 +932,7 @@ const AdminPanel = () => {
 
           {/* Community Moderation */}
           <TabsContent value="community">
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <h3 className="text-lg font-bold text-foreground p-4 flex items-center gap-2"><MessageSquare className="h-5 w-5" /> Community Posts Moderation</h3>
               <Table>
                 <TableHeader>
@@ -995,7 +997,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
