@@ -595,7 +595,7 @@ const AdminPanel = () => {
                 <div className="rounded-xl border border-border bg-card p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><CreditCard className="h-5 w-5" /> Subscription History</h3>
                   {(selectedUser.subscriptions || []).length > 0 ? (
-                    <Table>
+                    <div className="overflow-x-auto"><Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Plan</TableHead>
