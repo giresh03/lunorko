@@ -1,4 +1,4 @@
-import { Code2, Smartphone, Shield, Database, Brain, Cloud, Cpu, Globe, Palette, Terminal, Wifi, BarChart3 } from "lucide-react";
+import { Code2, Smartphone, Shield, Database, Brain, Cloud, Cpu, Globe, Palette, Terminal, Wifi, BarChart3, CircuitBoard, Zap, Radio, Bot } from "lucide-react";
 
 import webDevImg from "@/assets/domains/web-development.jpg";
 import appDevImg from "@/assets/domains/app-development.jpg";
@@ -12,6 +12,10 @@ import blockchainImg from "@/assets/domains/blockchain.jpg";
 import uiuxImg from "@/assets/domains/ui-ux.jpg";
 import dsaImg from "@/assets/domains/dsa.jpg";
 import systemDesignImg from "@/assets/domains/system-design.jpg";
+import vlsiImg from "@/assets/domains/vlsi.jpg";
+import powerSystemsImg from "@/assets/domains/power-systems.jpg";
+import signalProcessingImg from "@/assets/domains/signal-processing.jpg";
+import roboticsImg from "@/assets/domains/robotics.jpg";
 
 export interface Domain {
   id: string;
@@ -239,6 +243,70 @@ export const domains: Domain[] = [
       { id: "sd3", title: "System Design Primer", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=FSR1s2b-l_I", duration: "3h", thumbnail: "https://img.youtube.com/vi/FSR1s2b-l_I/maxresdefault.jpg", description: "Basics of system design for beginners — ByteByteGo." },
       { id: "sd4", title: "Microservices Full Course", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=lTAcCNbJ7KE", duration: "6h", thumbnail: "https://img.youtube.com/vi/lTAcCNbJ7KE/maxresdefault.jpg", description: "Complete microservices architecture tutorial." },
       { id: "sd5", title: "System Design — GeeksforGeeks", type: "article", source: "GeeksforGeeks", url: "https://www.geeksforgeeks.org/system-design-tutorial/", description: "System design concepts, case studies, and interview questions." },
+    ],
+  },
+  {
+    id: "vlsi",
+    name: "VLSI Design",
+    description: "Master VLSI chip design, Verilog, VHDL, FPGA programming, and semiconductor fabrication processes.",
+    icon: CircuitBoard,
+    color: "250 65% 55%",
+    image: vlsiImg,
+    topics: ["Verilog", "VHDL", "FPGA", "ASIC Design", "Digital Logic", "Semiconductor Physics", "RTL Design", "Cadence/Synopsys"],
+    resources: [
+      { id: "vl1", title: "Digital VLSI Design with Verilog", type: "course", source: "Udemy", url: "https://www.udemy.com/course/vlsi-academy-digital-design/", duration: "25h", description: "Complete VLSI design course covering RTL to GDSII flow." },
+      { id: "vl2", title: "Verilog HDL Full Course", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=PJGvZSlsLKs", duration: "8h", thumbnail: "https://img.youtube.com/vi/PJGvZSlsLKs/maxresdefault.jpg", description: "Complete Verilog hardware description language tutorial." },
+      { id: "vl3", title: "FPGA Design for Beginners", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=lLg1AgA2Xoo", duration: "3h", thumbnail: "https://img.youtube.com/vi/lLg1AgA2Xoo/maxresdefault.jpg", description: "Getting started with FPGA design and development." },
+      { id: "vl4", title: "VLSI Design — GeeksforGeeks", type: "article", source: "GeeksforGeeks", url: "https://www.geeksforgeeks.org/vlsi-design-introduction/", description: "VLSI fundamentals, design flow, and fabrication process." },
+      { id: "vl5", title: "Digital Electronics — Neso Academy", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=M0mx8S05v60", duration: "12h+", thumbnail: "https://img.youtube.com/vi/M0mx8S05v60/maxresdefault.jpg", description: "Complete digital electronics and logic design course." },
+    ],
+  },
+  {
+    id: "power-systems",
+    name: "Power Systems",
+    description: "Learn electrical power generation, transmission, distribution, and renewable energy systems.",
+    icon: Zap,
+    color: "35 85% 50%",
+    image: powerSystemsImg,
+    topics: ["Power Generation", "Transmission Lines", "Transformers", "Switchgear", "Renewable Energy", "Smart Grid", "Power Electronics", "Protection Systems"],
+    resources: [
+      { id: "ps1", title: "Electrical Engineering Fundamentals", type: "course", source: "Udemy", url: "https://www.udemy.com/course/electrical-engineering-fundamentals/", duration: "20h", description: "Complete electrical engineering course from basics to advanced." },
+      { id: "ps2", title: "Power Systems Full Course — Neso Academy", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=JY_Q5X2ND84", duration: "15h+", thumbnail: "https://img.youtube.com/vi/JY_Q5X2ND84/maxresdefault.jpg", description: "Complete power systems analysis course." },
+      { id: "ps3", title: "Power Electronics Full Course", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=YJjJ5lrwzTg", duration: "10h", thumbnail: "https://img.youtube.com/vi/YJjJ5lrwzTg/maxresdefault.jpg", description: "Power electronics converters and applications." },
+      { id: "ps4", title: "Power Systems — GeeksforGeeks", type: "article", source: "GeeksforGeeks", url: "https://www.geeksforgeeks.org/power-systems/", description: "Power systems concepts, load flow, and fault analysis." },
+      { id: "ps5", title: "Renewable Energy Systems", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=1kUE0BZtTRc", duration: "5h", thumbnail: "https://img.youtube.com/vi/1kUE0BZtTRc/maxresdefault.jpg", description: "Solar, wind, and renewable energy engineering course." },
+    ],
+  },
+  {
+    id: "signal-processing",
+    name: "Signals & Systems",
+    description: "Master signal processing, communication systems, DSP, and control systems engineering.",
+    icon: Radio,
+    color: "170 65% 45%",
+    image: signalProcessingImg,
+    topics: ["DSP", "Fourier Transform", "Laplace Transform", "Z-Transform", "Filters", "Communication Systems", "Control Systems", "MATLAB"],
+    resources: [
+      { id: "sp1", title: "Signals and Systems — Neso Academy", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=s8rsR_TStaA", duration: "20h+", thumbnail: "https://img.youtube.com/vi/s8rsR_TStaA/maxresdefault.jpg", description: "Complete signals and systems course — most popular EE playlist." },
+      { id: "sp2", title: "Digital Signal Processing Full Course", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=rkvEM5Y3N60", duration: "10h", thumbnail: "https://img.youtube.com/vi/rkvEM5Y3N60/maxresdefault.jpg", description: "DSP fundamentals and MATLAB implementations." },
+      { id: "sp3", title: "Control Systems Engineering", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=O-OqgFE9SD4", duration: "12h", thumbnail: "https://img.youtube.com/vi/O-OqgFE9SD4/maxresdefault.jpg", description: "Neso Academy's complete control systems course." },
+      { id: "sp4", title: "Signals & Systems — GeeksforGeeks", type: "article", source: "GeeksforGeeks", url: "https://www.geeksforgeeks.org/signals-and-systems/", description: "Signals, transforms, and system analysis fundamentals." },
+      { id: "sp5", title: "Communication Systems Course", type: "course", source: "Udemy", url: "https://www.udemy.com/course/communication-systems/", duration: "15h", description: "Analog and digital communication systems engineering." },
+    ],
+  },
+  {
+    id: "robotics",
+    name: "Robotics & Automation",
+    description: "Build intelligent robots with mechatronics, ROS, PLC programming, and industrial automation.",
+    icon: Bot,
+    color: "355 70% 50%",
+    image: roboticsImg,
+    topics: ["ROS", "PLC Programming", "Mechatronics", "Kinematics", "Servo Motors", "Computer Vision", "Industrial Automation", "SCADA"],
+    resources: [
+      { id: "rb1", title: "Robotics Full Course — FreeCodeCamp", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=1oFpfDAQXfs", duration: "6h", thumbnail: "https://img.youtube.com/vi/1oFpfDAQXfs/maxresdefault.jpg", description: "Complete robotics course from fundamentals to advanced." },
+      { id: "rb2", title: "ROS (Robot Operating System) Tutorial", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=Qk4vLFhvfbI", duration: "4h", thumbnail: "https://img.youtube.com/vi/Qk4vLFhvfbI/maxresdefault.jpg", description: "Getting started with ROS2 for robotics development." },
+      { id: "rb3", title: "PLC Programming Full Course", type: "video", source: "YouTube", url: "https://www.youtube.com/watch?v=JKleq2dCz7c", duration: "8h", thumbnail: "https://img.youtube.com/vi/JKleq2dCz7c/maxresdefault.jpg", description: "Complete PLC ladder logic programming course." },
+      { id: "rb4", title: "Robotics — GeeksforGeeks", type: "article", source: "GeeksforGeeks", url: "https://www.geeksforgeeks.org/robotics-introduction/", description: "Robotics fundamentals, kinematics, and automation concepts." },
+      { id: "rb5", title: "Industrial Automation & SCADA", type: "course", source: "Udemy", url: "https://www.udemy.com/course/plc-programming-from-scratch/", duration: "20h", description: "PLC, SCADA, and industrial automation from scratch." },
     ],
   },
 ];

@@ -166,6 +166,51 @@ export const domainEnvironments: Record<string, DomainEnvironment> = {
       { name: "architecture.json", language: "json", content: `{\n  "system": "URL Shortener",\n  "components": ["API Gateway", "App Server", "Cache (Redis)", "Database (PostgreSQL)", "CDN"],\n  "estimations": {\n    "reads_per_sec": 1000,\n    "writes_per_sec": 100,\n    "storage_per_year_gb": 15\n  }\n}\n` },
     ],
   },
+  "vlsi": {
+    id: "vlsi",
+    primaryLanguage: "verilog",
+    supportedLanguages: ["verilog", "vhdl", "python", "shell"],
+    runtime: "ai-simulated",
+    defaultFileName: "counter.v",
+    starterCode: `// VLSI Design Workspace - 4-bit Counter\nmodule counter_4bit (\n  input clk,\n  input reset,\n  output reg [3:0] count\n);\n\nalways @(posedge clk or posedge reset) begin\n  if (reset)\n    count <= 4'b0000;\n  else\n    count <= count + 1;\nend\n\nendmodule\n`,
+    templateFiles: [
+      { name: "counter.v", language: "verilog", content: `module counter_4bit(input clk, input reset, output reg [3:0] count);\nalways @(posedge clk or posedge reset)\n  if (reset) count <= 0; else count <= count + 1;\nendmodule\n` },
+      { name: "testbench.v", language: "verilog", content: `module tb_counter;\nreg clk, reset;\nwire [3:0] count;\ncounter_4bit uut(.clk(clk), .reset(reset), .count(count));\ninitial begin clk = 0; forever #5 clk = ~clk; end\ninitial begin reset = 1; #10 reset = 0; #200 $finish; end\ninitial $monitor("Time=%0t count=%b", $time, count);\nendmodule\n` },
+    ],
+  },
+  "power-systems": {
+    id: "power-systems",
+    primaryLanguage: "python",
+    supportedLanguages: ["python", "matlab", "javascript"],
+    runtime: "ai-simulated",
+    defaultFileName: "power_analysis.py",
+    starterCode: `# Power Systems Workspace\nimport numpy as np\n\nbase_mva = 100\nbase_kv = 220\nbase_impedance = base_kv**2 / base_mva\nprint(f"Base Impedance: {base_impedance} ohms")\nprint("Power Systems Analysis Ready!")\n`,
+    templateFiles: [
+      { name: "power_analysis.py", language: "python", content: `import numpy as np\nbase_mva = 100\nbase_kv = 220\nprint(f"Base Impedance: {base_kv**2/base_mva} ohms")\n` },
+    ],
+  },
+  "signal-processing": {
+    id: "signal-processing",
+    primaryLanguage: "python",
+    supportedLanguages: ["python", "matlab", "javascript"],
+    runtime: "ai-simulated",
+    defaultFileName: "signal_analysis.py",
+    starterCode: `# Signals & Systems Workspace\nimport numpy as np\n\nt = np.linspace(0, 1, 1000)\nsignal = np.sin(2*np.pi*50*t) + 0.5*np.sin(2*np.pi*120*t)\nprint("Signal with 50Hz and 120Hz components generated")\nprint("Signal Processing Ready!")\n`,
+    templateFiles: [
+      { name: "signal_analysis.py", language: "python", content: `import numpy as np\nt = np.linspace(0, 1, 1000)\nsignal = np.sin(2*np.pi*50*t)\nprint("Signal generated")\n` },
+    ],
+  },
+  "robotics": {
+    id: "robotics",
+    primaryLanguage: "python",
+    supportedLanguages: ["python", "cpp", "javascript"],
+    runtime: "ai-simulated",
+    defaultFileName: "robot_control.py",
+    starterCode: `# Robotics & Automation Workspace\nimport numpy as np\n\ndef forward_kinematics(theta1, theta2, L1=1.0, L2=0.8):\n    t1, t2 = np.radians(theta1), np.radians(theta2)\n    x = L1*np.cos(t1) + L2*np.cos(t1+t2)\n    y = L1*np.sin(t1) + L2*np.sin(t1+t2)\n    return round(x, 4), round(y, 4)\n\nfor angles in [(0,0), (45,30), (90,-45)]:\n    pos = forward_kinematics(*angles)\n    print(f"Theta={angles} -> X={pos[0]}, Y={pos[1]}")\n`,
+    templateFiles: [
+      { name: "robot_control.py", language: "python", content: `import numpy as np\n\nclass PIDController:\n    def __init__(self, Kp, Ki, Kd):\n        self.Kp, self.Ki, self.Kd = Kp, Ki, Kd\n        self.integral, self.prev_error = 0, 0\n    def compute(self, sp, pv, dt):\n        e = sp - pv\n        self.integral += e*dt\n        d = (e - self.prev_error)/dt\n        self.prev_error = e\n        return self.Kp*e + self.Ki*self.integral + self.Kd*d\n\npid = PIDController(1.0, 0.1, 0.05)\nprint(f"Output: {pid.compute(100, 80, 0.01)}")\n` },
+    ],
+  },
 };
 
 export function getDomainEnvironment(domainId: string): DomainEnvironment {

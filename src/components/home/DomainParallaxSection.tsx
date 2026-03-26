@@ -12,6 +12,10 @@ import blockchainImg from "@/assets/domains/blockchain.jpg";
 import uiuxImg from "@/assets/domains/ui-ux.jpg";
 import dsaImg from "@/assets/domains/dsa.jpg";
 import systemDesignImg from "@/assets/domains/system-design.jpg";
+import vlsiImg from "@/assets/domains/vlsi.jpg";
+import powerSystemsImg from "@/assets/domains/power-systems.jpg";
+import signalProcessingImg from "@/assets/domains/signal-processing.jpg";
+import roboticsImg from "@/assets/domains/robotics.jpg";
 import howItWorksImg from "@/assets/sections/how-it-works.jpg";
 import aiPowerImg from "@/assets/sections/ai-power.jpg";
 import studentSuccessImg from "@/assets/sections/student-success.jpg";
@@ -29,6 +33,10 @@ const domainProducts = [
   { title: "UI/UX Design", link: "/domain/ui-ux", thumbnail: uiuxImg },
   { title: "DSA", link: "/domain/dsa", thumbnail: dsaImg },
   { title: "System Design", link: "/domain/system-design", thumbnail: systemDesignImg },
+  { title: "VLSI Design", link: "/domain/vlsi", thumbnail: vlsiImg },
+  { title: "Power Systems", link: "/domain/power-systems", thumbnail: powerSystemsImg },
+  { title: "Signals & Systems", link: "/domain/signal-processing", thumbnail: signalProcessingImg },
+  { title: "Robotics & Automation", link: "/domain/robotics", thumbnail: roboticsImg },
   { title: "AI-Powered Learning", link: "/domains", thumbnail: aiPowerImg },
   { title: "Guided Roadmaps", link: "/domains", thumbnail: howItWorksImg },
   { title: "Student Success", link: "/about", thumbnail: studentSuccessImg },
