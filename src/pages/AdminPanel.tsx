@@ -840,24 +840,54 @@ const AdminPanel = () => {
                       </div>
                       <div>
                         <label className="text-sm font-medium text-foreground">Type</label>
-                        <select className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3" value={resourceForm.resource_type} onChange={(e) => setResourceForm({ ...resourceForm, resource_type: e.target.value as any })}>
+                        <select className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3" value={resourceForm.resource_type} onChange={(e) => { setResourceForm({ ...resourceForm, resource_type: e.target.value as any }); setPdfFile(null); }}>
                           <option value="video">Video</option>
                           <option value="article">Article</option>
                           <option value="course">Course</option>
                           <option value="material">Material</option>
+                          <option value="pdf">PDF Document</option>
                         </select>
                       </div>
                     </div>
                     <div><label className="text-sm font-medium text-foreground">Title</label><Input value={resourceForm.title} onChange={(e) => setResourceForm({ ...resourceForm, title: e.target.value })} placeholder="Resource title" /></div>
                     <div className="grid grid-cols-2 gap-4">
                       <div><label className="text-sm font-medium text-foreground">Source</label><Input value={resourceForm.source} onChange={(e) => setResourceForm({ ...resourceForm, source: e.target.value })} placeholder="YouTube, Udemy, etc." /></div>
-                      <div><label className="text-sm font-medium text-foreground">Duration</label><Input value={resourceForm.duration} onChange={(e) => setResourceForm({ ...resourceForm, duration: e.target.value })} placeholder="e.g. 2h 30m" /></div>
+                      <div><label className="text-sm font-medium text-foreground">Duration / Pages</label><Input value={resourceForm.duration} onChange={(e) => setResourceForm({ ...resourceForm, duration: e.target.value })} placeholder={resourceForm.resource_type === "pdf" ? "e.g. 50 pages" : "e.g. 2h 30m"} /></div>
                     </div>
-                    <div><label className="text-sm font-medium text-foreground">URL</label><Input value={resourceForm.url} onChange={(e) => setResourceForm({ ...resourceForm, url: e.target.value })} placeholder="https://..." /></div>
+                    {resourceForm.resource_type === "pdf" ? (
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Upload PDF File</label>
+                        <div className="mt-1 flex items-center gap-3">
+                          <Input
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                if (file.size > 20 * 1024 * 1024) {
+                                  toast({ title: "File too large", description: "Maximum 20MB", variant: "destructive" });
+                                  return;
+                                }
+                                setPdfFile(file);
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          {pdfFile && <Badge variant="outline" className="text-xs shrink-0">{(pdfFile.size / 1024 / 1024).toFixed(1)} MB</Badge>}
+                        </div>
+                        {resourceForm.url && !pdfFile && (
+                          <p className="mt-1 text-xs text-muted-foreground">Current: <a href={resourceForm.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View PDF</a></p>
+                        )}
+                      </div>
+                    ) : (
+                      <div><label className="text-sm font-medium text-foreground">URL</label><Input value={resourceForm.url} onChange={(e) => setResourceForm({ ...resourceForm, url: e.target.value })} placeholder="https://..." /></div>
+                    )}
                     <div><label className="text-sm font-medium text-foreground">Thumbnail URL</label><Input value={resourceForm.thumbnail} onChange={(e) => setResourceForm({ ...resourceForm, thumbnail: e.target.value })} placeholder="https://..." /></div>
                     <div><label className="text-sm font-medium text-foreground">Description</label><Textarea value={resourceForm.description} onChange={(e) => setResourceForm({ ...resourceForm, description: e.target.value })} /></div>
                     <div><label className="text-sm font-medium text-foreground">Sort Order</label><Input type="number" value={resourceForm.sort_order} onChange={(e) => setResourceForm({ ...resourceForm, sort_order: Number(e.target.value) })} /></div>
-                    <Button onClick={handleSaveResource}>{editingResource ? "Update Resource" : "Add Resource"}</Button>
+                    <Button onClick={handleSaveResource} disabled={uploadingPdf}>
+                      {uploadingPdf ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : editingResource ? "Update Resource" : "Add Resource"}
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
