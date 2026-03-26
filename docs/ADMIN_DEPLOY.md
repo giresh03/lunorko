@@ -81,6 +81,22 @@ npx supabase link --project-ref byveaoqwuwyhaykgjufj
 npx supabase db push
 ```
 
+### “Found local migration files to be inserted before the last migration on remote”
+
+**What it means:** Your **remote** database already recorded a **newer** migration as applied (e.g. hackathons), but an **older** migration file in the repo (e.g. `20260316174242_...sql` — security fix dropping a permissive policy on `subscriptions`) was never applied or never recorded. Supabase refuses a normal `db push` so history stays consistent.
+
+**Fix (recommended):** apply pending migrations including those “out of order”:
+
+```bash
+npx supabase db push --include-all
+```
+
+Use `--yes` if the CLI asks for confirmation. This is the supported way to reconcile local files with remote history.
+
+**Why it happens:** Migrations were applied on the server in a different order (manual SQL, another machine, or only some files pushed), or a migration was added to git with a timestamp **between** two migrations already on production.
+
+**If `--include-all` fails:** In Dashboard → **Database → Migrations**, inspect what’s applied. Advanced recovery: `supabase migration repair` (see [Supabase CLI docs](https://supabase.com/docs/guides/cli/managing-environments)) — only if you know what you’re doing.
+
 **Without CLI:** Supabase Dashboard → **SQL Editor** → paste and run, in order:
 
 1. `supabase/migrations/20260317120000_hackathons_marketplace.sql`
