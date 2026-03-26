@@ -524,6 +524,178 @@ export type Database = {
         }
         Relationships: []
       }
+      hackathon_project_purchases: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          project_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string
+          razorpay_signature: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          project_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string
+          razorpay_signature: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          project_id?: string
+          razorpay_order_id?: string
+          razorpay_payment_id?: string
+          razorpay_signature?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hackathon_project_purchases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "hackathon_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hackathon_projects: {
+        Row: {
+          buyers_count: number
+          created_at: string
+          hackathon_id: string | null
+          id: string
+          is_active: boolean
+          max_buyers: number
+          preview_url: string | null
+          price: number
+          repository_url: string | null
+          sort_order: number
+          summary: string | null
+          team_size: number
+          tech_stack: string[]
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          winner_name: string | null
+        }
+        Insert: {
+          buyers_count?: number
+          created_at?: string
+          hackathon_id?: string | null
+          id?: string
+          is_active?: boolean
+          max_buyers?: number
+          preview_url?: string | null
+          price: number
+          repository_url?: string | null
+          sort_order?: number
+          summary?: string | null
+          team_size?: number
+          tech_stack?: string[]
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          winner_name?: string | null
+        }
+        Update: {
+          buyers_count?: number
+          created_at?: string
+          hackathon_id?: string | null
+          id?: string
+          is_active?: boolean
+          max_buyers?: number
+          preview_url?: string | null
+          price?: number
+          repository_url?: string | null
+          sort_order?: number
+          summary?: string | null
+          team_size?: number
+          tech_stack?: string[]
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          winner_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hackathon_projects_hackathon_id_fkey"
+            columns: ["hackathon_id"]
+            isOneToOne: false
+            referencedRelation: "hackathons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hackathons: {
+        Row: {
+          banner_url: string | null
+          created_at: string
+          description: string | null
+          end_date: string
+          id: string
+          is_active: boolean
+          location: string
+          mode: string
+          organizer: string
+          prize_pool: string | null
+          registration_deadline: string | null
+          sort_order: number
+          start_date: string
+          title: string
+          updated_at: string
+          website_url: string
+        }
+        Insert: {
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          end_date: string
+          id?: string
+          is_active?: boolean
+          location?: string
+          mode?: string
+          organizer: string
+          prize_pool?: string | null
+          registration_deadline?: string | null
+          sort_order?: number
+          start_date: string
+          title: string
+          updated_at?: string
+          website_url: string
+        }
+        Update: {
+          banner_url?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          id?: string
+          is_active?: boolean
+          location?: string
+          mode?: string
+          organizer?: string
+          prize_pool?: string | null
+          registration_deadline?: string | null
+          sort_order?: number
+          start_date?: string
+          title?: string
+          updated_at?: string
+          website_url?: string
+        }
+        Relationships: []
+      }
       mentor_slots: {
         Row: {
           created_at: string

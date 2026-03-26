@@ -73,13 +73,12 @@ serve(async (req) => {
     }
     const order = await orderRes.json();
     const notes = order.notes || {};
+    const purchaseType = notes.purchase_type || "subscription";
     const plan_id = notes.plan_id;
     const domain_id = notes.domain_id;
+    const project_id = notes.project_id;
     const amount = order.amount; // in paise, from Razorpay
 
-    if (!plan_id || !domain_id) {
-      return new Response(JSON.stringify({ error: "Order missing plan or domain" }), { status: 400, headers: corsHeaders });
-    }
     if (notes.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Order does not belong to this user" }), { status: 403, headers: corsHeaders });
     }
@@ -89,6 +88,45 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    if (purchaseType === "hackathon_project") {
+      if (!project_id) {
+        return new Response(JSON.stringify({ error: "Order missing project_id" }), { status: 400, headers: corsHeaders });
+      }
+
+      const { data: existing } = await adminClient
+        .from("hackathon_project_purchases")
+        .select("id")
+        .eq("project_id", project_id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!existing) {
+        const { error: purchaseError } = await adminClient.from("hackathon_project_purchases").insert({
+          user_id: userId,
+          project_id,
+          amount,
+          currency: "INR",
+          status: "paid",
+          razorpay_payment_id,
+          razorpay_order_id,
+          razorpay_signature,
+        });
+
+        if (purchaseError) {
+          console.error("Hackathon project insert error:", purchaseError);
+          return new Response(JSON.stringify({ error: "Failed to save project purchase" }), { status: 500, headers: corsHeaders });
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, purchase_type: "hackathon_project", project_id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!plan_id || !domain_id) {
+      return new Response(JSON.stringify({ error: "Order missing plan or domain" }), { status: 400, headers: corsHeaders });
+    }
 
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + 1);
@@ -106,11 +144,11 @@ serve(async (req) => {
     });
 
     if (insertError) {
-      console.error("Insert error:", insertError);
+      console.error("Subscription insert error:", insertError);
       return new Response(JSON.stringify({ error: "Failed to save subscription" }), { status: 500, headers: corsHeaders });
     }
 
-    return new Response(JSON.stringify({ success: true, plan_id, domain_id }), {
+    return new Response(JSON.stringify({ success: true, purchase_type: "subscription", plan_id, domain_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

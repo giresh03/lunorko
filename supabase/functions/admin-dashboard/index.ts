@@ -203,6 +203,91 @@ serve(async (req) => {
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      if (action === "add-hackathon") {
+        const { id: _id, action: _a, ...rest } = body as Record<string, unknown>;
+        const insertData = {
+          title: rest.title,
+          organizer: rest.organizer,
+          location: rest.location || "Global",
+          mode: rest.mode || "online",
+          start_date: rest.start_date,
+          end_date: rest.end_date,
+          registration_deadline: rest.registration_deadline || null,
+          prize_pool: rest.prize_pool || null,
+          website_url: rest.website_url,
+          banner_url: rest.banner_url || null,
+          description: rest.description || null,
+          is_active: rest.is_active !== false,
+          sort_order: Number(rest.sort_order) || 0,
+        };
+        const { error } = await adminClient.from("hackathons").insert(insertData);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "update-hackathon") {
+        const { id, action: _act, ...updates } = body as Record<string, unknown>;
+        const cleanUpdates: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(updates)) {
+          if (["title","organizer","location","mode","start_date","end_date","registration_deadline","prize_pool","website_url","banner_url","description","sort_order","is_active"].includes(k)) {
+            cleanUpdates[k] = v;
+          }
+        }
+        const { error } = await adminClient.from("hackathons").update(cleanUpdates).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "delete-hackathon") {
+        const { error } = await adminClient.from("hackathons").delete().eq("id", (body as { id: string }).id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "add-hackathon-project") {
+        const { id: _id, action: _a, ...rest } = body as Record<string, unknown>;
+        const techStack = Array.isArray(rest.tech_stack)
+          ? rest.tech_stack
+          : typeof rest.tech_stack === "string"
+            ? (rest.tech_stack as string).split(",").map((t) => t.trim()).filter(Boolean)
+            : [];
+        const insertData = {
+          hackathon_id: rest.hackathon_id || null,
+          title: rest.title,
+          summary: rest.summary || null,
+          winner_name: rest.winner_name || null,
+          tech_stack: techStack,
+          team_size: Number(rest.team_size) || 1,
+          max_buyers: Number(rest.max_buyers) || 0,
+          price: Number(rest.price) || 0,
+          preview_url: rest.preview_url || null,
+          repository_url: rest.repository_url || null,
+          thumbnail_url: rest.thumbnail_url || null,
+          is_active: rest.is_active !== false,
+          sort_order: Number(rest.sort_order) || 0,
+        };
+        const { error } = await adminClient.from("hackathon_projects").insert(insertData);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "update-hackathon-project") {
+        const { id, action: _act, ...updates } = body as Record<string, unknown>;
+        const cleanUpdates: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(updates)) {
+          if (["hackathon_id","title","summary","winner_name","tech_stack","team_size","max_buyers","price","preview_url","repository_url","thumbnail_url","sort_order","is_active"].includes(k)) {
+            cleanUpdates[k] = k === "tech_stack"
+              ? (Array.isArray(v) ? v : typeof v === "string" ? (v as string).split(",").map((t) => t.trim()).filter(Boolean) : [])
+              : v;
+          }
+        }
+        const { error } = await adminClient.from("hackathon_projects").update(cleanUpdates).eq("id", id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (action === "delete-hackathon-project") {
+        const { error } = await adminClient.from("hackathon_projects").delete().eq("id", (body as { id: string }).id);
+        if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (action === "set-user-role") {
         const { user_id, role } = body as { user_id: string; role: string };
         await adminClient.from("user_roles").delete().eq("user_id", user_id);
@@ -416,6 +501,46 @@ serve(async (req) => {
         console.error("community_guidelines:", e);
         return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+    }
+
+    if (action === "hackathons") {
+      const { data, error } = await adminClient
+        .from("hackathons")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("start_date", { ascending: true });
+      if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "hackathon-projects") {
+      const { data, error } = await adminClient
+        .from("hackathon_projects")
+        .select("*, hackathons(id, title)")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+      if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (action === "hackathon-purchases") {
+      const { data, error } = await adminClient
+        .from("hackathon_project_purchases")
+        .select("*, hackathon_projects(id, title)")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+      const userIds = [...new Set((data || []).map((row: any) => row.user_id))];
+      const emailMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+        (authUsers || []).forEach((au: any) => { emailMap[au.id] = au.email || ""; });
+      }
+
+      const enriched = (data || []).map((row: any) => ({ ...row, email: emailMap[row.user_id] || "" }));
+      return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: `Unknown action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

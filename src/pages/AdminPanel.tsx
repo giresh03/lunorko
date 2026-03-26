@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
   CheckCircle, XCircle, Receipt, Video, Megaphone,
-  MessageSquare, Ban, UserPlus
+  MessageSquare, Ban, UserPlus, Trophy, ShoppingCart
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,9 @@ const AdminPanel = () => {
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [communityGuidelines, setCommunityGuidelines] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [hackathons, setHackathons] = useState<any[]>([]);
+  const [hackathonProjects, setHackathonProjects] = useState<any[]>([]);
+  const [hackathonPurchases, setHackathonPurchases] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -79,6 +82,42 @@ const AdminPanel = () => {
   const [guidelineDialog, setGuidelineDialog] = useState(false);
   const [editingGuideline, setEditingGuideline] = useState<any>(null);
   const [guidelineForm, setGuidelineForm] = useState({ domain_id: "", guideline_text: "", sort_order: 0 });
+
+  const [hackathonDialog, setHackathonDialog] = useState(false);
+  const [editingHackathon, setEditingHackathon] = useState<any>(null);
+  const [hackathonForm, setHackathonForm] = useState({
+    title: "",
+    organizer: "",
+    location: "Global",
+    mode: "online",
+    start_date: "",
+    end_date: "",
+    registration_deadline: "",
+    prize_pool: "",
+    website_url: "",
+    banner_url: "",
+    description: "",
+    is_active: true,
+    sort_order: 0,
+  });
+
+  const [hackathonProjectDialog, setHackathonProjectDialog] = useState(false);
+  const [editingHackathonProject, setEditingHackathonProject] = useState<any>(null);
+  const [hackathonProjectForm, setHackathonProjectForm] = useState({
+    hackathon_id: "",
+    title: "",
+    summary: "",
+    winner_name: "",
+    tech_stack: "",
+    team_size: 1,
+    max_buyers: 0,
+    price: 99900,
+    preview_url: "",
+    repository_url: "",
+    thumbnail_url: "",
+    is_active: true,
+    sort_order: 0,
+  });
 
   const callAdmin = async (action: string, method = "GET", body?: any) => {
     const runRequest = async (accessToken: string) =>
@@ -155,9 +194,12 @@ const AdminPanel = () => {
         callAdmin("community-posts"),
         callAdmin("community-guidelines"),
         callAdmin("feedback"),
+        callAdmin("hackathons"),
+        callAdmin("hackathon-projects"),
+        callAdmin("hackathon-purchases"),
       ]);
 
-      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData, feedbackData] = results.map((r) =>
+      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData, feedbackData, hackathonsData, hackathonProjectsData, hackathonPurchasesData] = results.map((r) =>
         r.status === "fulfilled" ? r.value : null
       );
 
@@ -171,6 +213,9 @@ const AdminPanel = () => {
       setCommunityPosts(Array.isArray(communityPostsData) ? communityPostsData : []);
       setCommunityGuidelines(Array.isArray(guidelinesData) ? guidelinesData : []);
       setFeedbacks(Array.isArray(feedbackData) ? feedbackData : []);
+      setHackathons(Array.isArray(hackathonsData) ? hackathonsData : []);
+      setHackathonProjects(Array.isArray(hackathonProjectsData) ? hackathonProjectsData : []);
+      setHackathonPurchases(Array.isArray(hackathonPurchasesData) ? hackathonPurchasesData : []);
     } catch (e: any) {
       console.error(e);
       toast({
@@ -183,6 +228,9 @@ const AdminPanel = () => {
       setStats(null);
       setUsers([]);
       setSubscriptions([]);
+      setHackathons([]);
+      setHackathonProjects([]);
+      setHackathonPurchases([]);
 
       if ((e?.message || "").toLowerCase().includes("not authenticated")) {
         navigate("/auth");
@@ -342,6 +390,124 @@ const AdminPanel = () => {
     fetchAll();
   };
 
+  const handleSaveHackathon = async () => {
+    if (!hackathonForm.title.trim() || !hackathonForm.organizer.trim() || !hackathonForm.website_url.trim()) {
+      toast({ title: "Title, organizer and website are required", variant: "destructive" });
+      return;
+    }
+    const payload = {
+      ...hackathonForm,
+      sort_order: Number(hackathonForm.sort_order),
+      registration_deadline: hackathonForm.registration_deadline || null,
+      prize_pool: hackathonForm.prize_pool || null,
+      banner_url: hackathonForm.banner_url || null,
+      description: hackathonForm.description || null,
+    };
+    if (editingHackathon) {
+      await callAdmin("update-hackathon", "POST", { id: editingHackathon.id, ...payload });
+      toast({ title: "Hackathon updated" });
+    } else {
+      await callAdmin("add-hackathon", "POST", payload);
+      toast({ title: "Hackathon added" });
+    }
+    setHackathonDialog(false);
+    setEditingHackathon(null);
+    setHackathonForm({
+      title: "", organizer: "", location: "Global", mode: "online",
+      start_date: "", end_date: "", registration_deadline: "", prize_pool: "",
+      website_url: "", banner_url: "", description: "", is_active: true, sort_order: 0,
+    });
+    fetchAll();
+  };
+
+  const openEditHackathon = (h: any) => {
+    setEditingHackathon(h);
+    setHackathonForm({
+      title: h.title || "",
+      organizer: h.organizer || "",
+      location: h.location || "Global",
+      mode: h.mode || "online",
+      start_date: h.start_date ? String(h.start_date).slice(0, 10) : "",
+      end_date: h.end_date ? String(h.end_date).slice(0, 10) : "",
+      registration_deadline: h.registration_deadline ? String(h.registration_deadline).slice(0, 10) : "",
+      prize_pool: h.prize_pool || "",
+      website_url: h.website_url || "",
+      banner_url: h.banner_url || "",
+      description: h.description || "",
+      is_active: h.is_active ?? true,
+      sort_order: h.sort_order ?? 0,
+    });
+    setHackathonDialog(true);
+  };
+
+  const handleDeleteHackathon = async (id: string) => {
+    await callAdmin("delete-hackathon", "POST", { id });
+    toast({ title: "Hackathon deleted" });
+    fetchAll();
+  };
+
+  const handleSaveHackathonProject = async () => {
+    if (!hackathonProjectForm.title.trim()) {
+      toast({ title: "Project title is required", variant: "destructive" });
+      return;
+    }
+    const payload = {
+      ...hackathonProjectForm,
+      hackathon_id: hackathonProjectForm.hackathon_id || null,
+      tech_stack: hackathonProjectForm.tech_stack,
+      team_size: Number(hackathonProjectForm.team_size) || 1,
+      max_buyers: Number(hackathonProjectForm.max_buyers) || 0,
+      price: Number(hackathonProjectForm.price) || 0,
+      sort_order: Number(hackathonProjectForm.sort_order) || 0,
+      summary: hackathonProjectForm.summary || null,
+      winner_name: hackathonProjectForm.winner_name || null,
+      preview_url: hackathonProjectForm.preview_url || null,
+      repository_url: hackathonProjectForm.repository_url || null,
+      thumbnail_url: hackathonProjectForm.thumbnail_url || null,
+    };
+    if (editingHackathonProject) {
+      await callAdmin("update-hackathon-project", "POST", { id: editingHackathonProject.id, ...payload });
+      toast({ title: "Project updated" });
+    } else {
+      await callAdmin("add-hackathon-project", "POST", payload);
+      toast({ title: "Project added" });
+    }
+    setHackathonProjectDialog(false);
+    setEditingHackathonProject(null);
+    setHackathonProjectForm({
+      hackathon_id: "", title: "", summary: "", winner_name: "", tech_stack: "",
+      team_size: 1, max_buyers: 0, price: 99900, preview_url: "", repository_url: "",
+      thumbnail_url: "", is_active: true, sort_order: 0,
+    });
+    fetchAll();
+  };
+
+  const openEditHackathonProject = (p: any) => {
+    setEditingHackathonProject(p);
+    setHackathonProjectForm({
+      hackathon_id: p.hackathon_id || "",
+      title: p.title || "",
+      summary: p.summary || "",
+      winner_name: p.winner_name || "",
+      tech_stack: Array.isArray(p.tech_stack) ? p.tech_stack.join(", ") : "",
+      team_size: p.team_size ?? 1,
+      max_buyers: p.max_buyers ?? 0,
+      price: p.price ?? 99900,
+      preview_url: p.preview_url || "",
+      repository_url: p.repository_url || "",
+      thumbnail_url: p.thumbnail_url || "",
+      is_active: p.is_active ?? true,
+      sort_order: p.sort_order ?? 0,
+    });
+    setHackathonProjectDialog(true);
+  };
+
+  const handleDeleteHackathonProject = async (id: string) => {
+    await callAdmin("delete-hackathon-project", "POST", { id });
+    toast({ title: "Project deleted" });
+    fetchAll();
+  };
+
   const handleSetUserRole = async (userId: string, role: string) => {
     await callAdmin("set-user-role", "POST", { user_id: userId, role });
     toast({ title: `Role set to ${role}` });
@@ -448,6 +614,7 @@ const AdminPanel = () => {
               <TabsTrigger value="resources" className="text-xs sm:text-sm px-2 sm:px-3"><Video className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Resources</span><span className="sm:hidden">Res</span></TabsTrigger>
               <TabsTrigger value="pop-ads" className="text-xs sm:text-sm px-2 sm:px-3"><Megaphone className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Ads</TabsTrigger>
               <TabsTrigger value="community" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Community</span><span className="sm:hidden">Com</span></TabsTrigger>
+              <TabsTrigger value="hackathons" className="text-xs sm:text-sm px-2 sm:px-3"><Trophy className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Hackathons</span><span className="sm:hidden">Hack</span></TabsTrigger>
               <TabsTrigger value="guidelines" className="text-xs sm:text-sm px-2 sm:px-3"><Shield className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Guidelines</span><span className="sm:hidden">Rules</span></TabsTrigger>
               <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Feedback</span><span className="sm:hidden">FB</span>{feedbacks.length > 0 && ` (${feedbacks.length})`}</TabsTrigger>
             </TabsList>
@@ -1044,6 +1211,217 @@ const AdminPanel = () => {
                   {communityPosts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No community posts yet</TableCell></TableRow>}
                 </TableBody>
               </Table>
+            </div>
+          </TabsContent>
+
+          {/* Hackathons */}
+          <TabsContent value="hackathons">
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-foreground">Global Hackathons</h3>
+                <Dialog
+                  open={hackathonDialog}
+                  onOpenChange={(open) => {
+                    setHackathonDialog(open);
+                    if (!open) {
+                      setEditingHackathon(null);
+                      setHackathonForm({
+                        title: "", organizer: "", location: "Global", mode: "online",
+                        start_date: "", end_date: "", registration_deadline: "", prize_pool: "",
+                        website_url: "", banner_url: "", description: "", is_active: true, sort_order: 0,
+                      });
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Add Hackathon</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>{editingHackathon ? "Edit Hackathon" : "Add Hackathon"}</DialogTitle></DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Title</label><Input value={hackathonForm.title} onChange={(e) => setHackathonForm({ ...hackathonForm, title: e.target.value })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">Organizer</label><Input value={hackathonForm.organizer} onChange={(e) => setHackathonForm({ ...hackathonForm, organizer: e.target.value })} /></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Location</label><Input value={hackathonForm.location} onChange={(e) => setHackathonForm({ ...hackathonForm, location: e.target.value })} /></div>
+                        <div>
+                          <label className="text-sm font-medium text-foreground">Mode</label>
+                          <select className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3" value={hackathonForm.mode} onChange={(e) => setHackathonForm({ ...hackathonForm, mode: e.target.value })}>
+                            <option value="online">online</option>
+                            <option value="offline">offline</option>
+                            <option value="hybrid">hybrid</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Start Date</label><Input type="date" value={hackathonForm.start_date} onChange={(e) => setHackathonForm({ ...hackathonForm, start_date: e.target.value })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">End Date</label><Input type="date" value={hackathonForm.end_date} onChange={(e) => setHackathonForm({ ...hackathonForm, end_date: e.target.value })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">Registration Deadline</label><Input type="date" value={hackathonForm.registration_deadline} onChange={(e) => setHackathonForm({ ...hackathonForm, registration_deadline: e.target.value })} /></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Prize Pool</label><Input value={hackathonForm.prize_pool} onChange={(e) => setHackathonForm({ ...hackathonForm, prize_pool: e.target.value })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">Website URL</label><Input value={hackathonForm.website_url} onChange={(e) => setHackathonForm({ ...hackathonForm, website_url: e.target.value })} /></div>
+                      </div>
+                      <div><label className="text-sm font-medium text-foreground">Banner URL</label><Input value={hackathonForm.banner_url} onChange={(e) => setHackathonForm({ ...hackathonForm, banner_url: e.target.value })} /></div>
+                      <div><label className="text-sm font-medium text-foreground">Description</label><Textarea value={hackathonForm.description} onChange={(e) => setHackathonForm({ ...hackathonForm, description: e.target.value })} /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Sort Order</label><Input type="number" value={hackathonForm.sort_order} onChange={(e) => setHackathonForm({ ...hackathonForm, sort_order: Number(e.target.value) })} /></div>
+                        <div className="flex items-center gap-2 mt-7"><input type="checkbox" checked={hackathonForm.is_active} onChange={(e) => setHackathonForm({ ...hackathonForm, is_active: e.target.checked })} /><label className="text-sm font-medium text-foreground">Active</label></div>
+                      </div>
+                      <Button onClick={handleSaveHackathon}>{editingHackathon ? "Update Hackathon" : "Add Hackathon"}</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className="rounded-xl border border-border bg-card overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Organizer</TableHead>
+                      <TableHead>Dates</TableHead>
+                      <TableHead>Mode</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {hackathons.map((h) => (
+                      <TableRow key={h.id}>
+                        <TableCell className="font-medium">{h.title}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{h.organizer}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{new Date(h.start_date).toLocaleDateString()} - {new Date(h.end_date).toLocaleDateString()}</TableCell>
+                        <TableCell><Badge variant="outline" className="text-xs capitalize">{h.mode}</Badge></TableCell>
+                        <TableCell><Badge variant={h.is_active ? "default" : "secondary"} className="text-xs">{h.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditHackathon(h)}><Edit className="h-3.5 w-3.5" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteHackathon(h.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {hackathons.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No hackathons yet</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-foreground">Winner Projects Marketplace</h3>
+                <Dialog
+                  open={hackathonProjectDialog}
+                  onOpenChange={(open) => {
+                    setHackathonProjectDialog(open);
+                    if (!open) {
+                      setEditingHackathonProject(null);
+                      setHackathonProjectForm({
+                        hackathon_id: "", title: "", summary: "", winner_name: "", tech_stack: "",
+                        team_size: 1, max_buyers: 0, price: 99900, preview_url: "", repository_url: "",
+                        thumbnail_url: "", is_active: true, sort_order: 0,
+                      });
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Add Project</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader><DialogTitle>{editingHackathonProject ? "Edit Project" : "Add Project"}</DialogTitle></DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Hackathon</label>
+                        <select className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3" value={hackathonProjectForm.hackathon_id} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, hackathon_id: e.target.value })}>
+                          <option value="">None</option>
+                          {hackathons.map((h) => <option key={h.id} value={h.id}>{h.title}</option>)}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Project Title</label><Input value={hackathonProjectForm.title} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, title: e.target.value })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">Winner Name</label><Input value={hackathonProjectForm.winner_name} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, winner_name: e.target.value })} /></div>
+                      </div>
+                      <div><label className="text-sm font-medium text-foreground">Summary</label><Textarea value={hackathonProjectForm.summary} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, summary: e.target.value })} /></div>
+                      <div><label className="text-sm font-medium text-foreground">Tech Stack (comma separated)</label><Input value={hackathonProjectForm.tech_stack} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, tech_stack: e.target.value })} /></div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Team Size</label><Input type="number" value={hackathonProjectForm.team_size} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, team_size: Number(e.target.value) })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">Max Buyers (0=unlimited)</label><Input type="number" value={hackathonProjectForm.max_buyers} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, max_buyers: Number(e.target.value) })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">Price (paise)</label><Input type="number" value={hackathonProjectForm.price} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, price: Number(e.target.value) })} /></div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Preview URL</label><Input value={hackathonProjectForm.preview_url} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, preview_url: e.target.value })} /></div>
+                        <div><label className="text-sm font-medium text-foreground">Repository URL</label><Input value={hackathonProjectForm.repository_url} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, repository_url: e.target.value })} /></div>
+                      </div>
+                      <div><label className="text-sm font-medium text-foreground">Thumbnail URL</label><Input value={hackathonProjectForm.thumbnail_url} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, thumbnail_url: e.target.value })} /></div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-sm font-medium text-foreground">Sort Order</label><Input type="number" value={hackathonProjectForm.sort_order} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, sort_order: Number(e.target.value) })} /></div>
+                        <div className="flex items-center gap-2 mt-7"><input type="checkbox" checked={hackathonProjectForm.is_active} onChange={(e) => setHackathonProjectForm({ ...hackathonProjectForm, is_active: e.target.checked })} /><label className="text-sm font-medium text-foreground">Active</label></div>
+                      </div>
+                      <Button onClick={handleSaveHackathonProject}>{editingHackathonProject ? "Update Project" : "Add Project"}</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className="rounded-xl border border-border bg-card overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project</TableHead>
+                      <TableHead>Hackathon</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Buyers</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {hackathonProjects.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.title}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.hackathons?.title || "—"}</TableCell>
+                        <TableCell className="text-sm font-medium">₹{Number((p.price || 0) / 100).toLocaleString()}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.buyers_count || 0}{p.max_buyers > 0 ? ` / ${p.max_buyers}` : ""}</TableCell>
+                        <TableCell><Badge variant={p.is_active ? "default" : "secondary"} className="text-xs">{p.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditHackathonProject(p)}><Edit className="h-3.5 w-3.5" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteHackathonProject(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {hackathonProjects.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No projects yet</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="rounded-xl border border-border bg-card overflow-x-auto">
+                <h3 className="text-base font-semibold text-foreground p-4 flex items-center gap-2"><ShoppingCart className="h-4 w-4" /> Recent Purchases</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment ID</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {hackathonPurchases.slice(0, 100).map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.hackathon_projects?.title || "—"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.email || p.user_id?.slice(0, 8)}</TableCell>
+                        <TableCell className="text-sm">₹{Number((p.amount || 0) / 100).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground truncate max-w-[140px]">{p.razorpay_payment_id}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{new Date(p.created_at).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                    {hackathonPurchases.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No purchases yet</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </TabsContent>
 

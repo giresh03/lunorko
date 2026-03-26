@@ -30,6 +30,7 @@ const navLinks = [
   { to: "/domains", label: "Domains" },
   { to: "/community", label: "Community" },
   { to: "/projects", label: "Projects" },
+  { to: "/hackathons", label: "Hackathons" },
   { to: "/visual-builder", label: "Visual Builder" },
   { to: "/ai-interview", label: "AI Interview" },
   { to: "/pricing", label: "Pricing" },
@@ -158,6 +159,11 @@ const Navbar = () => {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <Link to="/hackathons" className="cursor-pointer">
+                          <Trophy className="mr-2 h-4 w-4" /> Hackathons
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <Link to="/ai-interview" className="cursor-pointer">
                           <Video className="mr-2 h-4 w-4" /> AI Interview
                         </Link>
@@ -245,6 +251,9 @@ const Navbar = () => {
                     </Link>
                     <Link to="/ai-interview" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <Video className="h-4 w-4" /> AI Interview
+                    </Link>
+                    <Link to="/hackathons" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <Trophy className="h-4 w-4" /> Hackathons
                     </Link>
                     <Link to="/pricing" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <CreditCard className="h-4 w-4" /> Subscription

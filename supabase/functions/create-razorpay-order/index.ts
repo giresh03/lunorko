@@ -29,17 +29,71 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { plan_id, amount, domain_id } = await req.json();
-
-    if (!plan_id || !amount || !domain_id) {
-      return new Response(JSON.stringify({ error: "Missing plan_id, amount, or domain_id" }), { status: 400, headers: corsHeaders });
-    }
+    const payload = await req.json();
+    const {
+      plan_id,
+      amount,
+      domain_id,
+      purchase_type = "subscription",
+      project_id,
+    } = payload as {
+      plan_id?: string;
+      amount?: number;
+      domain_id?: string;
+      purchase_type?: "subscription" | "hackathon_project";
+      project_id?: string;
+    };
 
     const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
     const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
 
     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
       return new Response(JSON.stringify({ error: "Razorpay not configured" }), { status: 500, headers: corsHeaders });
+    }
+
+    let resolvedAmount = amount;
+    let notes: Record<string, string> = { user_id: userId };
+
+    if (purchase_type === "hackathon_project") {
+      if (!project_id) {
+        return new Response(JSON.stringify({ error: "Missing project_id for hackathon project purchase" }), { status: 400, headers: corsHeaders });
+      }
+
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      const { data: project, error: projectError } = await adminClient
+        .from("hackathon_projects")
+        .select("id, title, price, is_active, max_buyers, buyers_count")
+        .eq("id", project_id)
+        .maybeSingle();
+
+      if (projectError || !project || !project.is_active) {
+        return new Response(JSON.stringify({ error: "Project not found or inactive" }), { status: 404, headers: corsHeaders });
+      }
+      if ((project.max_buyers || 0) > 0 && (project.buyers_count || 0) >= (project.max_buyers || 0)) {
+        return new Response(JSON.stringify({ error: "Project purchase limit reached" }), { status: 400, headers: corsHeaders });
+      }
+
+      resolvedAmount = project.price;
+      notes = {
+        purchase_type: "hackathon_project",
+        project_id: project.id,
+        project_title: project.title || "Hackathon Project",
+        user_id: userId,
+      };
+    } else {
+      if (!plan_id || !resolvedAmount || !domain_id) {
+        return new Response(JSON.stringify({ error: "Missing plan_id, amount, or domain_id" }), { status: 400, headers: corsHeaders });
+      }
+      notes = {
+        purchase_type: "subscription",
+        plan_id,
+        domain_id,
+        user_id: userId,
+      };
     }
 
     const orderResponse = await fetch("https://api.razorpay.com/v1/orders", {
@@ -49,10 +103,10 @@ serve(async (req) => {
         Authorization: "Basic " + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`),
       },
       body: JSON.stringify({
-        amount: amount,
+        amount: resolvedAmount,
         currency: "INR",
-        receipt: `s_${userId.slice(0, 8)}_${Date.now()}`,
-        notes: { plan_id, user_id: userId, domain_id },
+        receipt: `${purchase_type === "hackathon_project" ? "hp" : "s"}_${userId.slice(0, 8)}_${Date.now()}`,
+        notes,
       }),
     });
 

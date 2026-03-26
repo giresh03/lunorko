@@ -23,6 +23,7 @@ import ResumeBuilder from "./pages/ResumeBuilder";
 import PromoVideo from "./pages/PromoVideo";
 import ProjectBuilder from "./pages/ProjectBuilder";
 import AIVideoInterview from "./pages/AIVideoInterview";
+import Hackathons from "./pages/Hackathons";
 import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
@@ -53,6 +54,7 @@ const AppContent = () => {
         <Route path="/resume-builder" element={<ResumeBuilder />} />
         <Route path="/promo" element={<PromoVideo />} />
         <Route path="/projects" element={<ProjectBuilder />} />
+        <Route path="/hackathons" element={<Hackathons />} />
         <Route path="/ai-interview" element={<AIVideoInterview />} />
         <Route path="/visual-builder" element={<VisualBuilderPage />} />
         <Route path="*" element={<NotFound />} />
