@@ -79,6 +79,8 @@ npx supabase db push --project-ref byveaoqwuwyhaykgjufj
 
 Or run migrations manually in Supabase Dashboard → SQL Editor.
 
+**Sample hackathons & winner projects:** migration `20260318100000_seed_hackathons_sample.sql` inserts **6 global events** and **10 marketplace projects** (with placeholder GitHub deliverable links). Replace links in **Admin → Hackathons** after deploy. Re-running the migration is safe (`ON CONFLICT DO NOTHING` / upsert deliverables).
+
 ## Remove user manually (if admin panel fails)
 
 Use `scripts/delete-user-by-email.sql` in Supabase Dashboard → SQL Editor.
