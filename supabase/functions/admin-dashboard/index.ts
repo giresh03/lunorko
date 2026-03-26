@@ -22,20 +22,26 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    // Use service role client for everything - it can verify any token
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!
+    );
+
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    const claims = claimsData?.claims as { sub?: string; email?: string } | undefined;
+
+    if (claimsError || !claims?.sub) {
+      console.error("Auth error:", claimsError?.message || "Missing token claims");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
+    const userId = claims.sub;
+    const userEmail = claims.email || "";
+
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    // Verify the user's token using the admin client
-    const { data: { user: authUser }, error: userError } = await adminClient.auth.getUser(token);
-    if (userError || !authUser) {
-      console.error("Auth error:", userError?.message);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    }
-    const userId = authUser.id;
-    const userEmail = authUser.email || "";
 
     // lunor.ko@gmail.com is the designated admin account; otherwise check user_roles
     const isDesignatedAdmin = userEmail === "lunor.ko@gmail.com";

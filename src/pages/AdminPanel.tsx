@@ -81,25 +81,37 @@ const AdminPanel = () => {
   const [guidelineForm, setGuidelineForm] = useState({ domain_id: "", guideline_text: "", sort_order: 0 });
 
   const callAdmin = async (action: string, method = "GET", body?: any) => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-
-    if (!token) {
-      throw new Error("Not authenticated. Please sign in again.");
-    }
-
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-dashboard?action=${action}`,
-      {
+    const runRequest = async (accessToken: string) =>
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-dashboard?action=${action}`, {
         method,
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    let token = sessionData?.session?.access_token;
+
+    if (!token) {
+      throw new Error("Session expired. Please sign in again.");
+    }
+
+    let res = await runRequest(token);
+
+    if (res.status === 401) {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      token = refreshed?.session?.access_token;
+
+      if (refreshError || !token) {
+        await supabase.auth.signOut();
+        throw new Error("Session expired. Please sign in again.");
       }
-    );
+
+      res = await runRequest(token);
+    }
 
     const raw = await res.text();
     const parsed = raw ? (() => {
@@ -111,6 +123,10 @@ const AdminPanel = () => {
     })() : null;
 
     if (!res.ok) {
+      if (res.status === 401) {
+        await supabase.auth.signOut();
+        throw new Error("Session expired. Please sign in again.");
+      }
       throw new Error(parsed?.error || `Request failed (${res.status})`);
     }
 
