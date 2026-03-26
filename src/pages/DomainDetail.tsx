@@ -256,6 +256,7 @@ const DomainDetail = () => {
   const allResources: Resource[] = [...adminResources, ...domain.resources];
   const videos = allResources.filter((r) => r.type === "video" || r.type === "course");
   const articles = allResources.filter((r) => r.type === "article");
+  const pdfs = allResources.filter((r) => r.type === "pdf");
 
   if (isFullscreenIDE && hasEditorAccess) {
     if (isUIUXDomain) {
