@@ -140,13 +140,13 @@ serve(async (req) => {
 
       if (action === "add-pop-ad") {
         const { id: _id, action: _a, ...rest } = body as Record<string, unknown>;
-        const { error } = await adminClient.from("pop_ads").insert({ ...rest, updated_at: new Date().toISOString() });
+        const { error } = await adminClient.from("pop_ads").insert({ ...rest });
         if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (action === "update-pop-ad") {
-        const { id, ...updates } = body as Record<string, unknown>;
-        const { error } = await adminClient.from("pop_ads").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id);
+        const { id, action: _act, ...updates } = body as Record<string, unknown>;
+        const { error } = await adminClient.from("pop_ads").update(updates).eq("id", id);
         if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
