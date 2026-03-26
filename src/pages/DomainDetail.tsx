@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
   CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
-  TrendingUp, Zap, Bookmark, CalendarDays
+  TrendingUp, Zap, Bookmark, CalendarDays, Download, Eye
 } from "lucide-react";
 import VideoLearningHub from "@/components/VideoLearningHub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -121,6 +121,78 @@ const ArticleCard = ({ resource }: { resource: Resource }) => (
   </a>
 );
 
+const PdfCard = ({ resource }: { resource: Resource }) => {
+  const [showViewer, setShowViewer] = useState(false);
+  
+  return (
+    <>
+      <div className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/30 hover:-translate-y-1 hover:shadow-lg">
+        <div className="flex gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+            <FileText className="h-7 w-7 text-red-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1.5 flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-400 border-red-500/20">PDF</Badge>
+              {resource.source && (
+                <Badge variant="outline" className={`text-[10px] ${sourceColors[resource.source] || "border-border"}`}>
+                  {resource.source}
+                </Badge>
+              )}
+              {resource.duration && (
+                <Badge variant="outline" className="text-[10px] border-border text-muted-foreground">
+                  {resource.duration}
+                </Badge>
+              )}
+            </div>
+            <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+              {resource.title}
+            </h4>
+            {resource.description && (
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{resource.description}</p>
+            )}
+            <div className="mt-3 flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setShowViewer(true)}>
+                <Eye className="mr-1.5 h-3.5 w-3.5" /> Read Online
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
+                <a href={resource.url} download target="_blank" rel="noopener noreferrer">
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                </a>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showViewer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-5xl h-[85vh] rounded-xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+              <h3 className="text-sm font-semibold text-foreground truncate">{resource.title}</h3>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
+                  <a href={resource.url} download target="_blank" rel="noopener noreferrer">
+                    <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                  </a>
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setShowViewer(false)}>
+                  ✕ Close
+                </Button>
+              </div>
+            </div>
+            <iframe
+              src={`${resource.url}#toolbar=1&navpanes=1`}
+              className="flex-1 w-full"
+              title={resource.title}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 const DomainDetail = () => {
   const { domainId } = useParams();
   const domain = domains.find((d) => d.id === domainId);
@@ -142,7 +214,7 @@ const DomainDetail = () => {
         const mapped: Resource[] = data.map((r: any) => ({
           id: r.id,
           title: r.title,
-          type: (r.resource_type === "material" ? "article" : r.resource_type) as "video" | "article" | "course",
+          type: (r.resource_type === "material" ? "article" : r.resource_type) as "video" | "article" | "course" | "pdf",
           source: r.source,
           url: r.url,
           duration: r.duration,
@@ -184,6 +256,7 @@ const DomainDetail = () => {
   const allResources: Resource[] = [...adminResources, ...domain.resources];
   const videos = allResources.filter((r) => r.type === "video" || r.type === "course");
   const articles = allResources.filter((r) => r.type === "article");
+  const pdfs = allResources.filter((r) => r.type === "pdf");
 
   if (isFullscreenIDE && hasEditorAccess) {
     if (isUIUXDomain) {
@@ -616,18 +689,37 @@ const DomainDetail = () => {
 
           {/* Materials Tab */}
           <TabsContent value="materials">
-            {articles.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {articles.map((r) => (
-                  <ArticleCard key={r.id} resource={r} />
-                ))}
+            {pdfs.length > 0 && (
+              <div className="mb-8">
+                <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-red-400" /> PDF Documents
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {pdfs.map((r) => (
+                    <PdfCard key={r.id} resource={r} />
+                  ))}
+                </div>
               </div>
-            ) : (
+            )}
+            {articles.length > 0 ? (
+              <>
+                {pdfs.length > 0 && (
+                  <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
+                    <BookMarked className="h-5 w-5 text-primary" /> Articles & Guides
+                  </h3>
+                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {articles.map((r) => (
+                    <ArticleCard key={r.id} resource={r} />
+                  ))}
+                </div>
+              </>
+            ) : pdfs.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-card/50 p-16 text-center">
                 <FileText className="mx-auto h-12 w-12 text-muted-foreground/30" />
                 <p className="mt-4 text-muted-foreground">Materials coming soon. Check back later!</p>
               </div>
-            )}
+            ) : null}
           </TabsContent>
         </Tabs>
       </main>
