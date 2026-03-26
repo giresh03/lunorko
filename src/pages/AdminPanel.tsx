@@ -60,9 +60,11 @@ const AdminPanel = () => {
   const [resourceDialog, setResourceDialog] = useState(false);
   const [editingResource, setEditingResource] = useState<any>(null);
   const [resourceForm, setResourceForm] = useState({
-    domain_id: "web-development", title: "", resource_type: "video" as "video" | "article" | "course" | "material",
+    domain_id: "web-development", title: "", resource_type: "video" as "video" | "article" | "course" | "material" | "pdf",
     source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0,
   });
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
 
   // Pop ad form
   const [popAdDialog, setPopAdDialog] = useState(false);
@@ -174,7 +176,7 @@ const AdminPanel = () => {
     }
   };
 
-  const DOMAIN_IDS = ["web-development", "app-development", "cybersecurity", "data-science", "cloud-computing", "devops", "database", "iot", "blockchain", "ui-ux", "dsa", "system-design"];
+  const DOMAIN_IDS = ["web-development", "app-development", "cybersecurity", "data-science", "cloud-computing", "devops", "database", "iot", "blockchain", "ui-ux", "dsa", "system-design", "vlsi", "power-systems", "signal-processing", "robotics"];
 
   const handleSaveResource = async () => {
     if (!resourceForm.title?.trim()) {
