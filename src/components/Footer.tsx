@@ -1,5 +1,6 @@
 import { Code2, Github, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
+import FeedbackForm from "./FeedbackForm";
 
 const Footer = () => (
   <footer className="border-t border-border bg-card">
@@ -33,9 +34,12 @@ const Footer = () => (
         </div>
         <div>
           <h4 className="mb-3 text-sm font-semibold text-foreground">Connect</h4>
-          <div className="flex gap-3">
-            <a href="#" className="text-muted-foreground hover:text-foreground"><Github className="h-5 w-5" /></a>
-            <a href="#" className="text-muted-foreground hover:text-foreground"><Twitter className="h-5 w-5" /></a>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-3">
+              <a href="#" className="text-muted-foreground hover:text-foreground"><Github className="h-5 w-5" /></a>
+              <a href="#" className="text-muted-foreground hover:text-foreground"><Twitter className="h-5 w-5" /></a>
+            </div>
+            <FeedbackForm />
           </div>
         </div>
       </div>

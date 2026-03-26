@@ -387,6 +387,12 @@ serve(async (req) => {
       return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (action === "feedback") {
+      const { data, error } = await adminClient.from("feedback").select("*").order("created_at", { ascending: false }).limit(200);
+      if (error) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(data || []), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "community-guidelines") {
       try {
         const { data, error } = await adminClient.from("community_guidelines").select("*").order("sort_order", { ascending: true });

@@ -51,6 +51,7 @@ const AdminPanel = () => {
   const [popAds, setPopAds] = useState<any[]>([]);
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [communityGuidelines, setCommunityGuidelines] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -135,9 +136,10 @@ const AdminPanel = () => {
         callAdmin("pop-ads"),
         callAdmin("community-posts"),
         callAdmin("community-guidelines"),
+        callAdmin("feedback"),
       ]);
 
-      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData] = results.map((r) =>
+      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData, feedbackData] = results.map((r) =>
         r.status === "fulfilled" ? r.value : null
       );
 
@@ -150,6 +152,7 @@ const AdminPanel = () => {
       setPopAds(Array.isArray(popAdsData) ? popAdsData : []);
       setCommunityPosts(Array.isArray(communityPostsData) ? communityPostsData : []);
       setCommunityGuidelines(Array.isArray(guidelinesData) ? guidelinesData : []);
+      setFeedbacks(Array.isArray(feedbackData) ? feedbackData : []);
     } catch (e: any) {
       console.error(e);
       toast({
@@ -403,6 +406,7 @@ const AdminPanel = () => {
               <TabsTrigger value="pop-ads" className="text-xs sm:text-sm px-2 sm:px-3"><Megaphone className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Ads</TabsTrigger>
               <TabsTrigger value="community" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Community</span><span className="sm:hidden">Com</span></TabsTrigger>
               <TabsTrigger value="guidelines" className="text-xs sm:text-sm px-2 sm:px-3"><Shield className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Guidelines</span><span className="sm:hidden">Rules</span></TabsTrigger>
+              <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Feedback</span><span className="sm:hidden">FB</span>{feedbacks.length > 0 && ` (${feedbacks.length})`}</TabsTrigger>
             </TabsList>
           </div>
 
@@ -1022,6 +1026,42 @@ const AdminPanel = () => {
                     </TableRow>
                   ))}
                   {communityGuidelines.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No guidelines yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Feedback */}
+          <TabsContent value="feedback">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary" /> User Feedback ({feedbacks.length})</h2>
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead className="min-w-[200px]">Message</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {feedbacks.map((fb: any) => (
+                    <TableRow key={fb.id}>
+                      <TableCell className="font-medium text-sm">{fb.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{fb.email}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <span key={s} className={s <= fb.rating ? "text-yellow-400" : "text-muted-foreground/30"}>★</span>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[300px]">{fb.message}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(fb.created_at).toLocaleDateString()}</TableCell>
+                    </TableRow>
+                  ))}
+                  {feedbacks.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No feedback yet</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
