@@ -71,13 +71,22 @@ If you get 403 Forbidden:
 2. Ensure your account has access to project byveaoqwuwyhaykgjufj
 3. Or deploy from Supabase Dashboard: Project → Edge Functions → admin-dashboard → Deploy
 
-## Run migrations (for pop_ads, admin_resources, etc.)
+## Run migrations (for pop_ads, admin_resources, hackathons, etc.)
+
+`db push` does **not** take `--project-ref`. Link the project once, then push:
 
 ```bash
-npx supabase db push --project-ref byveaoqwuwyhaykgjufj
+npx supabase login
+npx supabase link --project-ref byveaoqwuwyhaykgjufj
+npx supabase db push
 ```
 
-Or run migrations manually in Supabase Dashboard → SQL Editor.
+**Without CLI:** Supabase Dashboard → **SQL Editor** → paste and run, in order:
+
+1. `supabase/migrations/20260317120000_hackathons_marketplace.sql`
+2. `supabase/migrations/20260318100000_seed_hackathons_sample.sql` (optional sample rows)
+
+Or run migrations manually in Supabase Dashboard → **Database → Migrations** if your workflow uses that.
 
 **Sample hackathons & winner projects:** migration `20260318100000_seed_hackathons_sample.sql` inserts **6 global events** and **10 marketplace projects** (with placeholder GitHub deliverable links). Replace links in **Admin → Hackathons** after deploy. Re-running the migration is safe (`ON CONFLICT DO NOTHING` / upsert deliverables).
 

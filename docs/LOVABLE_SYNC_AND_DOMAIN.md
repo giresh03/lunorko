@@ -53,7 +53,7 @@ Then **redeploy / republish** from Lovable so the build picks up env vars.
 
 After pulling latest `main` in Lovable:
 
-1. Run **Supabase migration** for hackathons (or run SQL from `supabase/migrations/20260317120000_hackathons_marketplace.sql`).
+1. Apply hackathons migrations: `npx supabase link --project-ref byveaoqwuwyhaykgjufj` then `npx supabase db push` (do **not** use `--project-ref` on `db push`). Or run the SQL files in Dashboard → SQL Editor (see `docs/ADMIN_DEPLOY.md`).
 2. **Deploy** edge functions: `admin-dashboard`, `create-razorpay-order`, `verify-razorpay-payment` (see `docs/ADMIN_DEPLOY.md`).
 
 ---

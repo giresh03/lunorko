@@ -58,11 +58,13 @@ export default function Hackathons() {
   const [ownedIds, setOwnedIds] = useState<Set<string>>(new Set());
   const [deliverables, setDeliverables] = useState<Record<string, { deliverable_url: string | null; access_instructions: string | null }>>({});
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const [{ data: h }, { data: rawProjects }] = await Promise.all([
+      const [{ data: h, error: errH }, { data: rawProjects, error: errP }] = await Promise.all([
         supabase.from("hackathons").select("*").eq("is_active", true).order("sort_order", { ascending: true }),
         supabase
           .from("hackathon_projects")
@@ -70,6 +72,16 @@ export default function Hackathons() {
           .eq("is_active", true)
           .order("sort_order", { ascending: true }),
       ]);
+      if (errH || errP) {
+        const msg = errH?.message || errP?.message || "Could not load hackathons data";
+        setLoadError(msg);
+        setHackathons([]);
+        setProjects([]);
+        toast.error(msg.includes("schema") || msg.includes("relation") || msg.includes("does not exist")
+          ? "Hackathons tables are missing — run database migrations (see message below)."
+          : msg);
+        return;
+      }
       setHackathons((h as Hackathon[]) || []);
       const plist = rawProjects || [];
       const hidSet = [...new Set(plist.map((x: { hackathon_id: string | null }) => x.hackathon_id).filter(Boolean))] as string[];
@@ -85,15 +97,21 @@ export default function Hackathons() {
       setProjects(enriched);
 
       if (user) {
-        const { data: buys } = await supabase.from("hackathon_purchases").select("project_id").eq("user_id", user.id);
-        const ids = new Set((buys || []).map((b: { project_id: string }) => b.project_id));
-        setOwnedIds(ids);
-        const del: Record<string, { deliverable_url: string | null; access_instructions: string | null }> = {};
-        for (const pid of ids) {
-          const { data: d } = await supabase.from("hackathon_project_deliverables").select("*").eq("project_id", pid).maybeSingle();
-          if (d) del[pid] = { deliverable_url: d.deliverable_url, access_instructions: d.access_instructions };
+        const { data: buys, error: buyErr } = await supabase.from("hackathon_purchases").select("project_id").eq("user_id", user.id);
+        if (buyErr) {
+          console.warn("[Hackathons] purchases query:", buyErr.message);
+          setOwnedIds(new Set());
+          setDeliverables({});
+        } else {
+          const ids = new Set((buys || []).map((b: { project_id: string }) => b.project_id));
+          setOwnedIds(ids);
+          const del: Record<string, { deliverable_url: string | null; access_instructions: string | null }> = {};
+          for (const pid of ids) {
+            const { data: d } = await supabase.from("hackathon_project_deliverables").select("*").eq("project_id", pid).maybeSingle();
+            if (d) del[pid] = { deliverable_url: d.deliverable_url, access_instructions: d.access_instructions };
+          }
+          setDeliverables(del);
         }
-        setDeliverables(del);
       } else {
         setOwnedIds(new Set());
         setDeliverables({});
@@ -193,11 +211,34 @@ export default function Hackathons() {
           )}
         </div>
 
+        {loadError && (
+          <div className="max-w-3xl mx-auto mb-10 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left text-sm">
+            <p className="font-semibold text-destructive">Database setup required</p>
+            <p className="mt-2 text-muted-foreground">
+              The hackathons tables are not on this Supabase project yet, or the query failed:{" "}
+              <code className="text-xs break-all">{loadError}</code>
+            </p>
+            <p className="mt-3 text-foreground">
+              <strong>Fix (CLI):</strong> from the project repo, run:
+            </p>
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 text-xs">
+{`npx supabase login
+npx supabase link --project-ref byveaoqwuwyhaykgjufj
+npx supabase db push`}
+            </pre>
+            <p className="mt-3 text-muted-foreground">
+              <strong>Or</strong> open Supabase Dashboard → SQL Editor and run the SQL files in{" "}
+              <code className="text-xs">supabase/migrations/</code> for hackathons (see{" "}
+              <code className="text-xs">docs/ADMIN_DEPLOY.md</code>).
+            </p>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-20">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
           </div>
-        ) : (
+        ) : loadError ? null : (
           <>
             <section className="mb-16">
               <h2 className="text-xl font-semibold text-foreground mb-6 flex items-center gap-2">
