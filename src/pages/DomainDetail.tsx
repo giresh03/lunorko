@@ -121,6 +121,78 @@ const ArticleCard = ({ resource }: { resource: Resource }) => (
   </a>
 );
 
+const PdfCard = ({ resource }: { resource: Resource }) => {
+  const [showViewer, setShowViewer] = useState(false);
+  
+  return (
+    <>
+      <div className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/30 hover:-translate-y-1 hover:shadow-lg">
+        <div className="flex gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+            <FileText className="h-7 w-7 text-red-400" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1.5 flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px] bg-red-500/10 text-red-400 border-red-500/20">PDF</Badge>
+              {resource.source && (
+                <Badge variant="outline" className={`text-[10px] ${sourceColors[resource.source] || "border-border"}`}>
+                  {resource.source}
+                </Badge>
+              )}
+              {resource.duration && (
+                <Badge variant="outline" className="text-[10px] border-border text-muted-foreground">
+                  {resource.duration}
+                </Badge>
+              )}
+            </div>
+            <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+              {resource.title}
+            </h4>
+            {resource.description && (
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{resource.description}</p>
+            )}
+            <div className="mt-3 flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setShowViewer(true)}>
+                <Eye className="mr-1.5 h-3.5 w-3.5" /> Read Online
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
+                <a href={resource.url} download target="_blank" rel="noopener noreferrer">
+                  <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                </a>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {showViewer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-5xl h-[85vh] rounded-xl border border-border bg-card shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+              <h3 className="text-sm font-semibold text-foreground truncate">{resource.title}</h3>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
+                  <a href={resource.url} download target="_blank" rel="noopener noreferrer">
+                    <Download className="mr-1.5 h-3.5 w-3.5" /> Download
+                  </a>
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setShowViewer(false)}>
+                  ✕ Close
+                </Button>
+              </div>
+            </div>
+            <iframe
+              src={`${resource.url}#toolbar=1&navpanes=1`}
+              className="flex-1 w-full"
+              title={resource.title}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 const DomainDetail = () => {
   const { domainId } = useParams();
   const domain = domains.find((d) => d.id === domainId);
