@@ -689,18 +689,37 @@ const DomainDetail = () => {
 
           {/* Materials Tab */}
           <TabsContent value="materials">
-            {articles.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {articles.map((r) => (
-                  <ArticleCard key={r.id} resource={r} />
-                ))}
+            {pdfs.length > 0 && (
+              <div className="mb-8">
+                <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-red-400" /> PDF Documents
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {pdfs.map((r) => (
+                    <PdfCard key={r.id} resource={r} />
+                  ))}
+                </div>
               </div>
-            ) : (
+            )}
+            {articles.length > 0 ? (
+              <>
+                {pdfs.length > 0 && (
+                  <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
+                    <BookMarked className="h-5 w-5 text-primary" /> Articles & Guides
+                  </h3>
+                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {articles.map((r) => (
+                    <ArticleCard key={r.id} resource={r} />
+                  ))}
+                </div>
+              </>
+            ) : pdfs.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-card/50 p-16 text-center">
                 <FileText className="mx-auto h-12 w-12 text-muted-foreground/30" />
                 <p className="mt-4 text-muted-foreground">Materials coming soon. Check back later!</p>
               </div>
-            )}
+            ) : null}
           </TabsContent>
         </Tabs>
       </main>
