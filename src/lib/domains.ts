@@ -31,7 +31,7 @@ export interface Domain {
 export interface Resource {
   id: string;
   title: string;
-  type: "video" | "article" | "course";
+  type: "video" | "article" | "course" | "pdf";
   source: string;
   url: string;
   duration?: string;
