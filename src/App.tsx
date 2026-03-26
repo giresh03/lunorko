@@ -27,6 +27,7 @@ import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
 import Hackathons from "./pages/Hackathons";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
+import AuthEntryModal from "./components/AuthEntryModal";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const AppContent = () => {
   return (
     <BrowserRouter>
       <PopAd />
+      <AuthEntryModal />
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/domains" element={<Domains />} />

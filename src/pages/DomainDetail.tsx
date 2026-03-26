@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useDashboard } from "@/hooks/useDashboard";
 import { domains, type Resource } from "@/lib/domains";
+import DomainGuidanceJourney from "@/components/domain/DomainGuidanceJourney";
 import { supabase } from "@/integrations/supabase/client";
 
 const sourceColors: Record<string, string> = {
@@ -388,7 +389,8 @@ const DomainDetail = () => {
           </TabsList>
 
           {/* Guidance Tab */}
-          <TabsContent value="guidance">
+          <TabsContent value="guidance" className="space-y-10">
+            <DomainGuidanceJourney domain={domain} />
             <div className="grid gap-8 lg:grid-cols-5">
               {/* Roadmap - wider */}
               <div className="lg:col-span-3">
