@@ -183,12 +183,36 @@ const AdminPanel = () => {
       toast({ title: "Title is required", variant: "destructive" });
       return;
     }
-    if (!resourceForm.url?.trim()) {
+
+    let fileUrl = resourceForm.url;
+
+    // Upload PDF if selected
+    if (pdfFile && resourceForm.resource_type === "pdf") {
+      setUploadingPdf(true);
+      try {
+        const fileName = `${Date.now()}-${pdfFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        const filePath = `${resourceForm.domain_id}/${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from("resources")
+          .upload(filePath, pdfFile, { contentType: "application/pdf" });
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from("resources").getPublicUrl(filePath);
+        fileUrl = urlData.publicUrl;
+      } catch (e: any) {
+        toast({ title: "PDF upload failed", description: e?.message, variant: "destructive" });
+        setUploadingPdf(false);
+        return;
+      }
+      setUploadingPdf(false);
+    }
+
+    if (!fileUrl?.trim() && resourceForm.resource_type !== "pdf") {
       toast({ title: "URL is required", variant: "destructive" });
       return;
     }
+
     try {
-      const payload = { ...resourceForm, sort_order: Number(resourceForm.sort_order), action: editingResource ? "update-resource" : "add-resource" };
+      const payload = { ...resourceForm, url: fileUrl, sort_order: Number(resourceForm.sort_order), action: editingResource ? "update-resource" : "add-resource" };
       if (editingResource) {
         await callAdmin("update-resource", "POST", { id: editingResource.id, ...payload });
         toast({ title: "Resource updated" });
@@ -198,6 +222,7 @@ const AdminPanel = () => {
       }
       setResourceDialog(false);
       setEditingResource(null);
+      setPdfFile(null);
       setResourceForm({ domain_id: "web-development", title: "", resource_type: "video", source: "Custom", url: "", duration: "", thumbnail: "", description: "", sort_order: 0 });
       fetchAll();
     } catch (e: any) {
