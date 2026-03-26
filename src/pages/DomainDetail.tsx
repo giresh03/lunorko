@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
   CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
-  TrendingUp, Zap, Bookmark, CalendarDays
+  TrendingUp, Zap, Bookmark, CalendarDays, Download, Eye
 } from "lucide-react";
 import VideoLearningHub from "@/components/VideoLearningHub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
