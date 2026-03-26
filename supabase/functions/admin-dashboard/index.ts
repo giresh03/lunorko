@@ -115,15 +115,20 @@ serve(async (req) => {
           description: rest.description ?? null,
           sort_order: Number(rest.sort_order) || 0,
           is_active: rest.is_active !== false,
-          updated_at: new Date().toISOString(),
         };
         const { error } = await adminClient.from("admin_resources").insert(insertData);
         if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (action === "update-resource") {
-        const { id, ...updates } = body as Record<string, unknown>;
-        const { error } = await adminClient.from("admin_resources").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id);
+        const { id, action: _act, ...updates } = body as Record<string, unknown>;
+        const cleanUpdates: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(updates)) {
+          if (["domain_id","title","resource_type","source","url","duration","thumbnail","description","sort_order","is_active"].includes(k)) {
+            cleanUpdates[k] = v;
+          }
+        }
+        const { error } = await adminClient.from("admin_resources").update(cleanUpdates).eq("id", id);
         if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -135,13 +140,13 @@ serve(async (req) => {
 
       if (action === "add-pop-ad") {
         const { id: _id, action: _a, ...rest } = body as Record<string, unknown>;
-        const { error } = await adminClient.from("pop_ads").insert({ ...rest, updated_at: new Date().toISOString() });
+        const { error } = await adminClient.from("pop_ads").insert({ ...rest });
         if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (action === "update-pop-ad") {
-        const { id, ...updates } = body as Record<string, unknown>;
-        const { error } = await adminClient.from("pop_ads").update({ ...updates, updated_at: new Date().toISOString() }).eq("id", id);
+        const { id, action: _act, ...updates } = body as Record<string, unknown>;
+        const { error } = await adminClient.from("pop_ads").update(updates).eq("id", id);
         if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
