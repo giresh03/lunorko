@@ -17,6 +17,10 @@ import blockchainImg from "@/assets/domains/blockchain.jpg";
 import uiuxImg from "@/assets/domains/ui-ux.jpg";
 import dsaImg from "@/assets/domains/dsa.jpg";
 import systemDesignImg from "@/assets/domains/system-design.jpg";
+import vlsiImg from "@/assets/domains/vlsi.jpg";
+import powerSystemsImg from "@/assets/domains/power-systems.jpg";
+import signalProcessingImg from "@/assets/domains/signal-processing.jpg";
+import roboticsImg from "@/assets/domains/robotics.jpg";
 
 const domainMarkers: GlobeMarker[] = [
   { lat: 40.71, lng: -74.0, src: webDevImg, label: "Web Development" },
@@ -31,6 +35,10 @@ const domainMarkers: GlobeMarker[] = [
   { lat: 25.2, lng: 55.27, src: uiuxImg, label: "UI/UX Design" },
   { lat: -34.6, lng: -58.38, src: dsaImg, label: "DSA" },
   { lat: 1.35, lng: 103.82, src: systemDesignImg, label: "System Design" },
+  { lat: 13.08, lng: 80.27, src: vlsiImg, label: "VLSI Design" },
+  { lat: 52.52, lng: 13.41, src: powerSystemsImg, label: "Power Systems" },
+  { lat: 37.57, lng: 126.98, src: signalProcessingImg, label: "Signals & Systems" },
+  { lat: 39.9, lng: 116.4, src: roboticsImg, label: "Robotics & Automation" },
 ];
 
 export default function HeroSection() {
