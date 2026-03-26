@@ -11,10 +11,7 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
-    headers: {
-      "Cross-Origin-Embedder-Policy": "credentialless",
-      "Cross-Origin-Opener-Policy": "same-origin",
-    },
+    // No COEP/COOP here — they break embedded previews (Sandpack, iframes) unless every child frame sends matching headers.
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

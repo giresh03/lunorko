@@ -36,6 +36,10 @@ The AI Assistant in Web Development, App Development, and other domains calls th
      ```bash
      supabase secrets set GEMINI_API_KEY=your_gemini_api_key --project-ref byveaoqwuwyhaykgjufj
      ```
+   - Optional: override model (default `gemini-2.5-flash`; older `gemini-2.0-flash` is deprecated):
+     ```bash
+     supabase secrets set GEMINI_MODEL=gemini-2.5-flash --project-ref byveaoqwuwyhaykgjufj
+     ```
    - **Lovable** (fallback): Get key from [Lovable](https://lovable.dev) → Project Settings → API Keys
      ```bash
      supabase secrets set LOVABLE_API_KEY=your_lovable_api_key --project-ref byveaoqwuwyhaykgjufj
@@ -67,13 +71,40 @@ If you get 403 Forbidden:
 2. Ensure your account has access to project byveaoqwuwyhaykgjufj
 3. Or deploy from Supabase Dashboard: Project → Edge Functions → admin-dashboard → Deploy
 
-## Run migrations (for pop_ads, admin_resources, etc.)
+## Run migrations (for pop_ads, admin_resources, hackathons, etc.)
+
+`db push` does **not** take `--project-ref`. Link the project once, then push:
 
 ```bash
-npx supabase db push --project-ref byveaoqwuwyhaykgjufj
+npx supabase login
+npx supabase link --project-ref byveaoqwuwyhaykgjufj
+npx supabase db push
 ```
 
-Or run migrations manually in Supabase Dashboard → SQL Editor.
+### “Found local migration files to be inserted before the last migration on remote”
+
+**What it means:** Your **remote** database already recorded a **newer** migration as applied (e.g. hackathons), but an **older** migration file in the repo (e.g. `20260316174242_...sql` — security fix dropping a permissive policy on `subscriptions`) was never applied or never recorded. Supabase refuses a normal `db push` so history stays consistent.
+
+**Fix (recommended):** apply pending migrations including those “out of order”:
+
+```bash
+npx supabase db push --include-all
+```
+
+Use `--yes` if the CLI asks for confirmation. This is the supported way to reconcile local files with remote history.
+
+**Why it happens:** Migrations were applied on the server in a different order (manual SQL, another machine, or only some files pushed), or a migration was added to git with a timestamp **between** two migrations already on production.
+
+**If `--include-all` fails:** In Dashboard → **Database → Migrations**, inspect what’s applied. Advanced recovery: `supabase migration repair` (see [Supabase CLI docs](https://supabase.com/docs/guides/cli/managing-environments)) — only if you know what you’re doing.
+
+**Without CLI:** Supabase Dashboard → **SQL Editor** → paste and run, in order:
+
+1. `supabase/migrations/20260317120000_hackathons_marketplace.sql`
+2. `supabase/migrations/20260318100000_seed_hackathons_sample.sql` (optional sample rows)
+
+Or run migrations manually in Supabase Dashboard → **Database → Migrations** if your workflow uses that.
+
+**Sample hackathons & winner projects:** migration `20260318100000_seed_hackathons_sample.sql` inserts **6 global events** and **10 marketplace projects** (with placeholder GitHub deliverable links). Replace links in **Admin → Hackathons** after deploy. Re-running the migration is safe (`ON CONFLICT DO NOTHING` / upsert deliverables).
 
 ## Remove user manually (if admin panel fails)
 
