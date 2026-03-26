@@ -214,7 +214,7 @@ const DomainDetail = () => {
         const mapped: Resource[] = data.map((r: any) => ({
           id: r.id,
           title: r.title,
-          type: (r.resource_type === "material" ? "article" : r.resource_type) as "video" | "article" | "course",
+          type: (r.resource_type === "material" ? "article" : r.resource_type) as "video" | "article" | "course" | "pdf",
           source: r.source,
           url: r.url,
           duration: r.duration,
