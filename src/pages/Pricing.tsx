@@ -153,7 +153,7 @@ const Pricing = () => {
     });
 
   const handleSubscribe = useCallback(
-    async (plan: typeof plans[0]) => {
+    async (plan: { id: string; name: string; amountPaise: number }) => {
       if (!user) {
         toast.error("Please sign in first");
         return;
