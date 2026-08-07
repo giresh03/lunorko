@@ -155,6 +155,65 @@ export type Database = {
         }
         Relationships: []
       }
+      assistant_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_threads: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           created_at: string
@@ -769,24 +828,39 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          onboarded_at: string | null
+          resume_filename: string | null
+          resume_url: string | null
           updated_at: string
           user_id: string
+          username: string | null
+          wants_to_join_team: boolean
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
+          onboarded_at?: string | null
+          resume_filename?: string | null
+          resume_url?: string | null
           updated_at?: string
           user_id: string
+          username?: string | null
+          wants_to_join_team?: boolean
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
           id?: string
+          onboarded_at?: string | null
+          resume_filename?: string | null
+          resume_url?: string | null
           updated_at?: string
           user_id?: string
+          username?: string | null
+          wants_to_join_team?: boolean
         }
         Relationships: []
       }
