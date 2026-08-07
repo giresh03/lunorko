@@ -7,10 +7,12 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import GitHubPushDialog from "@/components/GitHubPushDialog";
+import { useGitHub } from "@/hooks/useGitHub";
 import ReactMarkdown from "react-markdown";
 import { editorThemes, getThemeById, type EditorTheme } from "@/lib/editorThemes";
 import { getDomainEnvironment, domainEnvironments } from "@/lib/domainEnvironments";
@@ -488,6 +490,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons">("files");
   const [showAIPanel, setShowAIPanel] = useState(true);
+  const [showGitHub, setShowGitHub] = useState(false);
+  const { status: githubStatus, push: githubPush } = useGitHub();
   const [online, setOnline] = useState(isOnline());
 
   // Sync offline cache on mount
@@ -1474,6 +1478,42 @@ ${jsCode}
   const handleChatSend = useCallback(async (overrideInput?: string) => {
     const input = (overrideInput ?? chatInput).trim();
     if (!input || chatLoading) return;
+
+    // --- Automation: "push / upload this to my github" ---
+    if (/\b(push|upload|export|publish|commit|save|send|deploy)\b[^.!?]{0,60}\bgit\s?hub\b/i.test(input)
+      || /\bgit\s?hub\b[^.!?]{0,40}\b(push|upload|export|repo|repository)\b/i.test(input)) {
+      const filesToPush = flattenFiles(fileTree).map((f) => ({ path: f.path, content: f.content || "" }));
+      setChatInput("");
+      setMessages((prev) => [...prev, { role: "user", content: input }]);
+      if (!filesToPush.length) {
+        setMessages((prev) => [...prev, { role: "assistant", content: "There are no files in this project yet — generate something first, then I'll push it to GitHub." }]);
+        return;
+      }
+      setMessages((prev) => [...prev, { role: "assistant", content: "Pushing your project to GitHub…" }]);
+      try {
+        const nameMatch = input.match(/(?:repo|repository|named|called)\s+["'`]?([A-Za-z0-9._-]{2,60})["'`]?/i);
+        const result = await githubPush(filesToPush, {
+          repo: nameMatch?.[1],
+          private: !/\bpublic\b/i.test(input),
+          commitMessage: "Update from Lunor.AI",
+        });
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: `${result.created ? "Created" : "Updated"} **${result.repo}** with ${result.fileCount} file(s) on \`${result.branch}\`.\n\n[Open repository](${result.repoUrl}) · [View commit](${result.commitUrl})`,
+        }]);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Push failed";
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: /connect your github/i.test(msg)
+            ? "I need access to your GitHub account first — I've opened the connect panel for you."
+            : `GitHub push failed: ${msg}`,
+        }]);
+        setShowGitHub(true);
+      }
+      return;
+    }
+
     // Build FULL project context so follow-up prompts modify the existing build
     const projectFiles = flattenFiles(fileTree);
     const CHAR_BUDGET = 120000;
@@ -2069,6 +2109,15 @@ ${jsCode}
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={handleSaveProject} title="Save Project">
             <Save className="h-3 w-3" />
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[10px]"
+            onClick={() => setShowGitHub(true)}
+            title={githubStatus.connected ? `Push to GitHub (${githubStatus.login})` : "Push to GitHub"}
+          >
+            <Github className="h-3 w-3" />
+          </Button>
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
             {showAIPanel ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
           </Button>
@@ -2082,6 +2131,13 @@ ${jsCode}
           )}
         </div>
       </div>
+
+      <GitHubPushDialog
+        open={showGitHub}
+        onOpenChange={setShowGitHub}
+        files={flattenFiles(fileTree).map((f) => ({ path: f.path, content: f.content || "" }))}
+        projectName={domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Activity bar */}

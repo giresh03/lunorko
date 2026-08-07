@@ -524,6 +524,39 @@ export type Database = {
         }
         Relationships: []
       }
+      github_connections: {
+        Row: {
+          access_token: string
+          auth_type: string
+          created_at: string
+          github_login: string | null
+          id: string
+          last_repo: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          auth_type: string
+          created_at?: string
+          github_login?: string | null
+          id?: string
+          last_repo?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          auth_type?: string
+          created_at?: string
+          github_login?: string | null
+          id?: string
+          last_repo?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mentor_slots: {
         Row: {
           created_at: string
