@@ -146,9 +146,11 @@ Do NOT wrap in markdown code blocks. Return raw JSON only.`,
 
     if (error) throw error;
 
-    return new Response(JSON.stringify(inserted), {
+    const { solution_code: _sc, ...safeInserted } = (inserted || {}) as Record<string, unknown>;
+    return new Response(JSON.stringify(safeInserted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (e) {
     console.error("generate-challenge error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
