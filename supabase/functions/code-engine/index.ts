@@ -784,6 +784,44 @@ ${code}
   }
 }
 
+
+const ADMIN_EMAIL = "lunor.ko@gmail.com";
+const CREDIT_ACTIONS = new Set([
+  "generate",
+  "generate-tests",
+  "generate-docs",
+  "analyze-code",
+  "explain-error",
+  "concept-image",
+  "visual-assets",
+]);
+
+async function chargeCredit(userId: string | null, isAdmin: boolean): Promise<{ ok: boolean; body?: Record<string, unknown> }> {
+  if (isAdmin) return { ok: true };
+  if (!userId) {
+    return { ok: false, body: { error: "Sign in required to use AI credits", code: "auth_required" } };
+  }
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { data, error } = await admin.rpc("consume_ai_credit", { _user_id: userId, _amount: 1 });
+  if (error) {
+    console.error("[credits] consume error:", error);
+    return { ok: false, body: { error: "Could not verify your AI credits", code: "credit_check_failed" } };
+  }
+  const result = data as { allowed: boolean; balance: number; plan_id: string };
+  if (!result?.allowed) {
+    return {
+      ok: false,
+      body: {
+        error: "You've used all your AI credits for this month. Top up 20 credits for ₹50 or upgrade your plan.",
+        code: "credits_exhausted",
+        balance: result?.balance ?? 0,
+        plan_id: result?.plan_id ?? "free",
+      },
+    };
+  }
+  return { ok: true };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -794,12 +832,16 @@ serve(async (req) => {
   }
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const isAnonKey = authHeader === `Bearer ${anonKey}`;
+  let requestUserId: string | null = null;
+  let isAdminUser = false;
   if (!isAnonKey) {
     const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL")!, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
     if (authError || !authUser) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    requestUserId = authUser.id;
+    isAdminUser = (authUser.email || "").toLowerCase() === ADMIN_EMAIL;
   }
 
   try {
@@ -821,6 +863,17 @@ serve(async (req) => {
     const action = body.action as string | undefined;
     const rawDomain = (body.domain as string) || "web-development";
     const domain = typeof rawDomain === "string" ? rawDomain.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "web-development" : "web-development";
+
+    // Credit metering for generative actions
+    if (action && CREDIT_ACTIONS.has(action)) {
+      const charge = await chargeCredit(requestUserId, isAdminUser);
+      if (!charge.ok) {
+        return new Response(JSON.stringify(charge.body), {
+          status: charge.body?.code === "auth_required" ? 401 : 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");

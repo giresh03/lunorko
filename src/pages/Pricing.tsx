@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import { domains } from "@/lib/domains";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useCredits } from "@/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -65,8 +66,8 @@ const plans = [
   {
     id: "pro",
     name: "Pro",
-    price: 50,
-    amountPaise: 5000,
+    price: 150,
+    amountPaise: 15000,
     icon: Star,
     credits: 60,
     color: "from-primary/20 to-primary/5",
@@ -88,8 +89,8 @@ const plans = [
   {
     id: "premium",
     name: "Premium",
-    price: 100,
-    amountPaise: 10000,
+    price: 250,
+    amountPaise: 25000,
     icon: Crown,
     credits: 100,
     color: "from-yellow-500/20 to-yellow-500/5",
@@ -110,8 +111,8 @@ const plans = [
   {
     id: "professional",
     name: "Professional",
-    price: 150,
-    amountPaise: 15000,
+    price: 500,
+    amountPaise: 50000,
     icon: Rocket,
     credits: 150,
     color: "from-primary/20 to-primary/5",
@@ -137,6 +138,7 @@ const Pricing = () => {
   const selectedDomain = domains.find((d) => d.id === selectedDomainId);
   const { user } = useAuth();
   const { getPlanForDomain, refetch } = useSubscription();
+  const { credits, refetch: refetchCredits } = useCredits();
   const [submitting, setSubmitting] = useState(false);
 
   const loadRazorpayScript = (): Promise<void> =>
@@ -153,7 +155,7 @@ const Pricing = () => {
     });
 
   const handleSubscribe = useCallback(
-    async (plan: typeof plans[0]) => {
+    async (plan: { id: string; name: string; amountPaise: number }) => {
       if (!user) {
         toast.error("Please sign in first");
         return;
@@ -191,8 +193,13 @@ const Pricing = () => {
                 },
               });
               if (verifyError) throw verifyError;
-              toast.success("Payment successful! Your subscription is now active.");
+              toast.success(
+                plan.id === "topup"
+                  ? "Top-up successful! 20 credits added."
+                  : "Payment successful! Your subscription is now active."
+              );
               refetch();
+              refetchCredits();
             } catch (err: any) {
               console.error(err);
               toast.error(err.message || "Payment verification failed");
@@ -214,7 +221,7 @@ const Pricing = () => {
         setSubmitting(false);
       }
     },
-    [user, selectedDomainId, selectedDomain, refetch]
+    [user, selectedDomainId, selectedDomain, refetch, refetchCredits]
   );
 
   const currentPlan = user ? getPlanForDomain(selectedDomainId) : "free";
@@ -321,6 +328,41 @@ const Pricing = () => {
               </div>
             );
           })}
+        </div>
+
+        {/* Credit top-up */}
+        <div className="max-w-3xl mx-auto mb-16">
+          <div className="rounded-2xl border border-primary/30 bg-card p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Coins className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-foreground">Need more credits?</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Top up any time — <span className="text-primary font-semibold">₹50 for 20 credits</span>. Top-up credits never
+                expire and are used after your monthly plan credits run out.
+              </p>
+              {credits && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Current balance: <span className="text-foreground font-semibold">{credits.balance} credits</span>{" "}
+                  ({credits.planCredits} plan + {credits.topupCredits} top-up)
+                </p>
+              )}
+            </div>
+            <Button
+              className="w-full sm:w-auto"
+              disabled={!user || submitting}
+              onClick={() => handleSubscribe({ id: "topup", name: "Credit Top-up", amountPaise: 5000 })}
+            >
+              {submitting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+              ) : !user ? (
+                "Sign in to top up"
+              ) : (
+                <><Coins className="mr-2 h-4 w-4" /> Buy 20 credits ₹50</>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Comparison table */}

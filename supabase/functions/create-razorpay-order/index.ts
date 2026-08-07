@@ -29,11 +29,23 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { plan_id, amount, domain_id } = await req.json();
+    const { plan_id, domain_id } = await req.json();
 
-    if (!plan_id || !amount || !domain_id) {
-      return new Response(JSON.stringify({ error: "Missing plan_id, amount, or domain_id" }), { status: 400, headers: corsHeaders });
+    // Server-side price table (never trust client amounts)
+    const PRICES: Record<string, number> = {
+      pro: 15000,
+      premium: 25000,
+      professional: 50000,
+      topup: 5000,
+    };
+
+    if (!plan_id || typeof plan_id !== "string" || !(plan_id in PRICES)) {
+      return new Response(JSON.stringify({ error: "Invalid plan_id" }), { status: 400, headers: corsHeaders });
     }
+    if (plan_id !== "topup" && (!domain_id || typeof domain_id !== "string")) {
+      return new Response(JSON.stringify({ error: "Missing domain_id" }), { status: 400, headers: corsHeaders });
+    }
+    const amount = PRICES[plan_id];
 
     const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
     const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
@@ -52,7 +64,7 @@ serve(async (req) => {
         amount: amount,
         currency: "INR",
         receipt: `s_${userId.slice(0, 8)}_${Date.now()}`,
-        notes: { plan_id, user_id: userId, domain_id },
+        notes: { plan_id, user_id: userId, domain_id: plan_id === "topup" ? "all" : domain_id },
       }),
     });
 

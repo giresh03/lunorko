@@ -6,6 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const ADMIN_EMAIL = "lunor.ko@gmail.com";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -18,6 +20,30 @@ serve(async (req) => {
   const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
   if (authError || !authUser) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  // Credit metering (admin bypasses)
+  if ((authUser.email || "").toLowerCase() !== ADMIN_EMAIL) {
+    const adminClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: creditData, error: creditError } = await adminClient.rpc("consume_ai_credit", {
+      _user_id: authUser.id,
+      _amount: 1,
+    });
+    if (creditError) {
+      console.error("[code-assistant] credit error:", creditError);
+      return new Response(JSON.stringify({ error: "Could not verify your AI credits", code: "credit_check_failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const credit = creditData as { allowed: boolean; balance: number };
+    if (!credit?.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "You've used all your AI credits for this month. Top up 20 credits for ₹50 or upgrade your plan.",
+          code: "credits_exhausted",
+          balance: credit?.balance ?? 0,
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   }
 
   try {
