@@ -92,6 +92,33 @@ export function useSiteAssistant(threadId: string | null) {
     [user],
   );
 
+  // Reuse an existing empty "New chat" thread instead of piling up blanks.
+  const openOrCreateThread = useCallback(async () => {
+    if (!user) return null;
+    if (bootstrapInFlight) return bootstrapInFlight;
+    bootstrapInFlight = (async () => {
+      const { data: blanks } = await supabase
+        .from("assistant_threads")
+        .select("id")
+        .eq("title", "New chat")
+        .order("updated_at", { ascending: false })
+        .limit(5);
+      for (const row of blanks ?? []) {
+        const { count } = await supabase
+          .from("assistant_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("thread_id", row.id);
+        if (!count) return row.id as string;
+      }
+      return await createThread();
+    })();
+    try {
+      return await bootstrapInFlight;
+    } finally {
+      bootstrapInFlight = null;
+    }
+  }, [user, createThread]);
+
   const deleteThread = useCallback(
     async (id: string) => {
       const { error: delErr } = await supabase.from("assistant_threads").delete().eq("id", id);
