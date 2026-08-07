@@ -937,14 +937,21 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 
     // Track which CSS/JS files were already referenced and injected
     const injectedFiles = new Set<string>();
+    const scaffolded = html;
+    const lookup = (fileName: string): string | undefined => {
+      if (allFiles[fileName] != null) return allFiles[fileName];
+      const key = Object.keys(allFiles).find((k) => (k.split("/").pop() || k) === fileName);
+      return key ? allFiles[key] : undefined;
+    };
 
     // Find referenced CSS files and inject inline if they exist in the project
     const cssLinkRegex = /<link[^>]+href=["']([^"']+\.css)["'][^>]*>/gi;
     let cssMatch;
-    while ((cssMatch = cssLinkRegex.exec(htmlContent)) !== null) {
+    while ((cssMatch = cssLinkRegex.exec(scaffolded)) !== null) {
       const cssFileName = cssMatch[1].split("/").pop() || "";
-      if (allFiles[cssFileName]) {
-        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${allFiles[cssFileName]}</style>`);
+      const cssContent = lookup(cssFileName);
+      if (cssContent != null) {
+        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${cssContent}</style>`);
         injectedFiles.add(cssFileName);
       }
     }
@@ -952,13 +959,15 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     // Find referenced JS files and inject inline if they exist in the project
     const jsScriptRegex = /<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/gi;
     let jsMatch;
-    while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
+    while ((jsMatch = jsScriptRegex.exec(scaffolded)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
-        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
+      const jsContent = lookup(jsFileName);
+      if (jsContent != null) {
+        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${jsContent}<\/script>`);
         injectedFiles.add(jsFileName);
       }
     }
+
 
     // Also inject any remaining CSS/JS files that weren't explicitly referenced
     const remainingCss = Object.entries(allFiles)
