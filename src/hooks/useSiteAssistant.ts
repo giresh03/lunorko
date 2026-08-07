@@ -19,6 +19,9 @@ export interface AssistantMessage {
 
 const titleFrom = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 48) || "New chat";
 
+// Shared across mounts so StrictMode double-effects can't create duplicate blank threads.
+let bootstrapInFlight: Promise<string | null> | null = null;
+
 export function useSiteAssistant(threadId: string | null) {
   const { user } = useAuth();
   const navigate = useNavigate();
