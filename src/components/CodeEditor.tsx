@@ -1713,7 +1713,6 @@ ${jsCode}
   const handleResolveError = useCallback(async () => {
     if (!previewError || resolvingError) return;
     setResolvingError(true);
-    setShowChat(true);
     const prompt =
       `The generated site threw a runtime error in the preview. Fix the root cause in the project files.\n` +
       `Error: ${previewError.message}\n` +
@@ -2790,7 +2789,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => handleChatSend()}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />
