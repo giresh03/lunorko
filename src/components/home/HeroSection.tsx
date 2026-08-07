@@ -59,15 +59,16 @@ export default function HeroSection() {
       className="relative overflow-hidden min-h-screen flex items-center"
     >
       {/* Dark background */}
-      <div className="absolute inset-0 bg-[#030712] z-0" />
+      <div className="absolute inset-0 bg-background z-0" />
+      <div className="absolute inset-0 z-0 tech-grid opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
 
       {/* Ambient glow spots */}
       <div
         className="absolute inset-0 z-[1] pointer-events-none"
         style={{ opacity: opacityFade }}
       >
-        <div className="absolute top-1/4 left-[10%] w-[500px] h-[500px] bg-[hsl(239,84%,67%/0.08)] rounded-full blur-[150px]" />
-        <div className="absolute bottom-1/4 right-[10%] w-[400px] h-[400px] bg-[hsl(192,91%,36%/0.06)] rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 left-[10%] w-[500px] h-[500px] bg-[hsl(0,84%,55%/0.08)] rounded-full blur-[150px]" />
+        <div className="absolute bottom-1/4 right-[10%] w-[400px] h-[400px] bg-[hsl(14,92%,58%/0.06)] rounded-full blur-[120px]" />
       </div>
 
       {/* Content + Globe */}
@@ -77,9 +78,9 @@ export default function HeroSection() {
       >
         {/* Left: Text */}
         <div className="flex flex-col items-start text-left max-w-xl">
-          <div className="mb-8 inline-flex items-center gap-2.5 rounded-full border border-[hsl(239,84%,67%/0.25)] bg-[hsl(239,84%,67%/0.06)] px-5 py-2 backdrop-blur-2xl animate-hero-badge">
-            <Sparkles className="h-3.5 w-3.5 text-[hsl(239,84%,67%)] animate-pulse" />
-            <span className="text-xs font-semibold tracking-[0.2em] uppercase text-[hsl(239,84%,67%)]">
+          <div className="mb-8 inline-flex items-center gap-2.5 rounded-full border border-[hsl(0,84%,55%/0.25)] bg-[hsl(0,84%,55%/0.06)] px-5 py-2 backdrop-blur-2xl animate-hero-badge">
+            <Sparkles className="h-3.5 w-3.5 text-[hsl(0,84%,55%)] animate-pulse" />
+            <span className="text-xs font-semibold tracking-[0.2em] uppercase text-[hsl(0,84%,55%)]">
               Next-Gen AI Learning Ecosystem
             </span>
           </div>
@@ -135,19 +136,19 @@ export default function HeroSection() {
             config={{
               radius: 2,
               showAtmosphere: true,
-              atmosphereColor: "#6366f1",
+              atmosphereColor: "#ef4444",
               atmosphereIntensity: 0.6,
               atmosphereBlur: 3,
               autoRotateSpeed: 0.4,
               enableZoom: false,
               enablePan: false,
               showWireframe: true,
-              wireframeColor: "#6366f1",
+              wireframeColor: "#ef4444",
               markerSize: 0.055,
               bumpScale: 0.8,
             }}
           />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-[hsl(239,84%,67%/0.06)] rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-[hsl(0,84%,55%/0.06)] rounded-full blur-[100px] pointer-events-none" />
         </div>
       </div>
 
@@ -158,7 +159,7 @@ export default function HeroSection() {
       >
         <span className="text-[10px] text-[#475569] uppercase tracking-[0.3em]">Scroll</span>
         <div className="h-9 w-5 rounded-full border-2 border-white/10 flex items-start justify-center p-1.5">
-          <div className="h-2 w-1 rounded-full bg-[hsl(239,84%,67%/0.6)] animate-scroll-dot" />
+          <div className="h-2 w-1 rounded-full bg-[hsl(0,84%,55%/0.6)] animate-scroll-dot" />
         </div>
       </div>
     </section>

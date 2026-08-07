@@ -45,7 +45,7 @@ export const domains: Domain[] = [
     name: "Web Development",
     description: "Master HTML, CSS, JavaScript, React, Node.js, and modern web frameworks to build full-stack applications.",
     icon: Globe,
-    color: "168 80% 50%",
+    color: "0 84% 55%",
     image: webDevImg,
     topics: ["HTML/CSS", "JavaScript", "React", "Node.js", "TypeScript", "Next.js", "REST APIs", "GraphQL"],
     resources: [
@@ -68,7 +68,7 @@ export const domains: Domain[] = [
     name: "App Development",
     description: "Build native and cross-platform mobile apps with React Native, Flutter, Swift, and Kotlin.",
     icon: Smartphone,
-    color: "260 60% 55%",
+    color: "6 88% 58%",
     image: appDevImg,
     topics: ["React Native", "Flutter", "Swift", "Kotlin", "iOS", "Android", "Expo", "Firebase"],
     resources: [
@@ -86,7 +86,7 @@ export const domains: Domain[] = [
     name: "Cybersecurity",
     description: "Learn ethical hacking, penetration testing, network security, and protect digital infrastructure.",
     icon: Shield,
-    color: "0 72% 50%",
+    color: "352 82% 52%",
     image: cybersecurityImg,
     topics: ["Ethical Hacking", "Penetration Testing", "Network Security", "Cryptography", "OWASP", "SOC", "Forensics"],
     resources: [
@@ -103,7 +103,7 @@ export const domains: Domain[] = [
     name: "Data Science & ML",
     description: "Explore machine learning, deep learning, data analysis, and AI with Python and TensorFlow.",
     icon: Brain,
-    color: "45 80% 55%",
+    color: "14 90% 55%",
     image: dataScienceImg,
     topics: ["Python", "TensorFlow", "PyTorch", "Pandas", "NumPy", "Scikit-learn", "NLP", "Computer Vision"],
     resources: [
@@ -121,7 +121,7 @@ export const domains: Domain[] = [
     name: "Cloud Computing",
     description: "Master AWS, Azure, GCP, Docker, Kubernetes, and cloud-native architecture.",
     icon: Cloud,
-    color: "200 70% 50%",
+    color: "0 72% 48%",
     image: cloudImg,
     topics: ["AWS", "Azure", "GCP", "Docker", "Kubernetes", "Terraform", "CI/CD", "Serverless"],
     resources: [
@@ -138,7 +138,7 @@ export const domains: Domain[] = [
     name: "DevOps",
     description: "Learn CI/CD pipelines, infrastructure as code, monitoring, and deployment automation.",
     icon: Terminal,
-    color: "340 65% 55%",
+    color: "350 78% 58%",
     image: devopsImg,
     topics: ["Jenkins", "GitHub Actions", "Ansible", "Prometheus", "Grafana", "Linux", "Bash", "Nginx"],
     resources: [
@@ -154,7 +154,7 @@ export const domains: Domain[] = [
     name: "Database Engineering",
     description: "Master SQL, NoSQL, database design, optimization, and distributed systems.",
     icon: Database,
-    color: "168 50% 40%",
+    color: "10 85% 50%",
     image: databaseImg,
     topics: ["PostgreSQL", "MongoDB", "Redis", "MySQL", "Cassandra", "Database Design", "Query Optimization"],
     resources: [
@@ -170,7 +170,7 @@ export const domains: Domain[] = [
     name: "IoT & Embedded",
     description: "Build connected devices with Arduino, Raspberry Pi, MQTT, and edge computing.",
     icon: Wifi,
-    color: "120 50% 45%",
+    color: "358 70% 45%",
     image: iotImg,
     topics: ["Arduino", "Raspberry Pi", "MQTT", "Edge Computing", "Sensors", "ESP32", "Embedded C"],
     resources: [
@@ -186,7 +186,7 @@ export const domains: Domain[] = [
     name: "Blockchain & Web3",
     description: "Develop smart contracts, dApps, and understand blockchain architecture with Solidity.",
     icon: Cpu,
-    color: "280 60% 50%",
+    color: "20 88% 52%",
     image: blockchainImg,
     topics: ["Solidity", "Ethereum", "Smart Contracts", "DeFi", "NFTs", "Web3.js", "Hardhat"],
     resources: [
@@ -201,7 +201,7 @@ export const domains: Domain[] = [
     name: "UI/UX Design",
     description: "Create stunning user interfaces and experiences with Figma, design systems, and prototyping.",
     icon: Palette,
-    color: "320 70% 55%",
+    color: "0 90% 60%",
     image: uiuxImg,
     topics: ["Figma", "Design Systems", "Wireframing", "Prototyping", "User Research", "Accessibility"],
     resources: [
@@ -217,7 +217,7 @@ export const domains: Domain[] = [
     name: "DSA & Competitive",
     description: "Master data structures, algorithms, and competitive programming for placements.",
     icon: BarChart3,
-    color: "30 80% 50%",
+    color: "4 80% 44%",
     image: dsaImg,
     topics: ["Arrays", "Trees", "Graphs", "Dynamic Programming", "Sorting", "Searching", "LeetCode"],
     resources: [
@@ -234,7 +234,7 @@ export const domains: Domain[] = [
     name: "System Design",
     description: "Learn to architect scalable, distributed systems used by top tech companies.",
     icon: Code2,
-    color: "190 60% 45%",
+    color: "345 75% 50%",
     image: systemDesignImg,
     topics: ["Load Balancing", "Caching", "Microservices", "Message Queues", "CAP Theorem", "Sharding"],
     resources: [
@@ -250,7 +250,7 @@ export const domains: Domain[] = [
     name: "VLSI Design",
     description: "Master VLSI chip design, Verilog, VHDL, FPGA programming, and semiconductor fabrication processes.",
     icon: CircuitBoard,
-    color: "250 65% 55%",
+    color: "16 92% 56%",
     image: vlsiImg,
     topics: ["Verilog", "VHDL", "FPGA", "ASIC Design", "Digital Logic", "Semiconductor Physics", "RTL Design", "Cadence/Synopsys"],
     resources: [
@@ -266,7 +266,7 @@ export const domains: Domain[] = [
     name: "Power Systems",
     description: "Learn electrical power generation, transmission, distribution, and renewable energy systems.",
     icon: Zap,
-    color: "35 85% 50%",
+    color: "0 65% 40%",
     image: powerSystemsImg,
     topics: ["Power Generation", "Transmission Lines", "Transformers", "Switchgear", "Renewable Energy", "Smart Grid", "Power Electronics", "Protection Systems"],
     resources: [
@@ -282,7 +282,7 @@ export const domains: Domain[] = [
     name: "Signals & Systems",
     description: "Master signal processing, communication systems, DSP, and control systems engineering.",
     icon: Radio,
-    color: "170 65% 45%",
+    color: "8 86% 62%",
     image: signalProcessingImg,
     topics: ["DSP", "Fourier Transform", "Laplace Transform", "Z-Transform", "Filters", "Communication Systems", "Control Systems", "MATLAB"],
     resources: [
@@ -298,7 +298,7 @@ export const domains: Domain[] = [
     name: "Robotics & Automation",
     description: "Build intelligent robots with mechatronics, ROS, PLC programming, and industrial automation.",
     icon: Bot,
-    color: "355 70% 50%",
+    color: "354 84% 46%",
     image: roboticsImg,
     topics: ["ROS", "PLC Programming", "Mechatronics", "Kinematics", "Servo Motors", "Computer Vision", "Industrial Automation", "SCADA"],
     resources: [

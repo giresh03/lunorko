@@ -128,7 +128,7 @@ function ParticleField() {
         </bufferGeometry>
         <pointsMaterial
           size={0.035}
-          color="#818cf8"
+          color="#f87171"
           transparent
           opacity={0.7}
           sizeAttenuation
@@ -140,7 +140,7 @@ function ParticleField() {
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={PARTICLE_COUNT * 2} array={linePositions} itemSize={3} />
         </bufferGeometry>
-        <lineBasicMaterial color="#6366f1" transparent opacity={0.08} blending={THREE.AdditiveBlending} />
+        <lineBasicMaterial color="#ef4444" transparent opacity={0.08} blending={THREE.AdditiveBlending} />
       </lineSegments>
     </>
   );
@@ -212,7 +212,7 @@ function OrbitingDomainCard({
         <mesh ref={meshRef}>
           <planeGeometry args={[1.6, 0.7]} />
           <meshBasicMaterial
-            color="#1e1b4b"
+            color="#1a0a0a"
             transparent
             opacity={0.65}
           />
@@ -221,7 +221,7 @@ function OrbitingDomainCard({
         <mesh position={[0, 0, -0.01]}>
           <planeGeometry args={[1.68, 0.78]} />
           <meshBasicMaterial
-            color="#6366f1"
+            color="#ef4444"
             transparent
             opacity={0.15}
           />
@@ -275,7 +275,7 @@ function OrbitRing({ radius }: { radius: number }) {
 
   return (
     <lineLoop ref={ref} geometry={geometry}>
-      <lineBasicMaterial color="#6366f1" transparent opacity={0.06} />
+      <lineBasicMaterial color="#ef4444" transparent opacity={0.06} />
     </lineLoop>
   );
 }
@@ -315,11 +315,11 @@ export default function HeroParticleField() {
         <ParticleField />
 
         {/* Glow orbs for ambient depth */}
-        <GlowOrb position={[-5, 3, -6]} color="#6366f1" scale={3} />
-        <GlowOrb position={[4, -2, -5]} color="#06b6d4" scale={2.5} />
-        <GlowOrb position={[0, 4, -8]} color="#8b5cf6" scale={2.8} />
+        <GlowOrb position={[-5, 3, -6]} color="#ef4444" scale={3} />
+        <GlowOrb position={[4, -2, -5]} color="#f97316" scale={2.5} />
+        <GlowOrb position={[0, 4, -8]} color="#dc2626" scale={2.8} />
         <GlowOrb position={[-3, -4, -4]} color="#14b8a6" scale={2} />
-        <GlowOrb position={[6, 1, -7]} color="#a855f7" scale={2.2} />
+        <GlowOrb position={[6, 1, -7]} color="#f43f5e" scale={2.2} />
 
         {/* Orbit ring */}
         <OrbitRing radius={7} />

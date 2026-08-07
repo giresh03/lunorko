@@ -32,7 +32,7 @@ const difficultyColors: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
   recruiting: "bg-primary/10 text-primary border-primary/20",
-  "in-progress": "bg-blue-500/10 text-blue-500 border-blue-500/20",
+  "in-progress": "bg-primary/10 text-primary border-primary/20",
   completed: "bg-green-500/10 text-green-500 border-green-500/20",
 };
 

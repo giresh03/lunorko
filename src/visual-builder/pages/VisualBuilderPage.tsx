@@ -20,7 +20,7 @@ function ExportButton() {
   return (
     <button
       onClick={handleExport}
-      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-md"
+      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary rounded-md"
       title="Copy JSON schema"
     >
       <Code className="h-4 w-4" />
@@ -40,7 +40,7 @@ function PreviewButton() {
   return (
     <button
       onClick={handlePreview}
-      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-200 hover:text-white hover:bg-slate-600 rounded-md"
+      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground hover:text-white hover:bg-muted-foreground rounded-md"
       title="Preview in new tab"
     >
       <Eye className="h-4 w-4" />
@@ -85,13 +85,13 @@ export default function VisualBuilderPage() {
   }, [selectedId, deleteElement, undo, redo]);
 
   return (
-    <div className="h-screen flex flex-col bg-slate-900">
+    <div className="h-screen flex flex-col bg-card">
       {/* Top toolbar */}
-      <header className="h-14 flex items-center justify-between px-4 bg-slate-800 border-b border-slate-600 shrink-0">
+      <header className="h-14 flex items-center justify-between px-4 bg-card border-b border-muted-foreground shrink-0">
         <div className="flex items-center gap-4">
           <Link
             to="/"
-            className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-white transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -101,14 +101,14 @@ export default function VisualBuilderPage() {
             type="text"
             value={page.name}
             onChange={(e) => setPageName(e.target.value)}
-            className="px-2 py-1 text-sm font-medium text-white bg-slate-700 border border-slate-600 rounded w-40"
+            className="px-2 py-1 text-sm font-medium text-white bg-card border border-muted-foreground rounded w-40"
           />
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={undo}
             disabled={!canUndo}
-            className="p-2 rounded text-slate-300 hover:text-white hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="p-2 rounded text-foreground hover:text-white hover:bg-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
             title="Undo (Ctrl+Z)"
           >
             <Undo2 className="h-4 w-4" />
@@ -116,13 +116,13 @@ export default function VisualBuilderPage() {
           <button
             onClick={redo}
             disabled={!canRedo}
-            className="p-2 rounded text-slate-300 hover:text-white hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="p-2 rounded text-foreground hover:text-white hover:bg-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
             title="Redo (Ctrl+Shift+Z)"
           >
             <Redo2 className="h-4 w-4" />
           </button>
           <PreviewButton />
-          <span className="text-xs text-slate-500 hidden lg:inline">Del: delete • Ctrl+D: duplicate</span>
+          <span className="text-xs text-muted-foreground hidden lg:inline">Del: delete • Ctrl+D: duplicate</span>
           <PreviewButton />
           <ExportButton />
         </div>

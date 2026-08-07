@@ -35,9 +35,9 @@ interface Comment {
 }
 
 const typeConfig: Record<string, { label: string; color: string }> = {
-  discussion: { label: "💬 Discussion", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  discussion: { label: "💬 Discussion", color: "bg-primary/10 text-primary border-primary/20" },
   project: { label: "🚀 Project", color: "bg-green-500/10 text-green-500 border-green-500/20" },
-  code: { label: "💻 Code", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
+  code: { label: "💻 Code", color: "bg-primary/10 text-primary border-primary/20" },
   doubt: { label: "❓ Doubt", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
 };
 

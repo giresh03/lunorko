@@ -419,8 +419,8 @@ const AdminPanel = () => {
         {stats && (
           <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5 mb-6 sm:mb-8">
             {[
-              { label: "Site Visitors", value: stats.totalVisitors, icon: Eye, color: "text-cyan-400" },
-              { label: "Registered Users", value: stats.totalUsers, icon: Users, color: "text-blue-400" },
+              { label: "Site Visitors", value: stats.totalVisitors, icon: Eye, color: "text-primary" },
+              { label: "Registered Users", value: stats.totalUsers, icon: Users, color: "text-primary" },
               { label: "Paid Users", value: stats.totalPaidUsers, icon: UserCheck, color: "text-green-400" },
               { label: "Revenue (₹)", value: `₹${Number(stats.totalRevenue ?? 0).toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
               { label: "Bookings", value: stats.totalBookings, icon: Calendar, color: "text-pink-400" },
@@ -458,7 +458,7 @@ const AdminPanel = () => {
             {/* Visitor Trends Chart */}
             <div className="rounded-xl border border-border bg-card p-6 mb-6">
               <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-cyan-400" /> Visitor Trends (Last 30 Days)
+                <TrendingUp className="h-5 w-5 text-primary" /> Visitor Trends (Last 30 Days)
               </h3>
               {visitorTrends.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>

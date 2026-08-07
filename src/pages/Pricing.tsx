@@ -114,7 +114,7 @@ const plans = [
     amountPaise: 15000,
     icon: Rocket,
     credits: 150,
-    color: "from-purple-500/20 to-purple-500/5",
+    color: "from-primary/20 to-primary/5",
     access: {
       "Credits / month": "150",
       "Domain Access": true,

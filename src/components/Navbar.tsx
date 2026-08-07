@@ -100,18 +100,18 @@ const Navbar = () => {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden items-center gap-1 md:flex">
+          <div className="hidden items-center gap-0.5 md:flex">
             {navLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
-                className="relative px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground group"
+                className="nav-underline relative px-3 py-2 text-sm font-medium text-muted-foreground rounded-lg transition-all duration-300 hover:text-foreground hover:bg-primary/5"
               >
                 {link.label}
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-0 bg-primary rounded-full transition-all duration-300 group-hover:w-3/4" />
               </Link>
             ))}
           </div>
+
 
           {/* Right section */}
           <div className="hidden items-center gap-2 md:flex">
@@ -189,6 +189,7 @@ const Navbar = () => {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="btn-outline-glow bg-transparent border-border/70"
                     disabled={googleLoading}
                     onClick={async () => {
                       setGoogleLoading(true);
@@ -199,14 +200,21 @@ const Navbar = () => {
                     {googleLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <GoogleIcon />}
                     <span className="ml-1.5">Google</span>
                   </Button>
-                  <Button variant="ghost" size="sm" asChild>
+                  <Button variant="ghost" size="sm" asChild className="nav-underline relative font-medium text-muted-foreground hover:text-foreground hover:bg-transparent">
                     <Link to="/auth">Sign In</Link>
                   </Button>
-                  <Button size="sm" asChild className="shadow-md shadow-primary/20">
-                    <Link to="/auth">Get Started</Link>
+                  <Button
+                    size="sm"
+                    asChild
+                    className="btn-sheen font-semibold bg-gradient-to-r from-primary to-primary-glow text-primary-foreground border border-primary/40 shadow-glow"
+                  >
+                    <Link to="/auth">
+                      Get Started <span className="ml-1.5 inline-block transition-transform duration-300 group-hover:translate-x-1">→</span>
+                    </Link>
                   </Button>
                 </div>
               )
+
             )}
           </div>
 
