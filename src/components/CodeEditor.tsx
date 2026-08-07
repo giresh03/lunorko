@@ -1357,8 +1357,32 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
-    // Add file context to the user message
-    const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
+    // Build FULL project context so follow-up prompts modify the existing build
+    const projectFiles = flattenFiles(fileTree);
+    const CHAR_BUDGET = 40000;
+    const PER_FILE = 9000;
+    let used = 0;
+    const fileBlocks: string[] = [];
+    // Active file first so the AI focuses on what the user is looking at
+    const ordered = [...projectFiles].sort((a, b) => {
+      if (activeTab && a.path === activeTab.id) return -1;
+      if (activeTab && b.path === activeTab.id) return 1;
+      return 0;
+    });
+    for (const f of ordered) {
+      if (used >= CHAR_BUDGET) break;
+      const body = (f.content || "").slice(0, PER_FILE);
+      used += body.length;
+      fileBlocks.push(`${f.path}\n\`\`\`${f.language || getLang(f.name)}\n${body}\n\`\`\``);
+    }
+    const fileContext = projectFiles.length
+      ? `\n\n---\n[CURRENT PROJECT STATE — ${projectFiles.length} file(s). This is the website/app already built. Treat my request above as an EDIT to these files.]\n` +
+        `Files: ${projectFiles.map((f) => f.path).join(", ")}\n` +
+        (activeTab ? `Currently open file: ${activeTab.id}\n` : "") +
+        `\n${fileBlocks.join("\n\n")}\n\n` +
+        `[EDIT RULES: Reuse the EXACT file paths above when changing a file. Return the COMPLETE updated file content (never diffs, never "// rest unchanged"). Only return the files that actually change. Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
+      : "";
+
     const userMsg: Message = { role: "user", content: chatInput };
     const updated = [...messages, userMsg];
     setMessages(updated);
