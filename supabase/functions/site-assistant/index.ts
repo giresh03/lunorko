@@ -53,6 +53,31 @@ Deno.serve(async (req) => {
     const key = Deno.env.get('LOVABLE_API_KEY');
     if (!key) return json({ error: 'Assistant is not configured' }, 500);
 
+    // ---- AI credit enforcement (admin exempt) ----
+    const email = String(claimsData?.claims?.email ?? '').toLowerCase();
+    const isAdmin = email === 'lunor.ko@gmail.com';
+    if (!isAdmin) {
+      const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      const { data: credit, error: creditErr } = await admin.rpc('consume_ai_credit', {
+        _user_id: userId,
+        _amount: 1,
+      });
+      if (creditErr) {
+        console.error('consume_ai_credit failed', creditErr);
+        return json({ error: 'Could not verify your AI credits.' }, 500);
+      }
+      if (!credit?.allowed) {
+        return json(
+          {
+            error: 'You are out of AI credits. Top up to keep chatting with your assistant.',
+            code: 'credits_exhausted',
+            balance: credit?.balance ?? 0,
+          },
+          402,
+        );
+      }
+    }
+
     // ---- Personal context (RLS-scoped to this user) ----
     const [profileRes, xpRes, progressRes, bookmarkRes, activityRes] = await Promise.all([
       supabase.from('profiles').select('username, display_name, wants_to_join_team').eq('user_id', userId).maybeSingle(),
