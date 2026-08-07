@@ -2109,6 +2109,15 @@ ${jsCode}
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={handleSaveProject} title="Save Project">
             <Save className="h-3 w-3" />
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[10px]"
+            onClick={() => setShowGitHub(true)}
+            title={githubStatus.connected ? `Push to GitHub (${githubStatus.login})` : "Push to GitHub"}
+          >
+            <Github className="h-3 w-3" />
+          </Button>
           <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
             {showAIPanel ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
           </Button>
@@ -2122,6 +2131,13 @@ ${jsCode}
           )}
         </div>
       </div>
+
+      <GitHubPushDialog
+        open={showGitHub}
+        onOpenChange={setShowGitHub}
+        files={flattenFiles(fileTree).map((f) => ({ path: f.path, content: f.content || "" }))}
+        projectName={domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Activity bar */}
