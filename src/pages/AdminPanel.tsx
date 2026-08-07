@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
   CheckCircle, XCircle, Receipt, Video, Megaphone,
-  MessageSquare, Ban, UserPlus
+  MessageSquare, Ban, UserPlus, Briefcase, FileText
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -52,9 +52,19 @@ const AdminPanel = () => {
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [communityGuidelines, setCommunityGuidelines] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [applicants, setApplicants] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  const viewResume = async (path: string) => {
+    const { data, error } = await supabase.storage.from("resumes").createSignedUrl(path, 300);
+    if (error || !data?.signedUrl) {
+      toast({ title: "Could not open resume", description: error?.message || "File missing", variant: "destructive" });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
 
   // Resource form
   const [resourceDialog, setResourceDialog] = useState(false);
@@ -171,6 +181,13 @@ const AdminPanel = () => {
       setCommunityPosts(Array.isArray(communityPostsData) ? communityPostsData : []);
       setCommunityGuidelines(Array.isArray(guidelinesData) ? guidelinesData : []);
       setFeedbacks(Array.isArray(feedbackData) ? feedbackData : []);
+
+      const { data: applicantData } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, resume_url, resume_filename, created_at")
+        .eq("wants_to_join_team", true)
+        .order("created_at", { ascending: false });
+      setApplicants(applicantData ?? []);
     } catch (e: any) {
       console.error(e);
       toast({
@@ -449,6 +466,7 @@ const AdminPanel = () => {
               <TabsTrigger value="pop-ads" className="text-xs sm:text-sm px-2 sm:px-3"><Megaphone className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Ads</TabsTrigger>
               <TabsTrigger value="community" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Community</span><span className="sm:hidden">Com</span></TabsTrigger>
               <TabsTrigger value="guidelines" className="text-xs sm:text-sm px-2 sm:px-3"><Shield className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Guidelines</span><span className="sm:hidden">Rules</span></TabsTrigger>
+              <TabsTrigger value="talent" className="text-xs sm:text-sm px-2 sm:px-3"><Briefcase className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Talent</span><span className="sm:hidden">Team</span>{applicants.length > 0 && ` (${applicants.length})`}</TabsTrigger>
               <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Feedback</span><span className="sm:hidden">FB</span>{feedbacks.length > 0 && ` (${feedbacks.length})`}</TabsTrigger>
             </TabsList>
           </div>
@@ -1105,6 +1123,41 @@ const AdminPanel = () => {
           </TabsContent>
 
           {/* Feedback */}
+          <TabsContent value="talent">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> Team Applicants ({applicants.length})</h2>
+            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Display Name</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Resume</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {applicants.map((a: any) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-medium text-sm">{a.username || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{a.display_name || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {a.resume_url ? (
+                          <Button size="sm" variant="outline" onClick={() => viewResume(a.resume_url)}>
+                            <FileText className="mr-1.5 h-3.5 w-3.5" /> View resume
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No file</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {applicants.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No team applicants yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
           <TabsContent value="feedback">
             <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary" /> User Feedback ({feedbacks.length})</h2>
             <div className="rounded-xl border border-border bg-card overflow-x-auto">

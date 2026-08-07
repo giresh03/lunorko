@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, User, LayoutDashboard, Shield, Loader2, Trophy, Radar, FileText, CreditCard, Video } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Shield, Loader2, Trophy, Radar, FileText, CreditCard, Video, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -148,6 +148,11 @@ const Navbar = () => {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <Link to="/assistant" className="cursor-pointer">
+                          <Sparkles className="mr-2 h-4 w-4" /> AI Assistant
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <Link to="/skill-radar" className="cursor-pointer">
                           <Radar className="mr-2 h-4 w-4" /> Skill Radar
                         </Link>
@@ -244,6 +249,9 @@ const Navbar = () => {
                   <>
                     <Link to="/dashboard" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <LayoutDashboard className="h-4 w-4" /> Dashboard
+                    </Link>
+                    <Link to="/assistant" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <Sparkles className="h-4 w-4" /> AI Assistant
                     </Link>
                     <Link to="/skill-radar" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <Radar className="h-4 w-4" /> Skill Radar

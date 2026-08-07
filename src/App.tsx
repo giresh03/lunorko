@@ -25,8 +25,11 @@ import ProjectBuilder from "./pages/ProjectBuilder";
 import AIVideoInterview from "./pages/AIVideoInterview";
 import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
 import GitHubCallback from "./pages/GitHubCallback";
+import Assistant from "./pages/Assistant";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
+import OnboardingDialog from "./components/onboarding/OnboardingDialog";
+import AssistantLauncher from "./components/assistant/AssistantLauncher";
 
 const queryClient = new QueryClient();
 
@@ -36,8 +39,11 @@ const AppContent = () => {
   return (
     <BrowserRouter>
       <PopAd />
+      <OnboardingDialog />
+      <AssistantLauncher />
       <Routes>
         <Route path="/" element={<Index />} />
+
         <Route path="/domains" element={<Domains />} />
         <Route path="/domain/:domainId" element={<DomainDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -57,6 +63,8 @@ const AppContent = () => {
         <Route path="/ai-interview" element={<AIVideoInterview />} />
         <Route path="/visual-builder" element={<VisualBuilderPage />} />
         <Route path="/github/callback" element={<GitHubCallback />} />
+        <Route path="/assistant" element={<Assistant />} />
+        <Route path="/assistant/:threadId" element={<Assistant />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
