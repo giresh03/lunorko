@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
-import { Send, Code2, ImagePlus, X } from "lucide-react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Send, Code2, ImagePlus, X, Copy, Check, AlertCircle, ArrowDown, Hash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 
 interface ChatMessage {
   id: string;
@@ -17,247 +17,414 @@ interface ChatMessage {
   code_language: string | null;
   file_url: string | null;
   created_at: string;
-  display_name?: string;
+  client_id?: string | null;
+  pending?: boolean;
+  failed?: boolean;
+  local_preview?: string;
 }
 
-const DomainChat = ({ domainId }: { domainId: string }) => {
+const NAME_COLORS = [
+  "text-primary",
+  "text-emerald-400",
+  "text-sky-400",
+  "text-amber-400",
+  "text-fuchsia-400",
+  "text-teal-300",
+  "text-orange-400",
+];
+
+const colorFor = (userId: string) => {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h * 31 + userId.charCodeAt(i)) % 9973;
+  return NAME_COLORS[h % NAME_COLORS.length];
+};
+
+const dayLabel = (iso: string) => {
+  const d = new Date(iso);
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, "MMMM d, yyyy");
+};
+
+const CodeBlock = ({ code }: { code: string }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="group/code relative mt-1.5 max-w-full overflow-hidden rounded-md border border-border bg-muted/60">
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(code);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1200);
+        }}
+        className="absolute right-1.5 top-1.5 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/code:opacity-100"
+        aria-label="Copy code"
+      >
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+      <pre className="overflow-x-auto p-3 text-xs font-mono leading-relaxed">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+const DomainChat = ({ domainId, channelName }: { domainId: string; channelName?: string }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [showCode, setShowCode] = useState(false);
   const [codeSnippet, setCodeSnippet] = useState("");
-  const [sending, setSending] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [atBottom, setAtBottom] = useState(true);
+  const [unseen, setUnseen] = useState(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const inputRef = useRef<HTMLInputElement>(null);
+  const profilesRef = useRef<Record<string, string>>({});
+  const atBottomRef = useRef(true);
 
-  // Fetch messages
+  profilesRef.current = profiles;
+  atBottomRef.current = atBottom;
+
+  const loadProfiles = useCallback(async (userIds: string[]) => {
+    const missing = userIds.filter((id) => id && !profilesRef.current[id]);
+    if (missing.length === 0) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("user_id, display_name")
+      .in("user_id", missing);
+    if (!data?.length) return;
+    setProfiles((prev) => {
+      const next = { ...prev };
+      data.forEach((p) => { next[p.user_id] = p.display_name || "User"; });
+      return next;
+    });
+  }, []);
+
+  // Initial fetch — paints messages first, resolves names after
   useEffect(() => {
-    const fetchMessages = async () => {
+    let cancelled = false;
+    setMessages([]);
+    (async () => {
       const { data } = await supabase
         .from("community_messages")
         .select("*")
         .eq("domain_id", domainId)
         .order("created_at", { ascending: true })
         .limit(100);
-      if (data) {
-        setMessages(data);
-        // Fetch profiles for all unique user_ids
-        const userIds = [...new Set(data.map((m) => m.user_id))];
-        if (userIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from("profiles")
-            .select("user_id, display_name")
-            .in("user_id", userIds);
-          const map: Record<string, string> = {};
-          (profilesData || []).forEach((p) => {
-            map[p.user_id] = p.display_name || "User";
-          });
-          setProfiles(map);
-        }
-      }
-    };
-    fetchMessages();
-  }, [domainId]);
+      if (cancelled || !data) return;
+      setMessages(data as ChatMessage[]);
+      loadProfiles([...new Set(data.map((m) => m.user_id))]);
+    })();
+    return () => { cancelled = true; };
+  }, [domainId, loadProfiles]);
 
-  // Real-time subscription
+  // Realtime — subscribe once per channel
   useEffect(() => {
     const channel = supabase
       .channel(`chat-${domainId}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "community_messages",
-          filter: `domain_id=eq.${domainId}`,
-        },
-        async (payload) => {
-          const newMsg = payload.new as ChatMessage;
-          setMessages((prev) => [...prev, newMsg]);
-          // Fetch profile if not cached
-          if (!profiles[newMsg.user_id]) {
-            const { data } = await supabase
-              .from("profiles")
-              .select("user_id, display_name")
-              .eq("user_id", newMsg.user_id)
-              .single();
-            if (data) {
-              setProfiles((prev) => ({ ...prev, [data.user_id]: data.display_name || "User" }));
+        { event: "INSERT", schema: "public", table: "community_messages", filter: `domain_id=eq.${domainId}` },
+        (payload) => {
+          const incoming = payload.new as ChatMessage;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === incoming.id)) return prev;
+            // replace matching optimistic row if present
+            const optimisticIdx = prev.findIndex(
+              (m) => m.pending && m.user_id === incoming.user_id && m.content === incoming.content
+            );
+            if (optimisticIdx !== -1) {
+              const next = [...prev];
+              next[optimisticIdx] = incoming;
+              return next;
             }
-          }
+            return [...prev, incoming];
+          });
+          if (!atBottomRef.current && incoming.user_id !== user?.id) setUnseen((u) => u + 1);
+          loadProfiles([incoming.user_id]);
         }
       )
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
-  }, [domainId, profiles]);
+  }, [domainId, loadProfiles, user?.id]);
 
-  // Auto-scroll
+  const scrollToBottom = useCallback((smooth = false) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    setUnseen(0);
+  }, []);
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+    if (atBottomRef.current) scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setAtBottom(near);
+    if (near) setUnseen(0);
+  };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return;
-    if (!file.type.startsWith("image/")) return;
+    if (file.size > 5 * 1024 * 1024 || !file.type.startsWith("image/")) return;
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
 
   const removeImage = () => {
     setImageFile(null);
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSend = async () => {
-    if ((!newMessage.trim() && !codeSnippet.trim() && !imageFile) || !user) return;
-    setSending(true);
+    const text = newMessage.trim();
+    const code = codeSnippet.trim();
+    const file = imageFile;
+    if ((!text && !code && !file) || !user) return;
 
+    const clientId = crypto.randomUUID();
+    const localPreview = imagePreview || undefined;
+
+    // 1. paint instantly
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: clientId,
+        client_id: clientId,
+        user_id: user.id,
+        domain_id: domainId,
+        content: text || (code ? "Shared a code snippet" : "Shared an image"),
+        message_type: file ? "image" : code ? "code" : "text",
+        code_snippet: code || null,
+        code_language: code ? "javascript" : null,
+        file_url: null,
+        local_preview: localPreview,
+        created_at: new Date().toISOString(),
+        pending: true,
+      },
+    ]);
+    setNewMessage("");
+    setCodeSnippet("");
+    setShowCode(false);
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setAtBottom(true);
+    atBottomRef.current = true;
+    inputRef.current?.focus();
+
+    // 2. persist in background
     let fileUrl: string | null = null;
-    if (imageFile) {
-      const ext = imageFile.name.split(".").pop();
+    if (file) {
+      const ext = file.name.split(".").pop();
       const path = `${user.id}/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("community-images").upload(path, imageFile);
+      const { error } = await supabase.storage.from("community-images").upload(path, file);
       if (!error) {
-        const { data } = supabase.storage.from("community-images").getPublicUrl(path);
-        fileUrl = data.publicUrl;
+        fileUrl = supabase.storage.from("community-images").getPublicUrl(path).data.publicUrl;
       }
     }
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       user_id: user.id,
       domain_id: domainId,
-      content: newMessage.trim() || (codeSnippet ? "Shared a code snippet" : fileUrl ? "Shared an image" : ""),
-      message_type: fileUrl ? "image" : codeSnippet ? "code" : "text",
+      content: text || (code ? "Shared a code snippet" : fileUrl ? "Shared an image" : ""),
+      message_type: fileUrl ? "image" : code ? "code" : "text",
     };
-    if (codeSnippet) {
-      payload.code_snippet = codeSnippet;
+    if (code) {
+      payload.code_snippet = code;
       payload.code_language = "javascript";
     }
     if (fileUrl) payload.file_url = fileUrl;
 
-    await supabase.from("community_messages").insert(payload);
-    setNewMessage("");
-    setCodeSnippet("");
-    setShowCode(false);
-    removeImage();
-    setSending(false);
+    const { data, error } = await supabase.from("community_messages").insert(payload).select().single();
+
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.client_id === clientId);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      if (error || !data) {
+        next[idx] = { ...next[idx], pending: false, failed: true };
+      } else if (prev.some((m) => m.id === (data as ChatMessage).id)) {
+        next.splice(idx, 1); // realtime already delivered it
+      } else {
+        next[idx] = data as ChatMessage;
+      }
+      return next;
+    });
   };
 
-  const getInitials = (userId: string) => {
-    const name = profiles[userId] || "U";
-    return name.slice(0, 2).toUpperCase();
-  };
+  const nameOf = (userId: string) => (userId === user?.id ? profiles[userId] || "You" : profiles[userId] || "User");
+
+  // group consecutive messages by author within 5 minutes
+  const rows = useMemo(() => {
+    return messages.map((msg, i) => {
+      const prev = messages[i - 1];
+      const newDay = !prev || dayLabel(prev.created_at) !== dayLabel(msg.created_at);
+      const grouped =
+        !newDay &&
+        prev?.user_id === msg.user_id &&
+        new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000;
+      return { msg, newDay, grouped };
+    });
+  }, [messages]);
 
   return (
-    <div className="flex flex-col h-[500px] rounded-lg border border-border bg-card">
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      {/* Transcript */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="relative flex-1 overflow-y-auto py-4"
+      >
         {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            No messages yet. Start the conversation! 💬
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+            <div className="rounded-full border border-border bg-card p-4">
+              <Hash className="h-6 w-6 text-primary" />
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              Welcome to #{channelName || domainId}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              This is the start of the channel. Say hello 👋
+            </p>
           </div>
         )}
-        {messages.map((msg) => {
-          const isOwn = msg.user_id === user?.id;
-          return (
-            <div key={msg.id} className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}>
-              <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                  {getInitials(msg.user_id)}
-                </AvatarFallback>
-              </Avatar>
-              <div className={`max-w-[75%] ${isOwn ? "items-end" : "items-start"}`}>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[10px] font-medium text-muted-foreground">
-                    {isOwn ? "You" : profiles[msg.user_id] || "User"}
-                  </span>
-                  <span className="text-[9px] text-muted-foreground/60">
+
+        {rows.map(({ msg, newDay, grouped }) => (
+          <div key={msg.id}>
+            {newDay && (
+              <div className="my-4 flex items-center gap-3 px-4">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {dayLabel(msg.created_at)}
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            )}
+            <div
+              className={`group flex gap-3 px-4 transition-colors hover:bg-muted/40 ${grouped ? "py-0.5" : "mt-2 py-1"} ${msg.pending ? "opacity-60" : ""}`}
+            >
+              <div className="w-9 shrink-0">
+                {grouped ? (
+                  <span className="hidden text-[10px] leading-6 text-muted-foreground/60 group-hover:block">
                     {format(new Date(msg.created_at), "HH:mm")}
                   </span>
-                </div>
-                <div className={`rounded-lg px-3 py-2 text-sm ${isOwn ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
-                  {msg.content}
-                </div>
-                {msg.code_snippet && (
-                  <pre className="mt-1 rounded-md bg-muted p-2 text-xs font-mono overflow-x-auto max-w-full">
-                    <code>{msg.code_snippet}</code>
-                  </pre>
+                ) : (
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback className="bg-card text-[11px] font-semibold text-foreground">
+                      {(nameOf(msg.user_id) || "U").slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                 )}
-                {msg.file_url && (
+              </div>
+              <div className="min-w-0 flex-1">
+                {!grouped && (
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-sm font-semibold ${colorFor(msg.user_id)}`}>
+                      {nameOf(msg.user_id)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70">
+                      {format(new Date(msg.created_at), "HH:mm")}
+                    </span>
+                    {msg.failed && (
+                      <span className="flex items-center gap-1 text-[10px] text-destructive">
+                        <AlertCircle className="h-3 w-3" /> failed to send
+                      </span>
+                    )}
+                  </div>
+                )}
+                {msg.content && (
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+                    {msg.content}
+                  </p>
+                )}
+                {msg.code_snippet && <CodeBlock code={msg.code_snippet} />}
+                {(msg.file_url || msg.local_preview) && (
                   <img
-                    src={msg.file_url}
-                    alt="Shared"
-                    className="mt-1 rounded-md max-w-full max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => window.open(msg.file_url!, '_blank')}
+                    src={msg.file_url || msg.local_preview}
+                    alt="Shared attachment"
+                    loading="lazy"
+                    className="mt-1.5 max-h-64 max-w-full cursor-pointer rounded-md border border-border object-cover transition-opacity hover:opacity-90"
+                    onClick={() => msg.file_url && window.open(msg.file_url, "_blank")}
                   />
                 )}
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
-      {/* Image preview */}
-      {imagePreview && (
-        <div className="border-t border-border p-2">
-          <div className="relative inline-block">
-            <img src={imagePreview} alt="Preview" className="h-20 rounded-md object-cover" />
-            <Button size="icon" variant="destructive" className="absolute -top-1 -right-1 h-5 w-5" onClick={removeImage}>
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
+      {/* New messages pill */}
+      {!atBottom && (
+        <button
+          onClick={() => scrollToBottom(true)}
+          className="mx-4 mb-1 flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1 text-[11px] font-medium text-primary-foreground shadow-lg"
+        >
+          <ArrowDown className="h-3 w-3" />
+          {unseen > 0 ? `${unseen} new message${unseen > 1 ? "s" : ""}` : "Jump to latest"}
+        </button>
       )}
 
-      {/* Code input */}
-      {showCode && (
-        <div className="border-t border-border p-2">
+      {/* Composer */}
+      <div className="px-4 pb-4 pt-1">
+        {imagePreview && (
+          <div className="mb-2 inline-block">
+            <div className="relative inline-block">
+              <img src={imagePreview} alt="Preview" className="h-20 rounded-md border border-border object-cover" />
+              <Button size="icon" variant="destructive" className="absolute -right-1.5 -top-1.5 h-5 w-5" onClick={removeImage}>
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+        {showCode && (
           <textarea
-            className="w-full rounded-md bg-muted p-2 text-xs font-mono resize-none h-20 focus:outline-none focus:ring-1 focus:ring-primary"
+            className="mb-2 h-24 w-full resize-none rounded-md border border-border bg-muted/60 p-2.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="Paste your code here..."
             value={codeSnippet}
             onChange={(e) => setCodeSnippet(e.target.value)}
           />
+        )}
+        <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1.5 transition-colors focus-within:border-primary/60">
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground" onClick={() => fileInputRef.current?.click()} title="Attach image">
+            <ImagePlus className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`h-8 w-8 shrink-0 ${showCode ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={() => setShowCode(!showCode)}
+            title="Share code"
+          >
+            <Code2 className="h-4 w-4" />
+          </Button>
+          <Input
+            ref={inputRef}
+            placeholder={`Message #${channelName || domainId}`}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            className="h-8 border-0 bg-transparent px-1 text-sm shadow-none focus-visible:ring-0"
+          />
+          <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSend} title="Send">
+            <Send className="h-4 w-4" />
+          </Button>
         </div>
-      )}
-
-      {/* Input bar */}
-      <div className="border-t border-border p-3 flex items-center gap-2">
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
-        <Button
-          size="icon"
-          variant="outline"
-          className="h-8 w-8 shrink-0"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <ImagePlus className="h-4 w-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant={showCode ? "default" : "outline"}
-          className="h-8 w-8 shrink-0"
-          onClick={() => setShowCode(!showCode)}
-        >
-          <Code2 className="h-4 w-4" />
-        </Button>
-        <Input
-          placeholder="Type a message..."
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-          className="h-8 text-sm"
-        />
-        <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSend} disabled={sending}>
-          <Send className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   );
