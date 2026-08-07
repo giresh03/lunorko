@@ -32,7 +32,7 @@ const Assistant = () => {
 
   const {
     threads, messages, loadingThreads, loadingMessages, sending, error,
-    createThread, openOrCreateThread, deleteThread, send,
+    createThread, openOrCreateThread, deleteThread, send, credits, outOfCredits,
   } = useSiteAssistant(threadId ?? null);
 
   const voice = useVoiceAssistant({
@@ -235,7 +235,7 @@ const Assistant = () => {
                   transcript={voice.transcript}
                   error={voice.error}
                   voiceEnabled={voice.voiceEnabled}
-                  disabled={sending}
+                  disabled={sending || outOfCredits}
                   accent="hsl(var(--primary))"
                   muted="hsl(var(--muted-foreground))"
                   onToggleListening={voice.toggleListening}
@@ -243,18 +243,35 @@ const Assistant = () => {
                   onStopSpeaking={voice.stopSpeaking}
                 />
               </div>
+              {credits && (
+                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{credits.balance} AI credits left</span>
+                  <Link to="/pricing" className="font-medium text-primary hover:underline">
+                    Top up
+                  </Link>
+                </div>
+              )}
+              {outOfCredits && (
+                <p className="mb-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-foreground">
+                  You are out of AI credits.{" "}
+                  <Link to="/pricing" className="font-semibold text-primary hover:underline">
+                    Top up for Rs50 / 20 credits
+                  </Link>{" "}
+                  to keep chatting.
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <Input
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                  placeholder="Ask your assistant anything…"
-                  disabled={sending}
+                  placeholder={outOfCredits ? "Out of AI credits — top up to continue" : "Ask your assistant anything…"}
+                  disabled={sending || outOfCredits}
                 />
                 <Button
                   onClick={() => handleSend()}
-                  disabled={sending || !input.trim()}
+                  disabled={sending || outOfCredits || !input.trim()}
                   className="btn-sheen bg-gradient-to-r from-primary to-primary-glow text-primary-foreground shadow-glow"
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
