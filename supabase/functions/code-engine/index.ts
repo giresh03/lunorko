@@ -874,15 +874,45 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- STACK: HTML + CSS + JS ONLY (vanilla). Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
+- MULTI-PAGE BY DEFAULT: build a real site with as many pages as the prompt implies
+  (index.html, about.html, services.html, pricing.html, contact.html, blog.html,
+  dashboard.html, login.html, signup.html, admin.html, ...). No artificial file limit.
+  * Every page is a COMPLETE standalone HTML document (<!DOCTYPE html> ... </html>).
+  * Every page links the SHARED styles.css + script.js, plus its own optional page script
+    (e.g. pricing.js) when it needs page-specific logic.
+  * Identical header/nav/footer markup on every page, with the active nav link marked
+    (class="active"). Nav hrefs are plain relative names: href="about.html".
+  * Large sites: split CSS into styles.css (base/layout/nav/footer) + components.css.
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
+
+FULL-STACK MODE (when the prompt needs auth, data, saving, dashboards, orders, bookings,
+comments, chat, admin, CRUD, or "backend"):
+- Produce a real backend layer as extra files alongside the pages:
+  * db/schema.sql — tables, columns, indexes, RLS policies, GRANTs (Postgres/Supabase style).
+  * api/README.md — endpoint list, request/response shapes, env vars needed.
+  * server/api.js — the ONLY module the pages talk to. It exposes async functions
+    (signUp, signIn, signOut, getSession, list/create/update/remove per resource).
+  * server/backend.js — the adapter behind api.js. It uses Supabase (supabase-js v2 via CDN
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>) when
+    window.__ENV__.SUPABASE_URL and SUPABASE_ANON_KEY are set, and otherwise falls back to a
+    localStorage-backed mock with the SAME function signatures and seeded demo data —
+    so the preview always runs with zero configuration.
+  * config.js — window.__ENV__ = { SUPABASE_URL: "", SUPABASE_ANON_KEY: "" }; with a comment
+    telling the user where to paste real values.
+- Pages NEVER call fetch/supabase directly — always through server/api.js.
+- Include real app behavior: forms with validation, loading and empty states, error messages,
+  auth-gated pages that redirect to login.html, and a session guard in script.js.
+- Serverless functions, when the prompt needs secrets or server logic:
+  functions/<name>/index.ts (Deno, Deno.serve, CORS headers, input validation) + a note in
+  api/README.md on how to deploy it. Never put secret keys in client files.`
+
         : "";
       const systemPrompt = `${basePrompt}
 
@@ -915,6 +945,10 @@ Iterative editing (critical — the user keeps chatting about the SAME project):
 - Preserve everything the user did not ask you to change (existing sections, styles, ids/classes, scripts, and cross-file references).
 - If the user reports an error or bug, fix the root cause in the existing files and return those same files, fully updated.
 - Only create a new file when the request genuinely needs one, and wire it into the existing files (e.g. add the <link>/<script> tag) in the same response.
+- MULTI-PAGE / FULL-STACK EDITS: when you add a page, also update the shared nav on EVERY
+  existing page in the same response so links never break. When you change a data shape,
+  update db/schema.sql, server/api.js, server/backend.js, and every page that reads it —
+  all in the same response. Never leave the project in a half-migrated state.
 ${stackDirective}`;
 
 
