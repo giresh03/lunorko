@@ -1405,7 +1405,7 @@ ${jsCode}
     if (!chatInput.trim() || chatLoading) return;
     // Build FULL project context so follow-up prompts modify the existing build
     const projectFiles = flattenFiles(fileTree);
-    const CHAR_BUDGET = 40000;
+    const CHAR_BUDGET = 120000;
     const PER_FILE = 9000;
     let used = 0;
     const fileBlocks: string[] = [];
