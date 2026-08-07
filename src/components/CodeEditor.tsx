@@ -23,6 +23,39 @@ import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
 
+// -- Preview runtime guard: sandbox-safe storage + error reporting --
+const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
+  if (window.__lunorGuard) return; window.__lunorGuard = true;
+  function memStore(){
+    var m = {};
+    return {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; },
+      setItem: function(k, v){ m[k] = String(v); },
+      removeItem: function(k){ delete m[k]; },
+      clear: function(){ m = {}; },
+      key: function(i){ return Object.keys(m)[i] || null; },
+      get length(){ return Object.keys(m).length; }
+    };
+  }
+  ['localStorage','sessionStorage'].forEach(function(name){
+    var ok = false;
+    try { var s = window[name]; s.setItem('__lunor_probe','1'); s.removeItem('__lunor_probe'); ok = true; } catch(e) { ok = false; }
+    if (!ok) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true, writable: true }); } catch(e) {} }
+  });
+  function report(m, s){
+    try { parent.postMessage({ __lunorPreview: true, type: 'error', message: String(m || 'Unknown error'), stack: String(s || '') }, '*'); } catch(e) {}
+  }
+  window.addEventListener('error', function(e){ if (e && e.message) report(e.message, e.error && e.error.stack); }, true);
+  window.addEventListener('unhandledrejection', function(e){ var r = e && e.reason; report((r && r.message) || r || 'Unhandled promise rejection', r && r.stack); });
+})();<\/script>`;
+
+function injectRuntimeGuard(html: string): string {
+  if (!html || html.includes("__lunor_guard")) return html;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
+  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
+  return PREVIEW_RUNTIME_GUARD + html;
+}
+
 // -- Project types --
 interface SavedProject {
   id: string;
@@ -497,6 +530,24 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Preview runtime errors reported by the sandboxed iframe
+  const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
+  const [resolvingError, setResolvingError] = useState(false);
+  const setPreview = useCallback((html: string) => {
+    setPreviewError(null);
+    setPreviewContent(injectRuntimeGuard(html));
+  }, []);
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as { __lunorPreview?: boolean; type?: string; message?: string; stack?: string } | null;
+      if (d && d.__lunorPreview && d.type === "error" && d.message) {
+        setPreviewError({ message: d.message, stack: d.stack });
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
   // Theme state
   const [currentThemeId, setCurrentThemeId] = useState<string>(() => localStorage.getItem("lunor-editor-theme") || "vs-dark");
   const [showThemeMenu, setShowThemeMenu] = useState(false);
@@ -933,7 +984,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
     }
 
-    return html;
+    return injectRuntimeGuard(html);
   }, []);
 
   // Build a full HTML document for preview, with multi-page in-iframe navigation
@@ -1089,17 +1140,17 @@ ${jsCode}
     const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
-      setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+      setPreview(buildPreviewHtml(activeTab.content, allFiles));
     } else if (isJsLike && hasJSXContent) {
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isJsLike && usesDOM) {
       // Vanilla JS with DOM usage — render in an HTML shell with DOM available
-      setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+      setPreview(buildVanillaJsPreview(activeTab.content, allFiles));
     } else if (isJsLike) {
       // Pure JS without DOM — run and capture console output
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     }
   }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain]);
 
@@ -1348,13 +1399,13 @@ ${jsCode}
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
       if (isHtml) {
-        setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+        setPreview(buildPreviewHtml(activeTab.content, allFiles));
       } else if (isJsLike && hasJSXInFile) {
-        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+        setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       } else if (isJsLike && usesDOM) {
-        setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+        setPreview(buildVanillaJsPreview(activeTab.content, allFiles));
       } else {
-        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+        setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       }
       setOutput((p) => [...p, "✅ Preview rendered successfully"]);
       setIsRunning(false);
@@ -1401,8 +1452,9 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (overrideInput?: string) => {
+    const input = (overrideInput ?? chatInput).trim();
+    if (!input || chatLoading) return;
     // Build FULL project context so follow-up prompts modify the existing build
     const projectFiles = flattenFiles(fileTree);
     const CHAR_BUDGET = 120000;
@@ -1429,7 +1481,7 @@ ${jsCode}
         `[EDIT RULES: Reuse the EXACT file paths above when changing a file. Return the COMPLETE updated file content (never diffs, never "// rest unchanged"). Only return the files that actually change. Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
       : "";
 
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: input };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1448,7 +1500,7 @@ ${jsCode}
 
     // Check for cached response when offline
     if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+      const cached = findCachedAIResponse(input, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
@@ -1505,7 +1557,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(input, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1600,13 +1652,13 @@ ${jsCode}
               const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(previewFile.code);
 
               if (isHtml) {
-                setPreviewContent(buildPreviewHtml(previewFile.code, allFiles));
+                setPreview(buildPreviewHtml(previewFile.code, allFiles));
               } else if (isJsLike && hasJSX) {
-                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+                setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               } else if (isJsLike && usesDOM) {
-                setPreviewContent(buildVanillaJsPreview(previewFile.code, allFiles));
+                setPreview(buildVanillaJsPreview(previewFile.code, allFiles));
               } else if (isJsLike) {
-                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+                setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               }
             }
 
@@ -1618,7 +1670,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = input.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -1656,6 +1708,23 @@ ${jsCode}
 
     setChatLoading(false);
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, fileTree, collectFiles]);
+
+  // One-click AI fix for runtime errors surfaced by the preview
+  const handleResolveError = useCallback(async () => {
+    if (!previewError || resolvingError) return;
+    setResolvingError(true);
+    const prompt =
+      `The generated site threw a runtime error in the preview. Fix the root cause in the project files.\n` +
+      `Error: ${previewError.message}\n` +
+      (previewError.stack ? `Stack: ${previewError.stack.slice(0, 1500)}\n` : "") +
+      `Rules: keep the existing design and features, avoid APIs unavailable in a sandboxed iframe (use in-memory or guarded storage), and return the COMPLETE updated file(s) using the exact existing file paths.`;
+    try {
+      await handleChatSend(prompt);
+    } finally {
+      setPreviewError(null);
+      setResolvingError(false);
+    }
+  }, [previewError, resolvingError, handleChatSend]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2720,7 +2789,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => handleChatSend()}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />
@@ -2733,6 +2802,34 @@ ${jsCode}
           </div>
         )}
       </div>
+
+      {/* Preview runtime error — one-click AI fix */}
+      {previewError && (
+        <div className="fixed bottom-10 right-4 z-[9998] w-72 rounded-lg border border-destructive/40 bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 text-destructive text-sm">⚠</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-foreground">1 error in preview</p>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground line-clamp-3 break-words">{previewError.message}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={handleResolveError}
+                  disabled={resolvingError}
+                  className="h-6 rounded-md bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-transform hover:scale-[1.03] disabled:opacity-60"
+                >
+                  {resolvingError ? "Resolving…" : "Resolve error"}
+                </button>
+                <button
+                  onClick={() => setPreviewError(null)}
+                  className="h-6 rounded-md px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status bar */}
       <div className="flex items-center justify-between h-6 border-t px-3 shrink-0 select-none" style={{ backgroundColor: currentTheme.uiColors.accent + "18", borderColor: currentTheme.uiColors.border }}>
