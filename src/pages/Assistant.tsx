@@ -32,7 +32,7 @@ const Assistant = () => {
 
   const {
     threads, messages, loadingThreads, loadingMessages, sending, error,
-    createThread, deleteThread, send,
+    createThread, openOrCreateThread, deleteThread, send,
   } = useSiteAssistant(threadId ?? null);
 
   const voice = useVoiceAssistant({
@@ -56,12 +56,12 @@ const Assistant = () => {
     if (threads.length > 0) {
       navigate(`/assistant/${threads[0].id}`, { replace: true });
     } else {
-      createThread().then((id) => {
+      openOrCreateThread().then((id) => {
         if (id) navigate(`/assistant/${id}`, { replace: true });
         else bootstrapped.current = false;
       });
     }
-  }, [authLoading, user, threadId, loadingThreads, threads, createThread, navigate]);
+  }, [authLoading, user, threadId, loadingThreads, threads, openOrCreateThread, navigate]);
 
   useEffect(() => {
     inputRef.current?.focus();

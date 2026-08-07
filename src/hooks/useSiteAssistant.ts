@@ -212,6 +212,7 @@ export function useSiteAssistant(threadId: string | null) {
     error,
     clearError: () => setError(null),
     createThread,
+    openOrCreateThread,
     deleteThread,
     loadThreads,
     send,
