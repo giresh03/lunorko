@@ -1497,7 +1497,7 @@ ${jsCode}
         `Files: ${projectFiles.map((f) => f.path).join(", ")}\n` +
         (activeTab ? `Currently open file: ${activeTab.id}\n` : "") +
         `\n${fileBlocks.join("\n\n")}\n\n` +
-        `[EDIT RULES: Reuse the EXACT file paths above when changing a file. Return the COMPLETE updated file content (never diffs, never "// rest unchanged"). Only return the files that actually change. Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
+        `[EDIT RULES: This is a TARGETED EDIT to the live project above. Change ONLY the exact part the user asked about; keep all other layout, structure, markup, ids, classes, styling, spacing, colors, fonts, animations, content and behavior byte-identical. Do NOT redesign, refactor, reorder or regenerate untouched sections, and do NOT add unrequested sections or files. Reuse the EXACT file paths above. Return the COMPLETE updated content of only the files that actually change (never diffs, never "// rest unchanged"). Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
       : "";
 
     const userMsg: Message = { role: "user", content: input };
