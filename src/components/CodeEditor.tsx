@@ -1000,16 +1000,23 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   // Build a full HTML document for preview, with multi-page in-iframe navigation
-  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
-    let html = assemblePage(htmlContent, allFiles);
+  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>, currentPage?: string) => {
+    // Identify which project page this content belongs to (so nav marks it active)
+    const activeName =
+      (currentPage && (currentPage.split("/").pop() || currentPage)) ||
+      Object.keys(allFiles).find((n) => n.endsWith(".html") && allFiles[n] === htmlContent)?.split("/").pop() ||
+      "index.html";
+    let html = assemblePage(htmlContent, allFiles, activeName);
 
     // Multi-page navigation: pre-assemble every sibling .html page and swap in-iframe
     const pageNames = Object.keys(allFiles).filter((n) => n.endsWith(".html"));
     if (pageNames.length > 1) {
       const pages: Record<string, string> = {};
       for (const name of pageNames) {
-        pages[name.split("/").pop() || name] = assemblePage(allFiles[name], allFiles);
+        const short = name.split("/").pop() || name;
+        pages[short] = assemblePage(allFiles[name], allFiles, short);
       }
+
       const shim = `<script>(function(){
   var PAGES = ${JSON.stringify(pages).replace(/<\/script>/gi, "<\\/script>")};
   function nav(name){
