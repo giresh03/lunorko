@@ -90,6 +90,25 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Credit top-up purchase: add credits, no subscription row
+    if (plan_id === "topup") {
+      const TOPUP_CREDITS = 20;
+      if (amount !== 5000) {
+        return new Response(JSON.stringify({ error: "Invalid top-up amount" }), { status: 400, headers: corsHeaders });
+      }
+      const { error: topupError } = await adminClient.rpc("add_topup_credits", {
+        _user_id: userId,
+        _credits: TOPUP_CREDITS,
+      });
+      if (topupError) {
+        console.error("Top-up error:", topupError);
+        return new Response(JSON.stringify({ error: "Failed to add credits" }), { status: 500, headers: corsHeaders });
+      }
+      return new Response(JSON.stringify({ success: true, plan_id, credits_added: TOPUP_CREDITS }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + 1);
 
@@ -109,6 +128,9 @@ serve(async (req) => {
       console.error("Insert error:", insertError);
       return new Response(JSON.stringify({ error: "Failed to save subscription" }), { status: 500, headers: corsHeaders });
     }
+
+    // Refresh plan credits for the new plan
+    await adminClient.rpc("sync_ai_credits", { _user_id: userId });
 
     return new Response(JSON.stringify({ success: true, plan_id, domain_id }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
