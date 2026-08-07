@@ -35,7 +35,10 @@ const Mentors = () => {
 
   useEffect(() => {
     const fetchMentors = async () => {
-      const { data } = await supabase.from("mentors").select("*").eq("is_active", true);
+      const { data } = await supabase
+        .from("mentors")
+        .select("id, name, company, role, domain_id, bio, avatar_url, meeting_link, years_experience, is_active, created_at, college_preparation, tech_stack, career_tips, journey_summary")
+        .eq("is_active", true);
       setMentors((data as Mentor[]) ?? []);
       setLoading(false);
     };

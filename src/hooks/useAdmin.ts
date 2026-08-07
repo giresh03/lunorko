@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-const ADMIN_EMAIL = "lunor.ko@gmail.com";
-
 export const useAdmin = () => {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -16,12 +14,6 @@ export const useAdmin = () => {
       return;
     }
 
-    // lunor.ko@gmail.com is the designated admin account
-    if (user.email === ADMIN_EMAIL) {
-      setIsAdmin(true);
-      setLoading(false);
-      return;
-    }
 
     const checkAdmin = async () => {
       const { data } = await supabase
