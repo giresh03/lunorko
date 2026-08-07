@@ -867,10 +867,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 </body></html>`;
   }, []);
 
-  // Build a full HTML document for preview by injecting sibling CSS/JS
-  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
+  // Assemble one HTML page with sibling CSS/JS injected inline (no nav shim)
+  const assemblePage = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
     let html = htmlContent;
-    
+
     // Inject a base visible style so content is never invisible against iframe bg
     const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
     if (html.includes("</head>")) {
@@ -880,7 +880,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     } else {
       html = baseStyle + html;
     }
-    
+
     // Track which CSS/JS files were already referenced and injected
     const injectedFiles = new Set<string>();
 
@@ -894,7 +894,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
         injectedFiles.add(cssFileName);
       }
     }
-    
+
     // Find referenced JS files and inject inline if they exist in the project
     const jsScriptRegex = /<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/gi;
     let jsMatch;
@@ -932,9 +932,54 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
         html += remainingJs;
       }
     }
-    
+
     return html;
   }, []);
+
+  // Build a full HTML document for preview, with multi-page in-iframe navigation
+  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
+    let html = assemblePage(htmlContent, allFiles);
+
+    // Multi-page navigation: pre-assemble every sibling .html page and swap in-iframe
+    const pageNames = Object.keys(allFiles).filter((n) => n.endsWith(".html"));
+    if (pageNames.length > 1) {
+      const pages: Record<string, string> = {};
+      for (const name of pageNames) {
+        pages[name.split("/").pop() || name] = assemblePage(allFiles[name], allFiles);
+      }
+      const shim = `<script>(function(){
+  var PAGES = ${JSON.stringify(pages).replace(/<\/script>/gi, "<\\/script>")};
+  function nav(name){
+    var doc = PAGES[name];
+    if(!doc) return;
+    document.open(); document.write(doc); document.close();
+    if (window.__attachPreviewNav) window.__attachPreviewNav();
+  }
+  window.__attachPreviewNav = function(){
+    document.addEventListener('click', function(e){
+      var a = e.target && e.target.closest && e.target.closest('a[href]');
+      if(!a) return;
+      var href = (a.getAttribute('href')||'').split('#')[0].split('?')[0];
+      if(!href) return;
+      var name = href.split('/').pop();
+      if(!name || !PAGES[name]) return;
+      e.preventDefault();
+      nav(name);
+    }, true);
+  };
+  window.__previewNavigate = nav;
+  window.__attachPreviewNav();
+})();<\/script>`;
+      if (/<\/body>/i.test(html)) {
+        html = html.replace(/<\/body>/i, `${shim}</body>`);
+      } else {
+        html += shim;
+      }
+    }
+
+    return html;
+  }, [assemblePage]);
+
 
   const isAppDomain = domainId === "app-development";
 
