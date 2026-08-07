@@ -307,7 +307,8 @@ function resolveTargetPath(
   }
 
   // 4. New file → place under src/
-  return clean.includes("/") ? clean : `src/${base}`;
+  return clean.startsWith("src/") ? clean : `src/${base}`;
+
 }
 
 
