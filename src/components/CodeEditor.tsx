@@ -1478,6 +1478,42 @@ ${jsCode}
   const handleChatSend = useCallback(async (overrideInput?: string) => {
     const input = (overrideInput ?? chatInput).trim();
     if (!input || chatLoading) return;
+
+    // --- Automation: "push / upload this to my github" ---
+    if (/\b(push|upload|export|publish|commit|save|send|deploy)\b[^.!?]{0,60}\bgit\s?hub\b/i.test(input)
+      || /\bgit\s?hub\b[^.!?]{0,40}\b(push|upload|export|repo|repository)\b/i.test(input)) {
+      const filesToPush = flattenFiles(fileTree).map((f) => ({ path: f.path, content: f.content || "" }));
+      setChatInput("");
+      setMessages((prev) => [...prev, { role: "user", content: input }]);
+      if (!filesToPush.length) {
+        setMessages((prev) => [...prev, { role: "assistant", content: "There are no files in this project yet — generate something first, then I'll push it to GitHub." }]);
+        return;
+      }
+      setMessages((prev) => [...prev, { role: "assistant", content: "Pushing your project to GitHub…" }]);
+      try {
+        const nameMatch = input.match(/(?:repo|repository|named|called)\s+["'`]?([A-Za-z0-9._-]{2,60})["'`]?/i);
+        const result = await githubPush(filesToPush, {
+          repo: nameMatch?.[1],
+          private: !/\bpublic\b/i.test(input),
+          commitMessage: "Update from Lunor.AI",
+        });
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: `${result.created ? "Created" : "Updated"} **${result.repo}** with ${result.fileCount} file(s) on \`${result.branch}\`.\n\n[Open repository](${result.repoUrl}) · [View commit](${result.commitUrl})`,
+        }]);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Push failed";
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: /connect your github/i.test(msg)
+            ? "I need access to your GitHub account first — I've opened the connect panel for you."
+            : `GitHub push failed: ${msg}`,
+        }]);
+        setShowGitHub(true);
+      }
+      return;
+    }
+
     // Build FULL project context so follow-up prompts modify the existing build
     const projectFiles = flattenFiles(fileTree);
     const CHAR_BUDGET = 120000;
