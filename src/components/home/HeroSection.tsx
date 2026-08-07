@@ -59,7 +59,8 @@ export default function HeroSection() {
       className="relative overflow-hidden min-h-screen flex items-center"
     >
       {/* Dark background */}
-      <div className="absolute inset-0 bg-[#0a0a0a] z-0" />
+      <div className="absolute inset-0 bg-background z-0" />
+      <div className="absolute inset-0 z-0 tech-grid opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
 
       {/* Ambient glow spots */}
       <div
