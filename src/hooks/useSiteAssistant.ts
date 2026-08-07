@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useCredits } from "./useCredits";
+import { useAdmin } from "./useAdmin";
 
 export interface AssistantThread {
   id: string;
@@ -25,6 +27,9 @@ let bootstrapInFlight: Promise<string | null> | null = null;
 export function useSiteAssistant(threadId: string | null) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { credits, refetch: refetchCredits } = useCredits();
+  const { isAdmin } = useAdmin();
+  const outOfCredits = !isAdmin && credits !== null && credits.balance <= 0;
   const [threads, setThreads] = useState<AssistantThread[]>([]);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [loadingThreads, setLoadingThreads] = useState(true);
@@ -138,6 +143,10 @@ export function useSiteAssistant(threadId: string | null) {
     async (text: string, currentPath: string) => {
       const clean = text.trim();
       if (!clean || !user || sending) return null;
+      if (outOfCredits) {
+        setError("You are out of AI credits. Top up to keep chatting with your assistant.");
+        return null;
+      }
 
       let activeId = threadId;
       if (!activeId) activeId = await createThread(titleFrom(clean));
@@ -188,6 +197,8 @@ export function useSiteAssistant(threadId: string | null) {
         await supabase.from("assistant_threads").update(threadPatch).eq("id", activeId);
         await loadThreads();
 
+        refetchCredits();
+
         if (target) {
           setTimeout(() => navigate(target), 350);
         }
@@ -195,12 +206,13 @@ export function useSiteAssistant(threadId: string | null) {
       } catch (e: any) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setError(e?.message || "The assistant could not answer.");
+        refetchCredits();
         return null;
       } finally {
         setSending(false);
       }
     },
-    [user, threadId, messages, sending, createThread, loadThreads, navigate],
+    [user, threadId, messages, sending, outOfCredits, refetchCredits, createThread, loadThreads, navigate],
   );
 
   return {
@@ -210,6 +222,9 @@ export function useSiteAssistant(threadId: string | null) {
     loadingMessages,
     sending,
     error,
+    credits,
+    outOfCredits,
+    refetchCredits,
     clearError: () => setError(null),
     createThread,
     openOrCreateThread,
