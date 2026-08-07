@@ -23,6 +23,39 @@ import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
 
+// -- Preview runtime guard: sandbox-safe storage + error reporting --
+const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
+  if (window.__lunorGuard) return; window.__lunorGuard = true;
+  function memStore(){
+    var m = {};
+    return {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; },
+      setItem: function(k, v){ m[k] = String(v); },
+      removeItem: function(k){ delete m[k]; },
+      clear: function(){ m = {}; },
+      key: function(i){ return Object.keys(m)[i] || null; },
+      get length(){ return Object.keys(m).length; }
+    };
+  }
+  ['localStorage','sessionStorage'].forEach(function(name){
+    var ok = false;
+    try { var s = window[name]; s.setItem('__lunor_probe','1'); s.removeItem('__lunor_probe'); ok = true; } catch(e) { ok = false; }
+    if (!ok) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true, writable: true }); } catch(e) {} }
+  });
+  function report(m, s){
+    try { parent.postMessage({ __lunorPreview: true, type: 'error', message: String(m || 'Unknown error'), stack: String(s || '') }, '*'); } catch(e) {}
+  }
+  window.addEventListener('error', function(e){ if (e && e.message) report(e.message, e.error && e.error.stack); }, true);
+  window.addEventListener('unhandledrejection', function(e){ var r = e && e.reason; report((r && r.message) || r || 'Unhandled promise rejection', r && r.stack); });
+})();<\/script>`;
+
+function injectRuntimeGuard(html: string): string {
+  if (!html || html.includes("__lunor_guard")) return html;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
+  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
+  return PREVIEW_RUNTIME_GUARD + html;
+}
+
 // -- Project types --
 interface SavedProject {
   id: string;
