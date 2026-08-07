@@ -920,8 +920,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   // Assemble one HTML page with sibling CSS/JS injected inline (no nav shim)
-  const assemblePage = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
-    let html = htmlContent;
+  const assemblePage = useCallback((htmlContent: string, allFiles: Record<string, string>, pageName = "index.html") => {
+    // Scaffold shared assets + site nav BEFORE inlining, so injected tags get inlined too
+    let html = scaffoldPage(pageName, htmlContent, allFiles);
+
 
     // Inject a base visible style so content is never invisible against iframe bg
     const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
