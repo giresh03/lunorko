@@ -25,6 +25,8 @@ import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
+import VoiceAssistant from "@/components/editor/VoiceAssistant";
+import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
@@ -1768,6 +1770,21 @@ ${jsCode}
     setChatLoading(false);
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, fileTree, collectFiles]);
 
+  // -- Voice assistant: speak commands, hear friendly replies --
+  const voice = useVoiceAssistant({
+    onFinalTranscript: (text) => { void handleChatSend(text); },
+  });
+  const spokenRef = useRef<number>(-1);
+  useEffect(() => {
+    if (!voice.voiceEnabled || chatLoading) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (spokenRef.current === messages.length - 1) return;
+    spokenRef.current = messages.length - 1;
+    void voice.speak(last.content);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, chatLoading, voice.voiceEnabled]);
+
   // One-click AI fix for runtime errors surfaced by the preview
   const handleResolveError = useCallback(async () => {
     if (!previewError || resolvingError) return;
@@ -2847,7 +2864,21 @@ ${jsCode}
                   </button>
                 )}
               </div>
-              <div className="flex gap-1.5">
+              <VoiceAssistant
+                supported={voice.supported}
+                listening={voice.listening}
+                speaking={voice.speaking}
+                transcript={voice.transcript}
+                error={voice.error}
+                voiceEnabled={voice.voiceEnabled}
+                disabled={chatLoading}
+                accent={currentTheme.uiColors.accent}
+                muted={currentTheme.uiColors.muted}
+                onToggleListening={voice.toggleListening}
+                onToggleVoice={() => voice.setVoiceEnabled(!voice.voiceEnabled)}
+                onStopSpeaking={voice.stopSpeaking}
+              />
+              <div className="mt-1 flex gap-1.5">
                 <input
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
