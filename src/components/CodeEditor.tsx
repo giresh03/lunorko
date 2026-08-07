@@ -530,6 +530,24 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Preview runtime errors reported by the sandboxed iframe
+  const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
+  const [resolvingError, setResolvingError] = useState(false);
+  const setPreview = useCallback((html: string) => {
+    setPreviewError(null);
+    setPreviewContent(injectRuntimeGuard(html));
+  }, []);
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as { __lunorPreview?: boolean; type?: string; message?: string; stack?: string } | null;
+      if (d && d.__lunorPreview && d.type === "error" && d.message) {
+        setPreviewError({ message: d.message, stack: d.stack });
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
   // Theme state
   const [currentThemeId, setCurrentThemeId] = useState<string>(() => localStorage.getItem("lunor-editor-theme") || "vs-dark");
   const [showThemeMenu, setShowThemeMenu] = useState(false);
@@ -966,7 +984,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
     }
 
-    return html;
+    return injectRuntimeGuard(html);
   }, []);
 
   // Build a full HTML document for preview, with multi-page in-iframe navigation
