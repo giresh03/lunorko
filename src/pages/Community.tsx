@@ -135,110 +135,108 @@ const Community = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <FeatureGate feature="community" featureName="Community Hub" requiredPlan="pro">
-        <main className="pt-16">
-          <div className="flex h-[calc(100vh-4rem)] overflow-hidden border-t border-border">
-            {/* Channel sidebar */}
-            <aside className="hidden w-60 shrink-0 border-r border-border bg-card/40 lg:block">
-              <ChannelList />
-            </aside>
+      <main className="pt-16">
+        <div className="flex h-[calc(100vh-4rem)] overflow-hidden border-t border-border">
+          {/* Channel sidebar */}
+          <aside className="hidden w-60 shrink-0 border-r border-border bg-card/40 lg:block">
+            <ChannelList />
+          </aside>
 
-            {/* Channel body */}
-            <section className="flex min-w-0 flex-1 flex-col">
-              {/* Channel header */}
-              <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-                <Sheet open={mobileNav} onOpenChange={setMobileNav}>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden">
-                      <Menu className="h-4 w-4" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-64 p-0">
-                    <ChannelList />
-                  </SheetContent>
-                </Sheet>
+          {/* Channel body */}
+          <section className="flex min-w-0 flex-1 flex-col">
+            {/* Channel header */}
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
+              <Sheet open={mobileNav} onOpenChange={setMobileNav}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 p-0">
+                  <ChannelList />
+                </SheetContent>
+              </Sheet>
 
-                <Hash className="h-4 w-4 text-muted-foreground" />
-                <h1 className="truncate text-sm font-semibold text-foreground">
-                  {currentDomain?.name || selectedDomain}
-                </h1>
-                <Badge variant="outline" className="hidden gap-1 text-[10px] sm:flex">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-                  Live
-                </Badge>
+              <Hash className="h-4 w-4 text-muted-foreground" />
+              <h1 className="truncate text-sm font-semibold text-foreground">
+                {currentDomain?.name || selectedDomain}
+              </h1>
+              <Badge variant="outline" className="hidden gap-1 text-[10px] sm:flex">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                Live
+              </Badge>
 
-                <div className="ml-auto flex items-center gap-1">
-                  <div className="flex rounded-md border border-border p-0.5">
-                    {(["chat", "forum"] as const).map((t) => (
+              <div className="ml-auto flex items-center gap-1">
+                <div className="flex rounded-md border border-border p-0.5">
+                  {(["chat", "forum"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setActiveTab(t)}
+                      className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
+                        activeTab === t
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t === "chat" ? <MessageCircle className="h-3 w-3" /> : <PenSquare className="h-3 w-3" />}
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                {activeTab === "forum" && (
+                  <Button size="sm" className="h-7 text-[11px]" onClick={() => setShowCreate(true)}>
+                    <PenSquare className="mr-1 h-3 w-3" /> New Post
+                  </Button>
+                )}
+              </div>
+            </header>
+
+            {/* Content */}
+            {activeTab === "chat" ? (
+              <DomainChat domainId={selectedDomain} channelName={currentDomain?.name} />
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <div className="mx-auto max-w-3xl">
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {postTypeFilters.map((f) => (
                       <button
-                        key={t}
-                        onClick={() => setActiveTab(t)}
-                        className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
-                          activeTab === t
+                        key={f.value}
+                        onClick={() => setPostFilter(f.value)}
+                        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                          postFilter === f.value
                             ? "bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:text-foreground"
+                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                         }`}
                       >
-                        {t === "chat" ? <MessageCircle className="h-3 w-3" /> : <PenSquare className="h-3 w-3" />}
-                        {t}
+                        <f.icon className="h-3 w-3" />
+                        {f.label}
                       </button>
                     ))}
                   </div>
-                  {activeTab === "forum" && (
-                    <Button size="sm" className="h-7 text-[11px]" onClick={() => setShowCreate(true)}>
-                      <PenSquare className="mr-1 h-3 w-3" /> New Post
-                    </Button>
-                  )}
-                </div>
-              </header>
 
-              {/* Content */}
-              {activeTab === "chat" ? (
-                <DomainChat domainId={selectedDomain} channelName={currentDomain?.name} />
-              ) : (
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                  <div className="mx-auto max-w-3xl">
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      {postTypeFilters.map((f) => (
-                        <button
-                          key={f.value}
-                          onClick={() => setPostFilter(f.value)}
-                          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                            postFilter === f.value
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                          }`}
-                        >
-                          <f.icon className="h-3 w-3" />
-                          {f.label}
-                        </button>
+                  {loading ? (
+                    <div className="py-16 text-center text-muted-foreground">Loading posts...</div>
+                  ) : posts.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
+                      <PenSquare className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                      <p className="text-muted-foreground">No posts yet in this channel.</p>
+                      <Button size="sm" className="mt-3" onClick={() => setShowCreate(true)}>
+                        Be the first to post!
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {posts.map((post) => (
+                        <PostCard key={post.id} post={post} profiles={profiles} onRefresh={fetchPosts} />
                       ))}
                     </div>
-
-                    {loading ? (
-                      <div className="py-16 text-center text-muted-foreground">Loading posts...</div>
-                    ) : posts.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border bg-card/50 p-12 text-center">
-                        <PenSquare className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                        <p className="text-muted-foreground">No posts yet in this channel.</p>
-                        <Button size="sm" className="mt-3" onClick={() => setShowCreate(true)}>
-                          Be the first to post!
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {posts.map((post) => (
-                          <PostCard key={post.id} post={post} profiles={profiles} onRefresh={fetchPosts} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
-              )}
-            </section>
-          </div>
-        </main>
-      </FeatureGate>
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
 
       <CreatePostDialog
         open={showCreate}
