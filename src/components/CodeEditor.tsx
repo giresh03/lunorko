@@ -1583,15 +1583,20 @@ ${jsCode}
           if (resp.status === 404) msg = `AI service not deployed. Run: supabase functions deploy code-engine --project-ref ${import.meta.env.VITE_SUPABASE_PROJECT_ID || "YOUR_PROJECT_REF"}`;
           if (resp.status === 401) msg = "Please log in to use the AI assistant.";
           if (resp.status === 402) {
-            let diagnostic = "";
-            try {
-              const pingResp = await fetchCodeEngine({ action: "ping" });
-              if (pingResp.ok) {
-                const ping = await pingResp.json();
-                diagnostic = `\n\n**Diagnostic:** Provider=${ping.provider}, Project=${ping.projectRef}. ${ping.hint || ""}`;
-              }
-            } catch {}
-            msg = `AI credits exhausted.${diagnostic}\n\n**Fix:** Get a free key from [Google AI Studio](https://aistudio.google.com/apikey), then run: \`supabase secrets set GEMINI_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj\`. If on Lovable preview, set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Lovable env to point to byveaoqwuwyhaykgjufj.`;
+            if (err?.code === "credits_exhausted") {
+              msg = `**You're out of AI credits.** Balance: ${err?.balance ?? 0}.\n\nTop up **20 credits for ₹50** or upgrade your plan on the [Pricing page](/pricing).`;
+              refetchCredits();
+            } else {
+              let diagnostic = "";
+              try {
+                const pingResp = await fetchCodeEngine({ action: "ping" });
+                if (pingResp.ok) {
+                  const ping = await pingResp.json();
+                  diagnostic = `\n\n**Diagnostic:** Provider=${ping.provider}, Project=${ping.projectRef}. ${ping.hint || ""}`;
+                }
+              } catch {}
+              msg = `AI service credits exhausted on the provider side.${diagnostic}`;
+            }
           }
           if (resp.status === 503 && err?.hint) msg = `${err.error} ${err.hint}`;
           upsert(`❌ ${msg}`);
