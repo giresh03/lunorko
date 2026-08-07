@@ -301,7 +301,7 @@ function resolveTargetPath(
   const isGeneric = /^(untitled|index|main|app|script|style|styles)\./i.test(base);
   if (ext) {
     const sameExt = existing.filter((f) => f.name.toLowerCase().endsWith(`.${ext}`));
-    if (sameExt.length === 1 && (isGeneric || sameExt[0].name.split(".").pop()?.toLowerCase() === ext)) {
+    if (isGeneric && sameExt.length === 1) {
       return sameExt[0].path;
     }
   }
