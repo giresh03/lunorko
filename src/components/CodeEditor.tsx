@@ -132,9 +132,9 @@ const getLang = (name: string) => {
 const getFileIcon = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   const colors: Record<string, string> = {
-    js: "text-yellow-400", ts: "text-blue-400", py: "text-green-400",
-    html: "text-orange-400", css: "text-purple-400", json: "text-yellow-300",
-    jsx: "text-cyan-400", tsx: "text-blue-300", md: "text-muted-foreground",
+    js: "text-yellow-400", ts: "text-primary", py: "text-green-400",
+    html: "text-orange-400", css: "text-primary", json: "text-yellow-300",
+    jsx: "text-primary", tsx: "text-primary", md: "text-muted-foreground",
   };
   return colors[ext] || "text-muted-foreground";
 };
@@ -651,14 +651,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; }
 .app { padding: 16px; }
-button { padding: 8px 16px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
+button { padding: 8px 16px; border-radius: 8px; border: none; background: #ef4444; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
 button:active { opacity: 0.8; }
 input, textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; width: 100%; margin: 4px 0; }
 select { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; }
 h1 { font-size: 24px; margin-bottom: 12px; } h2 { font-size: 20px; margin-bottom: 8px; } h3 { font-size: 16px; margin-bottom: 6px; }
 p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
 img { max-width: 100%; border-radius: 8px; }
-a { color: #818cf8; text-decoration: none; }
+a { color: #f87171; text-decoration: none; }
 .error-boundary { padding: 16px; background: #1a0000; border: 1px solid #ff4444; border-radius: 8px; margin: 16px; }
 .error-boundary h3 { color: #ff6b6b; margin-bottom: 8px; }
 .error-boundary pre { font-size: 11px; color: #ff9999; white-space: pre-wrap; word-break: break-all; }
@@ -682,12 +682,12 @@ window.StyleSheet = { create: (s) => s, flatten: (s) => Object.assign({}, ...(Ar
 window.Alert = { alert: (title, msg) => window.alert(title + (msg ? '\\n' + msg : '')) };
 window.Dimensions = { get: () => ({width: window.innerWidth, height: window.innerHeight}) };
 window.Platform = { OS: 'web', select: (o) => o.web || o.default || o.ios };
-window.ActivityIndicator = (props) => React.createElement('div', {style:{textAlign:'center', padding:'20px', color: props?.color || '#6366f1'}}, '⏳ Loading...');
+window.ActivityIndicator = (props) => React.createElement('div', {style:{textAlign:'center', padding:'20px', color: props?.color || '#ef4444'}}, '⏳ Loading...');
 window.Switch = (props) => React.createElement('input', {type:'checkbox', checked: props?.value, onChange: (e) => props?.onValueChange?.(e.target.checked), style:{width:'40px', height:'20px', cursor:'pointer'}});
 window.Modal = (props) => props?.visible ? React.createElement('div', {style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}, React.createElement('div', {style:{background:'#1e1e2e',borderRadius:'12px',padding:'20px',maxWidth:'90%',maxHeight:'90%',overflow:'auto'}}, props?.children)) : null;
 window.KeyboardAvoidingView = (props) => React.createElement('div', props, props?.children);
 // React Native Button shim
-window.Button = (props) => React.createElement('button', {onClick: props?.onPress, disabled: props?.disabled, style: {padding:'10px 20px', borderRadius:'8px', border:'none', background: props?.color || '#6366f1', color:'white', fontSize:'14px', cursor:'pointer', opacity: props?.disabled ? 0.5 : 1, margin:'4px'}}, props?.title || 'Button');
+window.Button = (props) => React.createElement('button', {onClick: props?.onPress, disabled: props?.disabled, style: {padding:'10px 20px', borderRadius:'8px', border:'none', background: props?.color || '#ef4444', color:'white', fontSize:'14px', cursor:'pointer', opacity: props?.disabled ? 0.5 : 1, margin:'4px'}}, props?.title || 'Button');
 window.TouchableHighlight = (props) => React.createElement('button', {...props, onClick: props?.onPress, style: {background:'transparent', border:'none', color:'inherit', padding:0, cursor:'pointer', ...props?.style}}, props?.children);
 window.TouchableWithoutFeedback = (props) => React.createElement('div', {...props, onClick: props?.onPress, style: {cursor:'pointer', ...props?.style}}, props?.children);
 window.SectionList = (props) => React.createElement('div', {style: props?.style}, props?.sections?.map?.((section, si) => React.createElement('div', {key:si}, props?.renderSectionHeader?.({section}), section.data?.map?.((item, index) => props?.renderItem?.({item, index, section})))));
@@ -797,7 +797,7 @@ try {
 body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0f0f23; color: #e0e0e0; padding: 16px; font-size: 13px; }
 .log-line { padding: 2px 0; white-space: pre-wrap; word-break: break-all; border-bottom: 1px solid #1a1a2e; }
 .error { color: #ff6b6b; } .warn { color: #fbbf24; }
-h3 { color: #6366f1; margin-bottom: 8px; font-size: 14px; }
+h3 { color: #ef4444; margin-bottom: 8px; font-size: 14px; }
 ${allCss}
 </style>
 </head><body>
@@ -961,10 +961,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; padding: 16px; }
-button { padding: 8px 16px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
+button { padding: 8px 16px; border-radius: 8px; border: none; background: #ef4444; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
 button:active { opacity: 0.8; }
 input, textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; width: 100%; margin: 4px 0; }
-h1 { font-size: 24px; margin-bottom: 12px; color: #6366f1; }
+h1 { font-size: 24px; margin-bottom: 12px; color: #ef4444; }
 h2 { font-size: 20px; margin-bottom: 8px; }
 p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
 ${allCss}
@@ -2285,12 +2285,12 @@ ${jsCode}
                         {debugOverlay && (
                           <div className="absolute inset-0 z-20 pointer-events-none" style={{ top: "48px" }}>
                             {/* Safe area top */}
-                            <div className="absolute top-0 left-0 right-0 h-11 border-b border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-top</span>
+                            <div className="absolute top-0 left-0 right-0 h-11 border-b border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-primary/70">safe-area-top</span>
                             </div>
                             {/* Safe area bottom */}
-                            <div className="absolute bottom-0 left-0 right-0 h-8 border-t border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-bottom</span>
+                            <div className="absolute bottom-0 left-0 right-0 h-8 border-t border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-primary/70">safe-area-bottom</span>
                             </div>
                             {/* Center crosshair */}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6">
@@ -2300,15 +2300,15 @@ ${jsCode}
                             {/* Grid columns */}
                             <div className="absolute inset-0 flex">
                               {[...Array(4)].map((_, i) => (
-                                <div key={i} className="flex-1 border-r border-dashed border-purple-400/20" />
+                                <div key={i} className="flex-1 border-r border-dashed border-primary/20" />
                               ))}
                             </div>
                             {/* Horizontal thirds */}
                             <div className="absolute left-0 right-0" style={{ top: "33%" }}>
-                              <div className="h-px bg-purple-400/15" />
+                              <div className="h-px bg-primary/15" />
                             </div>
                             <div className="absolute left-0 right-0" style={{ top: "66%" }}>
-                              <div className="h-px bg-purple-400/15" />
+                              <div className="h-px bg-primary/15" />
                             </div>
                             {/* Padding guides */}
                             <div className="absolute top-0 bottom-0 left-4 w-px border-l border-dotted border-yellow-400/30" />
@@ -2343,11 +2343,11 @@ ${jsCode}
                         {/* Debug overlay - tablet */}
                         {debugOverlay && (
                           <div className="absolute inset-0 z-20 pointer-events-none" style={{ top: "32px" }}>
-                            <div className="absolute top-0 left-0 right-0 h-6 border-b border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-top</span>
+                            <div className="absolute top-0 left-0 right-0 h-6 border-b border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-primary/70">safe-area-top</span>
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 h-5 border-t border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-bottom</span>
+                            <div className="absolute bottom-0 left-0 right-0 h-5 border-t border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-primary/70">safe-area-bottom</span>
                             </div>
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8">
                               <div className="absolute top-1/2 left-0 right-0 h-px bg-red-400/40" />
@@ -2355,7 +2355,7 @@ ${jsCode}
                             </div>
                             <div className="absolute inset-0 flex">
                               {[...Array(6)].map((_, i) => (
-                                <div key={i} className="flex-1 border-r border-dashed border-purple-400/15" />
+                                <div key={i} className="flex-1 border-r border-dashed border-primary/15" />
                               ))}
                             </div>
                             <div className="absolute top-0 bottom-0 left-5 w-px border-l border-dotted border-yellow-400/25" />

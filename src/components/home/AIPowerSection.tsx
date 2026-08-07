@@ -130,7 +130,7 @@ const darkColors: Record<TokenType, string> = {
   variable: "text-[#eeffff]",
   plain: "text-[#eeffff]",
   decorator: "text-[#c792ea]",
-  "ai-suggestion": "text-[#6366f1]",
+  "ai-suggestion": "text-[#ef4444]",
 };
 
 const lightColors: Record<TokenType, string> = {
@@ -145,7 +145,7 @@ const lightColors: Record<TokenType, string> = {
   variable: "text-[#1e293b]",
   plain: "text-[#334155]",
   decorator: "text-[#7c3aed]",
-  "ai-suggestion": "text-[#6366f1]",
+  "ai-suggestion": "text-[#ef4444]",
 };
 
 const darkGlowColors: Record<TokenType, string> = {
@@ -289,7 +289,7 @@ const AIPowerSection = () => {
                   <div className={cn(
                     "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-all duration-500",
                     aiThinking
-                      ? "bg-[hsl(239,84%,67%/0.15)] text-[#818cf8]"
+                      ? "bg-[hsl(0,84%,55%/0.15)] text-[#f87171]"
                       : isDark
                         ? "bg-[#21262d] text-[#8b949e]"
                         : "bg-[#eaeef2] text-[#656d76]"
@@ -311,7 +311,7 @@ const AIPowerSection = () => {
                       className={cn(
                         "absolute top-0.5 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)]",
                         isDark
-                          ? "left-0.5 bg-[#6366f1] shadow-[0_0_12px_rgba(99,102,241,0.5)]"
+                          ? "left-0.5 bg-[#ef4444] shadow-[0_0_12px_rgba(99,102,241,0.5)]"
                           : "left-[26px] bg-[#fbbf24] shadow-[0_0_12px_rgba(251,191,36,0.5)]"
                       )}
                     >
@@ -341,14 +341,14 @@ const AIPowerSection = () => {
                       key={lineIdx}
                       className={cn(
                         "flex items-center group transition-all duration-300",
-                        cursorLine === lineIdx && "bg-[hsl(239,84%,67%/0.04)]"
+                        cursorLine === lineIdx && "bg-[hsl(0,84%,55%/0.04)]"
                       )}
                     >
                       {/* Line number */}
                       <span className={cn(
                         "w-8 shrink-0 text-right pr-4 select-none text-[11px] transition-colors duration-700",
                         isDark ? "text-[#484f58]" : "text-[#c9d1d9]",
-                        cursorLine === lineIdx && (isDark ? "text-[#6366f1]" : "text-[#4f46e5]")
+                        cursorLine === lineIdx && (isDark ? "text-[#ef4444]" : "text-[#4f46e5]")
                       )}>
                         {lineIdx + 1}
                       </span>
@@ -376,7 +376,7 @@ const AIPowerSection = () => {
                             className={cn(
                               "inline-block w-[2px] h-[18px] ml-0.5 transition-opacity duration-100",
                               cursorVisible ? "opacity-100" : "opacity-0",
-                              isDark ? "bg-[#6366f1]" : "bg-[#4f46e5]",
+                              isDark ? "bg-[#ef4444]" : "bg-[#4f46e5]",
                             )}
                             style={{
                               boxShadow: isDark ? "0 0 8px rgba(99,102,241,0.6)" : "none",
@@ -431,11 +431,11 @@ const AIPowerSection = () => {
               {/* Ambient glow (dark mode only) */}
               <div className={cn(
                 "absolute -bottom-20 -right-20 w-60 h-60 rounded-full blur-[80px] transition-opacity duration-700 pointer-events-none",
-                isDark ? "opacity-100 bg-[hsl(239,84%,67%/0.06)]" : "opacity-0"
+                isDark ? "opacity-100 bg-[hsl(0,84%,55%/0.06)]" : "opacity-0"
               )} />
               <div className={cn(
                 "absolute -top-10 -left-10 w-40 h-40 rounded-full blur-[60px] transition-opacity duration-700 pointer-events-none",
-                isDark ? "opacity-100 bg-[hsl(192,91%,36%/0.04)]" : "opacity-0"
+                isDark ? "opacity-100 bg-[hsl(14,92%,58%/0.04)]" : "opacity-0"
               )} />
             </div>
           </div>
@@ -443,12 +443,12 @@ const AIPowerSection = () => {
           {/* Content */}
           <div className="order-1 lg:order-2">
             <div className="scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
-              <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-[hsl(239,84%,67%/0.3)] bg-[hsl(239,84%,67%/0.06)] px-4 py-1.5 text-xs font-semibold tracking-wider uppercase text-[hsl(239,84%,67%)]">
+              <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-[hsl(0,84%,55%/0.3)] bg-[hsl(0,84%,55%/0.06)] px-4 py-1.5 text-xs font-semibold tracking-wider uppercase text-[hsl(0,84%,55%)]">
                 <Sparkles className="h-3 w-3" /> AI-Powered IDE
               </span>
               <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl lg:text-5xl leading-[1.1]">
                 Your Personal{" "}
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#6366f1] to-[#06b6d4]">
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#ef4444] to-[#f97316]">
                   AI Coding Mentor
                 </span>
               </h2>
@@ -465,9 +465,9 @@ const AIPowerSection = () => {
                   className="scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out"
                   style={{ transitionDelay: `${i * 80}ms` }}
                 >
-                  <div className="group flex gap-3 rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm p-4 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-[hsl(239,84%,67%/0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(99,102,241,0.06)]">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(239,84%,67%/0.08)] transition-all duration-500 group-hover:scale-110 group-hover:bg-[hsl(239,84%,67%/0.15)] group-hover:shadow-[0_0_20px_rgba(99,102,241,0.15)]">
-                      <cap.icon className="h-4 w-4 text-[hsl(239,84%,67%)]" />
+                  <div className="group flex gap-3 rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm p-4 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:border-[hsl(0,84%,55%/0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(99,102,241,0.06)]">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[hsl(0,84%,55%/0.08)] transition-all duration-500 group-hover:scale-110 group-hover:bg-[hsl(0,84%,55%/0.15)] group-hover:shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+                      <cap.icon className="h-4 w-4 text-[hsl(0,84%,55%)]" />
                     </div>
                     <div>
                       <h4 className="text-sm font-semibold text-foreground">{cap.title}</h4>

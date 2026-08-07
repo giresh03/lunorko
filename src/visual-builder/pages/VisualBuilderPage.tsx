@@ -20,7 +20,7 @@ function ExportButton() {
   return (
     <button
       onClick={handleExport}
-      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-md"
+      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-primary hover:bg-primary rounded-md"
       title="Copy JSON schema"
     >
       <Code className="h-4 w-4" />

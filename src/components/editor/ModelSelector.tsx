@@ -76,16 +76,16 @@ const ModelSelector = ({ selectedModel, onSelect, themeColors }: ModelSelectorPr
               onClick={() => { onSelect(model.id); setOpen(false); }}
               className="flex w-full items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/5"
               style={{
-                color: isSelected ? "#818cf8" : "#e0e0e0",
+                color: isSelected ? "#f87171" : "#e0e0e0",
                 backgroundColor: isSelected ? "rgba(129,140,248,0.12)" : "transparent",
               }}
             >
-              <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: isSelected ? "#818cf8" : "#888" }} />
+              <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: isSelected ? "#f87171" : "#888" }} />
               <div className="flex-1 text-left">
                 <span className="font-medium">{model.label}</span>
                 <span className="block text-[9px]" style={{ color: "#999" }}>{model.description}</span>
               </div>
-              {isSelected && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "#818cf8" }} />}
+              {isSelected && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "#f87171" }} />}
             </button>
           );
         })}

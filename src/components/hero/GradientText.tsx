@@ -16,7 +16,7 @@ export default function GradientText({ children, className, animate = true }: Gr
         className
       )}
       style={{
-        backgroundImage: "linear-gradient(135deg, #6366f1 0%, #06b6d4 30%, #8b5cf6 60%, #14b8a6 100%)",
+        backgroundImage: "linear-gradient(135deg, #ef4444 0%, #f97316 30%, #dc2626 60%, #14b8a6 100%)",
       }}
     >
       {children}
