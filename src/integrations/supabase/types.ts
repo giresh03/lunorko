@@ -122,6 +122,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_credits: {
+        Row: {
+          created_at: string
+          id: string
+          period_start: string
+          plan_credits: number
+          plan_id: string
+          topup_credits: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          period_start?: string
+          plan_credits?: number
+          plan_id?: string
+          topup_credits?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          period_start?: string
+          plan_credits?: number
+          plan_id?: string
+          topup_credits?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           created_at: string
@@ -1179,6 +1212,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_topup_credits: {
+        Args: { _credits: number; _user_id: string }
+        Returns: Json
+      }
+      consume_ai_credit: {
+        Args: { _amount?: number; _user_id: string }
+        Returns: Json
+      }
       count_unique_visitors: { Args: never; Returns: number }
       get_user_plan: { Args: { _user_id: string }; Returns: string }
       get_visitor_trends: {
@@ -1195,6 +1236,26 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      plan_credit_allowance: { Args: { _plan_id: string }; Returns: number }
+      sync_ai_credits: {
+        Args: { _user_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          period_start: string
+          plan_credits: number
+          plan_id: string
+          topup_credits: number
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ai_credits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
