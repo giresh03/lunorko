@@ -65,8 +65,8 @@ const plans = [
   {
     id: "pro",
     name: "Pro",
-    price: 50,
-    amountPaise: 5000,
+    price: 150,
+    amountPaise: 15000,
     icon: Star,
     credits: 60,
     color: "from-primary/20 to-primary/5",
@@ -88,8 +88,8 @@ const plans = [
   {
     id: "premium",
     name: "Premium",
-    price: 100,
-    amountPaise: 10000,
+    price: 250,
+    amountPaise: 25000,
     icon: Crown,
     credits: 100,
     color: "from-yellow-500/20 to-yellow-500/5",
@@ -110,8 +110,8 @@ const plans = [
   {
     id: "professional",
     name: "Professional",
-    price: 150,
-    amountPaise: 15000,
+    price: 500,
+    amountPaise: 50000,
     icon: Rocket,
     credits: 150,
     color: "from-primary/20 to-primary/5",
