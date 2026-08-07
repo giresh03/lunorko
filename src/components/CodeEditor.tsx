@@ -1770,6 +1770,21 @@ ${jsCode}
     setChatLoading(false);
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, fileTree, collectFiles]);
 
+  // -- Voice assistant: speak commands, hear friendly replies --
+  const voice = useVoiceAssistant({
+    onFinalTranscript: (text) => { void handleChatSend(text); },
+  });
+  const spokenRef = useRef<number>(-1);
+  useEffect(() => {
+    if (!voice.voiceEnabled || chatLoading) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (spokenRef.current === messages.length - 1) return;
+    spokenRef.current = messages.length - 1;
+    void voice.speak(last.content);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, chatLoading, voice.voiceEnabled]);
+
   // One-click AI fix for runtime errors surfaced by the preview
   const handleResolveError = useCallback(async () => {
     if (!previewError || resolvingError) return;
