@@ -1473,15 +1473,24 @@ ${jsCode}
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
-      // Prepare all new files/updates in one pass
+      // Prepare all new files/updates in one pass — resolve onto existing paths first
+      const existingForResolve = flattenFiles(fileTree);
       const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const newId = resolveTargetPath(fname, normalizedLang, existingForResolve);
+        const displayName = newId.split("/").pop() || fname;
+        if (newFiles.some((f) => f.id === newId)) {
+          // Same file returned twice in one response — keep the latest version
+          const idx = newFiles.findIndex((f) => f.id === newId);
+          newFiles[idx] = { id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code };
+          return;
+        }
+        newFiles.push({ id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code });
       });
+
 
       // Batch update file tree in a single setState
       setFileTree(prev => {
