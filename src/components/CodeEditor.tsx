@@ -1709,6 +1709,24 @@ ${jsCode}
     setChatLoading(false);
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, fileTree, collectFiles]);
 
+  // One-click AI fix for runtime errors surfaced by the preview
+  const handleResolveError = useCallback(async () => {
+    if (!previewError || resolvingError) return;
+    setResolvingError(true);
+    setShowChat(true);
+    const prompt =
+      `The generated site threw a runtime error in the preview. Fix the root cause in the project files.\n` +
+      `Error: ${previewError.message}\n` +
+      (previewError.stack ? `Stack: ${previewError.stack.slice(0, 1500)}\n` : "") +
+      `Rules: keep the existing design and features, avoid APIs unavailable in a sandboxed iframe (use in-memory or guarded storage), and return the COMPLETE updated file(s) using the exact existing file paths.`;
+    try {
+      await handleChatSend(prompt);
+    } finally {
+      setPreviewError(null);
+      setResolvingError(false);
+    }
+  }, [previewError, resolvingError, handleChatSend]);
+
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
   };
