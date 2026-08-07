@@ -2871,6 +2871,21 @@ ${jsCode}
                   </button>
                 )}
               </div>
+              {credits && (
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
+                  style={{
+                    color: credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444",
+                    backgroundColor: (credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444") + "15",
+                  }}
+                  title={`${credits.planCredits} plan credits + ${credits.topupCredits} top-up credits`}
+                >
+                  {credits.balance} credits
+                  {credits.balance === 0 && (
+                    <a href="/pricing" className="underline ml-1">Top up</a>
+                  )}
+                </div>
+              )}
               <VoiceAssistant
                 supported={voice.supported}
                 listening={voice.listening}
