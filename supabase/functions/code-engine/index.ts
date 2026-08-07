@@ -945,6 +945,10 @@ Iterative editing (critical — the user keeps chatting about the SAME project):
 - Preserve everything the user did not ask you to change (existing sections, styles, ids/classes, scripts, and cross-file references).
 - If the user reports an error or bug, fix the root cause in the existing files and return those same files, fully updated.
 - Only create a new file when the request genuinely needs one, and wire it into the existing files (e.g. add the <link>/<script> tag) in the same response.
+- MULTI-PAGE / FULL-STACK EDITS: when you add a page, also update the shared nav on EVERY
+  existing page in the same response so links never break. When you change a data shape,
+  update db/schema.sql, server/api.js, server/backend.js, and every page that reads it —
+  all in the same response. Never leave the project in a half-migrated state.
 ${stackDirective}`;
 
 
