@@ -263,6 +263,55 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
   return blocks;
 }
 
+// Flatten a file tree into a list of real files (path + content)
+function flattenFiles(nodes: FileNode[]): { path: string; name: string; content: string; language?: string }[] {
+  const out: { path: string; name: string; content: string; language?: string }[] = [];
+  const walk = (ns: FileNode[]) => {
+    for (const n of ns) {
+      if (n.type === "file") out.push({ path: n.id, name: n.name, content: n.content ?? "", language: n.language });
+      if (n.children) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
+// Map a filename returned by the AI onto an EXISTING project file when possible,
+// so follow-up prompts edit the current build instead of creating duplicates.
+function resolveTargetPath(
+  filename: string,
+  language: string,
+  existing: { path: string; name: string; language?: string }[]
+): string {
+  const clean = filename.replace(/^\.?\//, "");
+  const base = clean.split("/").pop() || clean;
+
+  // 1. Exact path match
+  const byPath = existing.find((f) => f.path === clean || f.path === `src/${clean}`);
+  if (byPath) return byPath.path;
+
+  // 2. Same basename anywhere in the tree (prefer src/)
+  const byName = existing
+    .filter((f) => f.name.toLowerCase() === base.toLowerCase())
+    .sort((a, b) => (a.path.startsWith("src/") ? -1 : 1) - (b.path.startsWith("src/") ? -1 : 1));
+  if (byName[0]) return byName[0].path;
+
+  // 3. Untitled/generic name but a single existing file of the same extension → edit that file
+  const ext = base.split(".").pop()?.toLowerCase() || "";
+  const isGeneric = /^(untitled|index|main|app|script|style|styles)\./i.test(base);
+  if (ext) {
+    const sameExt = existing.filter((f) => f.name.toLowerCase().endsWith(`.${ext}`));
+    if (isGeneric && sameExt.length === 1) {
+      return sameExt[0].path;
+    }
+  }
+
+  // 4. New file → place under src/
+  return clean.startsWith("src/") ? clean : `src/${base}`;
+
+}
+
+
 // -- File Explorer Item --
 const FileItem = ({
   node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
@@ -1309,8 +1358,32 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
-    // Add file context to the user message
-    const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
+    // Build FULL project context so follow-up prompts modify the existing build
+    const projectFiles = flattenFiles(fileTree);
+    const CHAR_BUDGET = 40000;
+    const PER_FILE = 9000;
+    let used = 0;
+    const fileBlocks: string[] = [];
+    // Active file first so the AI focuses on what the user is looking at
+    const ordered = [...projectFiles].sort((a, b) => {
+      if (activeTab && a.path === activeTab.id) return -1;
+      if (activeTab && b.path === activeTab.id) return 1;
+      return 0;
+    });
+    for (const f of ordered) {
+      if (used >= CHAR_BUDGET) break;
+      const body = (f.content || "").slice(0, PER_FILE);
+      used += body.length;
+      fileBlocks.push(`${f.path}\n\`\`\`${f.language || getLang(f.name)}\n${body}\n\`\`\``);
+    }
+    const fileContext = projectFiles.length
+      ? `\n\n---\n[CURRENT PROJECT STATE — ${projectFiles.length} file(s). This is the website/app already built. Treat my request above as an EDIT to these files.]\n` +
+        `Files: ${projectFiles.map((f) => f.path).join(", ")}\n` +
+        (activeTab ? `Currently open file: ${activeTab.id}\n` : "") +
+        `\n${fileBlocks.join("\n\n")}\n\n` +
+        `[EDIT RULES: Reuse the EXACT file paths above when changing a file. Return the COMPLETE updated file content (never diffs, never "// rest unchanged"). Only return the files that actually change. Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
+      : "";
+
     const userMsg: Message = { role: "user", content: chatInput };
     const updated = [...messages, userMsg];
     setMessages(updated);
@@ -1401,15 +1474,24 @@ ${jsCode}
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
-      // Prepare all new files/updates in one pass
+      // Prepare all new files/updates in one pass — resolve onto existing paths first
+      const existingForResolve = flattenFiles(fileTree);
       const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const newId = resolveTargetPath(fname, normalizedLang, existingForResolve);
+        const displayName = newId.split("/").pop() || fname;
+        if (newFiles.some((f) => f.id === newId)) {
+          // Same file returned twice in one response — keep the latest version
+          const idx = newFiles.findIndex((f) => f.id === newId);
+          newFiles[idx] = { id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code };
+          return;
+        }
+        newFiles.push({ id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code });
       });
+
 
       // Batch update file tree in a single setState
       setFileTree(prev => {
@@ -1528,7 +1610,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, fileTree, collectFiles]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
