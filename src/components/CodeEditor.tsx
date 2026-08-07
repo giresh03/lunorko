@@ -22,6 +22,7 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { scaffoldPage } from "@/lib/siteScaffold";
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
