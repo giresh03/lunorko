@@ -22,6 +22,7 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { scaffoldPage } from "@/lib/siteScaffold";
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
@@ -919,8 +920,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   // Assemble one HTML page with sibling CSS/JS injected inline (no nav shim)
-  const assemblePage = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
-    let html = htmlContent;
+  const assemblePage = useCallback((htmlContent: string, allFiles: Record<string, string>, pageName = "index.html") => {
+    // Scaffold shared assets + site nav BEFORE inlining, so injected tags get inlined too
+    let html = scaffoldPage(pageName, htmlContent, allFiles);
+
 
     // Inject a base visible style so content is never invisible against iframe bg
     const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
@@ -934,14 +937,21 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 
     // Track which CSS/JS files were already referenced and injected
     const injectedFiles = new Set<string>();
+    const scaffolded = html;
+    const lookup = (fileName: string): string | undefined => {
+      if (allFiles[fileName] != null) return allFiles[fileName];
+      const key = Object.keys(allFiles).find((k) => (k.split("/").pop() || k) === fileName);
+      return key ? allFiles[key] : undefined;
+    };
 
     // Find referenced CSS files and inject inline if they exist in the project
     const cssLinkRegex = /<link[^>]+href=["']([^"']+\.css)["'][^>]*>/gi;
     let cssMatch;
-    while ((cssMatch = cssLinkRegex.exec(htmlContent)) !== null) {
+    while ((cssMatch = cssLinkRegex.exec(scaffolded)) !== null) {
       const cssFileName = cssMatch[1].split("/").pop() || "";
-      if (allFiles[cssFileName]) {
-        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${allFiles[cssFileName]}</style>`);
+      const cssContent = lookup(cssFileName);
+      if (cssContent != null) {
+        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${cssContent}</style>`);
         injectedFiles.add(cssFileName);
       }
     }
@@ -949,13 +959,15 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     // Find referenced JS files and inject inline if they exist in the project
     const jsScriptRegex = /<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/gi;
     let jsMatch;
-    while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
+    while ((jsMatch = jsScriptRegex.exec(scaffolded)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
-        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
+      const jsContent = lookup(jsFileName);
+      if (jsContent != null) {
+        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${jsContent}<\/script>`);
         injectedFiles.add(jsFileName);
       }
     }
+
 
     // Also inject any remaining CSS/JS files that weren't explicitly referenced
     const remainingCss = Object.entries(allFiles)
@@ -988,16 +1000,23 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   // Build a full HTML document for preview, with multi-page in-iframe navigation
-  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
-    let html = assemblePage(htmlContent, allFiles);
+  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>, currentPage?: string) => {
+    // Identify which project page this content belongs to (so nav marks it active)
+    const activeName =
+      (currentPage && (currentPage.split("/").pop() || currentPage)) ||
+      Object.keys(allFiles).find((n) => n.endsWith(".html") && allFiles[n] === htmlContent)?.split("/").pop() ||
+      "index.html";
+    let html = assemblePage(htmlContent, allFiles, activeName);
 
     // Multi-page navigation: pre-assemble every sibling .html page and swap in-iframe
     const pageNames = Object.keys(allFiles).filter((n) => n.endsWith(".html"));
     if (pageNames.length > 1) {
       const pages: Record<string, string> = {};
       for (const name of pageNames) {
-        pages[name.split("/").pop() || name] = assemblePage(allFiles[name], allFiles);
+        const short = name.split("/").pop() || name;
+        pages[short] = assemblePage(allFiles[name], allFiles, short);
       }
+
       const shim = `<script>(function(){
   var PAGES = ${JSON.stringify(pages).replace(/<\/script>/gi, "<\\/script>")};
   function nav(name){
@@ -1140,7 +1159,7 @@ ${jsCode}
     const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
-      setPreview(buildPreviewHtml(activeTab.content, allFiles));
+      setPreview(buildPreviewHtml(activeTab.content, allFiles, activeTab.name));
     } else if (isJsLike && hasJSXContent) {
       setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
@@ -1399,7 +1418,7 @@ ${jsCode}
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
       if (isHtml) {
-        setPreview(buildPreviewHtml(activeTab.content, allFiles));
+        setPreview(buildPreviewHtml(activeTab.content, allFiles, activeTab.name));
       } else if (isJsLike && hasJSXInFile) {
         setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       } else if (isJsLike && usesDOM) {
@@ -1652,7 +1671,7 @@ ${jsCode}
               const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(previewFile.code);
 
               if (isHtml) {
-                setPreview(buildPreviewHtml(previewFile.code, allFiles));
+                setPreview(buildPreviewHtml(previewFile.code, allFiles, previewFile.name));
               } else if (isJsLike && hasJSX) {
                 setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               } else if (isJsLike && usesDOM) {
