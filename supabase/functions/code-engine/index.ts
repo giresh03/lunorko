@@ -957,6 +957,16 @@ Iterative editing (critical — the user keeps chatting about the SAME project):
   existing page in the same response so links never break. When you change a data shape,
   update db/schema.sql, server/api.js, server/backend.js, and every page that reads it —
   all in the same response. Never leave the project in a half-migrated state.
+- TARGETED EDIT ONLY (highest priority): identify the exact thing the user asked to change and
+  change only that. Everything else must stay byte-identical: layout, DOM structure, markup order,
+  class names, ids, styling, spacing, colors, fonts, animations, copy/content, images, scripts,
+  data attributes, and behavior.
+- Do NOT redesign, restyle, refactor, rename, reformat, reorder, "improve", or regenerate any
+  section the user did not mention — even if you think it could be better.
+- Do NOT add new sections, pages, dependencies, or files unless the request requires them.
+- Treat every follow-up as a patch to the existing project, not a new generation. If a change
+  could ripple, keep the impact as localized as possible (smallest edit that satisfies the ask).
+- Suggestions for unrelated improvements are not allowed in code — only change what was asked.
 ${stackDirective}`;
 
 
