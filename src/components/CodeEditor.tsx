@@ -263,6 +263,54 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
   return blocks;
 }
 
+// Flatten a file tree into a list of real files (path + content)
+function flattenFiles(nodes: FileNode[]): { path: string; name: string; content: string; language?: string }[] {
+  const out: { path: string; name: string; content: string; language?: string }[] = [];
+  const walk = (ns: FileNode[]) => {
+    for (const n of ns) {
+      if (n.type === "file") out.push({ path: n.id, name: n.name, content: n.content ?? "", language: n.language });
+      if (n.children) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
+// Map a filename returned by the AI onto an EXISTING project file when possible,
+// so follow-up prompts edit the current build instead of creating duplicates.
+function resolveTargetPath(
+  filename: string,
+  language: string,
+  existing: { path: string; name: string; language?: string }[]
+): string {
+  const clean = filename.replace(/^\.?\//, "");
+  const base = clean.split("/").pop() || clean;
+
+  // 1. Exact path match
+  const byPath = existing.find((f) => f.path === clean || f.path === `src/${clean}`);
+  if (byPath) return byPath.path;
+
+  // 2. Same basename anywhere in the tree (prefer src/)
+  const byName = existing
+    .filter((f) => f.name.toLowerCase() === base.toLowerCase())
+    .sort((a, b) => (a.path.startsWith("src/") ? -1 : 1) - (b.path.startsWith("src/") ? -1 : 1));
+  if (byName[0]) return byName[0].path;
+
+  // 3. Untitled/generic name but a single existing file of the same extension → edit that file
+  const ext = base.split(".").pop()?.toLowerCase() || "";
+  const isGeneric = /^(untitled|index|main|app|script|style|styles)\./i.test(base);
+  if (ext) {
+    const sameExt = existing.filter((f) => f.name.toLowerCase().endsWith(`.${ext}`));
+    if (sameExt.length === 1 && (isGeneric || sameExt[0].name.split(".").pop()?.toLowerCase() === ext)) {
+      return sameExt[0].path;
+    }
+  }
+
+  // 4. New file → place under src/
+  return clean.includes("/") ? clean : `src/${base}`;
+}
+
+
 // -- File Explorer Item --
 const FileItem = ({
   node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
