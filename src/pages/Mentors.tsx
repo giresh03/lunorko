@@ -13,7 +13,6 @@ import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 export interface Mentor {
   id: string;
   name: string;
-  email: string;
   company: string;
   role: string;
   domain_id: string;

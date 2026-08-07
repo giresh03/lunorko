@@ -21,7 +21,6 @@ import { domains } from "@/lib/domains";
 interface GuidanceMentor {
   id: string;
   name: string;
-  email: string;
   company: string;
   role: string;
   domain_id: string;
