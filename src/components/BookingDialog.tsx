@@ -63,35 +63,42 @@ const BookingDialog = ({ open, onOpenChange, mentor }: BookingDialogProps) => {
 
     setBooking(true);
 
-    // Mark slot as booked
-    const { error: slotError } = await supabase
+    // Create booking first (slot updates are only allowed for your own booking)
+    const { data: createdBooking, error: bookingError } = await supabase
+      .from("bookings")
+      .insert({
+        student_id: user.id,
+        mentor_id: mentor.id,
+        slot_id: selectedSlot.id,
+        domain_id: mentor.domain_id,
+        meeting_link: mentor.meeting_link,
+        notes: notes.trim() || null,
+      })
+      .select("id")
+      .single();
+
+    if (bookingError || !createdBooking) {
+      toast({ title: "Booking failed", description: "Please try again.", variant: "destructive" });
+      setBooking(false);
+      return;
+    }
+
+    // Mark slot as booked (only succeeds if still free)
+    const { data: updatedSlots, error: slotError } = await supabase
       .from("mentor_slots")
       .update({ is_booked: true })
-      .eq("id", selectedSlot.id);
+      .eq("id", selectedSlot.id)
+      .eq("is_booked", false)
+      .select("id");
 
-    if (slotError) {
+    if (slotError || !updatedSlots || updatedSlots.length === 0) {
+      // Slot was taken in the meantime: remove the booking again
+      await supabase.from("bookings").delete().eq("id", createdBooking.id);
       toast({ title: "Booking failed", description: "This slot may already be taken. Please try another.", variant: "destructive" });
       setBooking(false);
       return;
     }
 
-    // Create booking
-    const { error: bookingError } = await supabase.from("bookings").insert({
-      student_id: user.id,
-      mentor_id: mentor.id,
-      slot_id: selectedSlot.id,
-      domain_id: mentor.domain_id,
-      meeting_link: mentor.meeting_link,
-      notes: notes.trim() || null,
-    });
-
-    if (bookingError) {
-      // Revert slot
-      await supabase.from("mentor_slots").update({ is_booked: false }).eq("id", selectedSlot.id);
-      toast({ title: "Booking failed", description: bookingError.message, variant: "destructive" });
-      setBooking(false);
-      return;
-    }
 
     setBooked(true);
     setBooking(false);

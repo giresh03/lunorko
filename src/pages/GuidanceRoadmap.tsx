@@ -21,7 +21,6 @@ import { domains } from "@/lib/domains";
 interface GuidanceMentor {
   id: string;
   name: string;
-  email: string;
   company: string;
   role: string;
   domain_id: string;
@@ -56,7 +55,7 @@ const GuidanceRoadmap = () => {
     const fetchMentors = async () => {
       const { data } = await supabase
         .from("mentors")
-        .select("*")
+        .select("id, name, company, role, domain_id, bio, avatar_url, meeting_link, years_experience, is_active, created_at, college_preparation, tech_stack, career_tips, journey_summary")
         .eq("is_active", true)
         .not("college_preparation", "is", null);
       setMentors((data as GuidanceMentor[]) ?? []);
