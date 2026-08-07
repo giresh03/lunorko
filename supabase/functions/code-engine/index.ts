@@ -876,6 +876,14 @@ serve(async (req) => {
         ? `
 - STACK: HTML + CSS + JS ONLY (vanilla). Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - MULTI-PAGE BY DEFAULT: build a real site with as many pages as the prompt implies
+- SCAFFOLD FIRST (a single prompt must produce the WHOLE site): before writing page bodies,
+  decide the complete page list and the shared shell, then emit files in this order:
+  1) styles.css (design tokens, layout, shared nav/footer styles),
+  2) script.js (nav active-state, mobile menu toggle, shared helpers),
+  3) index.html, 4) every other page.
+  * The nav in EVERY page lists the SAME pages in the SAME order, with class="active" on the
+    current page. Never link to a page you did not create, and never create an orphan page.
+  * Never leave a page as a stub — every page has real, page-specific content.
   (index.html, about.html, services.html, pricing.html, contact.html, blog.html,
   dashboard.html, login.html, signup.html, admin.html, ...). No artificial file limit.
   * Every page is a COMPLETE standalone HTML document (<!DOCTYPE html> ... </html>).
