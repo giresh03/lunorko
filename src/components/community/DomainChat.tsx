@@ -233,7 +233,7 @@ const DomainChat = ({ domainId, channelName }: { domainId: string; channelName?:
       }
     }
 
-    const payload: Record<string, unknown> = {
+    const payload: any = {
       user_id: user.id,
       domain_id: domainId,
       content: text || (code ? "Shared a code snippet" : fileUrl ? "Shared an image" : ""),
