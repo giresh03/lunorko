@@ -7,10 +7,12 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import GitHubPushDialog from "@/components/GitHubPushDialog";
+import { useGitHub } from "@/hooks/useGitHub";
 import ReactMarkdown from "react-markdown";
 import { editorThemes, getThemeById, type EditorTheme } from "@/lib/editorThemes";
 import { getDomainEnvironment, domainEnvironments } from "@/lib/domainEnvironments";
@@ -488,6 +490,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showSidebar, setShowSidebar] = useState(true);
   const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons">("files");
   const [showAIPanel, setShowAIPanel] = useState(true);
+  const [showGitHub, setShowGitHub] = useState(false);
+  const { status: githubStatus, push: githubPush } = useGitHub();
   const [online, setOnline] = useState(isOnline());
 
   // Sync offline cache on mount
