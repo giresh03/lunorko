@@ -1140,17 +1140,17 @@ ${jsCode}
     const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
-      setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+      setPreview(buildPreviewHtml(activeTab.content, allFiles));
     } else if (isJsLike && hasJSXContent) {
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isJsLike && usesDOM) {
       // Vanilla JS with DOM usage — render in an HTML shell with DOM available
-      setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+      setPreview(buildVanillaJsPreview(activeTab.content, allFiles));
     } else if (isJsLike) {
       // Pure JS without DOM — run and capture console output
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     }
   }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain]);
 
@@ -1399,13 +1399,13 @@ ${jsCode}
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
       if (isHtml) {
-        setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+        setPreview(buildPreviewHtml(activeTab.content, allFiles));
       } else if (isJsLike && hasJSXInFile) {
-        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+        setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       } else if (isJsLike && usesDOM) {
-        setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+        setPreview(buildVanillaJsPreview(activeTab.content, allFiles));
       } else {
-        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+        setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       }
       setOutput((p) => [...p, "✅ Preview rendered successfully"]);
       setIsRunning(false);
@@ -1651,13 +1651,13 @@ ${jsCode}
               const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(previewFile.code);
 
               if (isHtml) {
-                setPreviewContent(buildPreviewHtml(previewFile.code, allFiles));
+                setPreview(buildPreviewHtml(previewFile.code, allFiles));
               } else if (isJsLike && hasJSX) {
-                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+                setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               } else if (isJsLike && usesDOM) {
-                setPreviewContent(buildVanillaJsPreview(previewFile.code, allFiles));
+                setPreview(buildVanillaJsPreview(previewFile.code, allFiles));
               } else if (isJsLike) {
-                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+                setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               }
             }
 
