@@ -56,7 +56,7 @@ const AppContent = () => {
         <Route path="/projects" element={<ProjectBuilder />} />
         <Route path="/ai-interview" element={<AIVideoInterview />} />
         <Route path="/visual-builder" element={<VisualBuilderPage />} />
-        <Route path="/github/callback" element={<GitHubCallback />} />>
+        <Route path="/github/callback" element={<GitHubCallback />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
