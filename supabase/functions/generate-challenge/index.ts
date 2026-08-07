@@ -40,10 +40,12 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
-      return new Response(JSON.stringify(existing), {
+      const { solution_code: _s, ...safeExisting } = existing as Record<string, unknown>;
+      return new Response(JSON.stringify(safeExisting), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const domainNames: Record<string, string> = {
       "web-development": "Web Development (HTML, CSS, JS, React, Node.js)",
