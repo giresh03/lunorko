@@ -25,6 +25,8 @@ import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
+import VoiceAssistant from "@/components/editor/VoiceAssistant";
+import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
@@ -2847,7 +2849,21 @@ ${jsCode}
                   </button>
                 )}
               </div>
-              <div className="flex gap-1.5">
+              <VoiceAssistant
+                supported={voice.supported}
+                listening={voice.listening}
+                speaking={voice.speaking}
+                transcript={voice.transcript}
+                error={voice.error}
+                voiceEnabled={voice.voiceEnabled}
+                disabled={chatLoading}
+                accent={currentTheme.uiColors.accent}
+                muted={currentTheme.uiColors.muted}
+                onToggleListening={voice.toggleListening}
+                onToggleVoice={() => voice.setVoiceEnabled(!voice.voiceEnabled)}
+                onStopSpeaking={voice.stopSpeaking}
+              />
+              <div className="mt-1 flex gap-1.5">
                 <input
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
