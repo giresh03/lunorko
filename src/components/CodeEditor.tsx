@@ -1452,8 +1452,9 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (overrideInput?: string) => {
+    const input = (overrideInput ?? chatInput).trim();
+    if (!input || chatLoading) return;
     // Build FULL project context so follow-up prompts modify the existing build
     const projectFiles = flattenFiles(fileTree);
     const CHAR_BUDGET = 120000;
@@ -1480,7 +1481,7 @@ ${jsCode}
         `[EDIT RULES: Reuse the EXACT file paths above when changing a file. Return the COMPLETE updated file content (never diffs, never "// rest unchanged"). Only return the files that actually change. Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
       : "";
 
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: input };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1499,7 +1500,7 @@ ${jsCode}
 
     // Check for cached response when offline
     if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+      const cached = findCachedAIResponse(input, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
@@ -1556,7 +1557,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(input, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1669,7 +1670,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = input.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
