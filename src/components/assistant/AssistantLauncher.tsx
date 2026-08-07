@@ -20,7 +20,8 @@ const AssistantLauncher = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { threads, messages, sending, error, createThread, send } = useSiteAssistant(activeThread);
+  const { threads, messages, sending, error, createThread, send, credits, outOfCredits } =
+    useSiteAssistant(activeThread);
   const voice = useVoiceAssistant({ onFinalTranscript: (text) => handleSend(text) });
 
   // Attach to the most recent thread so the widget and the full page share history.
@@ -133,7 +134,7 @@ const AssistantLauncher = () => {
                 transcript={voice.transcript}
                 error={voice.error}
                 voiceEnabled={voice.voiceEnabled}
-                disabled={sending}
+                disabled={sending || outOfCredits}
                 accent="hsl(var(--primary))"
                 muted="hsl(var(--muted-foreground))"
                 onToggleListening={voice.toggleListening}
@@ -141,20 +142,36 @@ const AssistantLauncher = () => {
                 onStopSpeaking={voice.stopSpeaking}
               />
             </div>
+            {credits && (
+              <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{credits.balance} credits left</span>
+                <Link to="/pricing" className="font-medium text-primary hover:underline">
+                  Top up
+                </Link>
+              </div>
+            )}
+            {outOfCredits && (
+              <p className="mb-2 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[11px] text-foreground">
+                Out of AI credits.{" "}
+                <Link to="/pricing" className="font-semibold text-primary hover:underline">
+                  Top up for Rs50 / 20 credits
+                </Link>
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                placeholder="Ask or say a command…"
-                disabled={sending}
+                placeholder={outOfCredits ? "Out of credits — top up" : "Ask or say a command…"}
+                disabled={sending || outOfCredits}
                 className="h-9 text-sm"
               />
               <Button
                 size="sm"
                 onClick={() => handleSend()}
-                disabled={sending || !input.trim()}
+                disabled={sending || outOfCredits || !input.trim()}
                 className="btn-sheen h-9 bg-gradient-to-r from-primary to-primary-glow text-primary-foreground shadow-glow"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
