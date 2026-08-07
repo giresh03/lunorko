@@ -905,7 +905,18 @@ Output contract (critical):
   // code
   \`\`\`
 - Keep file paths stable and unique so they can be auto-applied safely
+
+Iterative editing (critical — the user keeps chatting about the SAME project):
+- The user message may include a "[CURRENT PROJECT STATE ...]" section listing the existing files and their contents. That is the live project already running in the editor preview.
+- When it is present, treat the request as a MODIFICATION of those files — never start a new project, never rename files, never create a parallel copy (e.g. no "index2.html", no "untitled.html").
+- Reuse the EXACT same file paths given in the project state for any file you change.
+- Always return the COMPLETE final content of each file you change. Never output diffs, snippets, ellipses, or placeholders like "// ...rest unchanged" — the file content you return replaces the file entirely.
+- Return ONLY the files that actually change. Leave untouched files out of the response.
+- Preserve everything the user did not ask you to change (existing sections, styles, ids/classes, scripts, and cross-file references).
+- If the user reports an error or bug, fix the root cause in the existing files and return those same files, fully updated.
+- Only create a new file when the request genuinely needs one, and wire it into the existing files (e.g. add the <link>/<script> tag) in the same response.
 ${stackDirective}`;
+
 
       if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
