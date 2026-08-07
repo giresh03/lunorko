@@ -1159,7 +1159,7 @@ ${jsCode}
     const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
-      setPreview(buildPreviewHtml(activeTab.content, allFiles));
+      setPreview(buildPreviewHtml(activeTab.content, allFiles, activeTab.name));
     } else if (isJsLike && hasJSXContent) {
       setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
@@ -1418,7 +1418,7 @@ ${jsCode}
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
       if (isHtml) {
-        setPreview(buildPreviewHtml(activeTab.content, allFiles));
+        setPreview(buildPreviewHtml(activeTab.content, allFiles, activeTab.name));
       } else if (isJsLike && hasJSXInFile) {
         setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       } else if (isJsLike && usesDOM) {
@@ -1671,7 +1671,7 @@ ${jsCode}
               const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(previewFile.code);
 
               if (isHtml) {
-                setPreview(buildPreviewHtml(previewFile.code, allFiles));
+                setPreview(buildPreviewHtml(previewFile.code, allFiles, previewFile.name));
               } else if (isJsLike && hasJSX) {
                 setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               } else if (isJsLike && usesDOM) {
