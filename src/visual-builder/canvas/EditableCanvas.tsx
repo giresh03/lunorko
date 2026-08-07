@@ -57,11 +57,11 @@ export function EditableCanvas() {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-700 overflow-auto">
-      <div className="p-4 flex items-center gap-2 border-b border-slate-600 bg-slate-800">
-        <Monitor className="h-4 w-4 text-slate-400" />
+    <div className="flex-1 flex flex-col bg-card overflow-auto">
+      <div className="p-4 flex items-center gap-2 border-b border-muted-foreground bg-card">
+        <Monitor className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-semibold text-white">{page.name}</span>
-        <span className="text-xs text-slate-400">• {page.elements.length} elements</span>
+        <span className="text-xs text-muted-foreground">• {page.elements.length} elements</span>
       </div>
       <div
         className="flex-1 p-8 overflow-auto"
@@ -75,7 +75,7 @@ export function EditableCanvas() {
         >
           {page.elements.length === 0 ? (
             <div
-              className="flex items-center justify-center min-h-[600px] border-2 border-dashed border-slate-400 rounded-lg text-slate-500 text-lg font-medium"
+              className="flex items-center justify-center min-h-[600px] border-2 border-dashed border-muted-foreground rounded-lg text-muted-foreground text-lg font-medium"
               onMouseEnter={() => setHoveredElement(null)}
             >
               Drop components here
