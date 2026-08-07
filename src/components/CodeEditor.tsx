@@ -27,6 +27,7 @@ import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
+import { useCredits } from "@/hooks/useCredits";
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
@@ -483,6 +484,7 @@ const LAYOUT_SUGGESTIONS = [
 ];
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
+  const { credits, refetch: refetchCredits } = useCredits();
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
