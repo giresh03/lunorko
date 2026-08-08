@@ -122,6 +122,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_credit_usage: {
+        Row: {
+          amount: number
+          created_at: string
+          feature: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          feature?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          feature?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_credits: {
         Row: {
           created_at: string
@@ -1291,7 +1315,7 @@ export type Database = {
         Returns: Json
       }
       consume_ai_credit: {
-        Args: { _amount?: number; _user_id: string }
+        Args: { _amount?: number; _feature?: string; _user_id: string }
         Returns: Json
       }
       count_unique_visitors: { Args: never; Returns: number }

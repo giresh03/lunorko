@@ -802,7 +802,7 @@ async function chargeCredit(userId: string | null, isAdmin: boolean): Promise<{ 
     return { ok: false, body: { error: "Sign in required to use AI credits", code: "auth_required" } };
   }
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { data, error } = await admin.rpc("consume_ai_credit", { _user_id: userId, _amount: 1 });
+  const { data, error } = await admin.rpc("consume_ai_credit", { _user_id: userId, _amount: 1, _feature: "code-engine" });
   if (error) {
     console.error("[credits] consume error:", error);
     return { ok: false, body: { error: "Could not verify your AI credits", code: "credit_check_failed" } };

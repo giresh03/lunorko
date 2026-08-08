@@ -9,6 +9,7 @@ import { domains } from "@/lib/domains";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useCredits } from "@/hooks/useCredits";
+import { CreditTracker } from "@/components/CreditTracker";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -47,10 +48,10 @@ const plans = [
     price: 0,
     amountPaise: 0,
     icon: Zap,
-    credits: 4,
+    credits: 100,
     color: "from-muted to-muted/50",
     access: {
-      "Credits / month": "4",
+      "Credits / month": "100",
       "Domain Access": false,
       "Videos": false,
       "Code Editor": false,
@@ -69,11 +70,11 @@ const plans = [
     price: 150,
     amountPaise: 15000,
     icon: Star,
-    credits: 60,
+    credits: 1500,
     color: "from-primary/20 to-primary/5",
     popular: true,
     access: {
-      "Credits / month": "60",
+      "Credits / month": "1,500",
       "Domain Access": true,
       "Videos": true,
       "Code Editor": true,
@@ -92,10 +93,10 @@ const plans = [
     price: 250,
     amountPaise: 25000,
     icon: Crown,
-    credits: 100,
+    credits: 4000,
     color: "from-yellow-500/20 to-yellow-500/5",
     access: {
-      "Credits / month": "100",
+      "Credits / month": "4,000",
       "Domain Access": true,
       "Videos": true,
       "Code Editor": true,
@@ -114,10 +115,10 @@ const plans = [
     price: 500,
     amountPaise: 50000,
     icon: Rocket,
-    credits: 150,
+    credits: 10000,
     color: "from-primary/20 to-primary/5",
     access: {
-      "Credits / month": "150",
+      "Credits / month": "10,000",
       "Domain Access": true,
       "Videos": true,
       "Code Editor": true,
@@ -195,7 +196,7 @@ const Pricing = () => {
               if (verifyError) throw verifyError;
               toast.success(
                 plan.id === "topup"
-                  ? "Top-up successful! 20 credits added."
+                  ? "Top-up successful! 200 credits added."
                   : "Payment successful! Your subscription is now active."
               );
               refetch();
@@ -281,7 +282,7 @@ const Pricing = () => {
                 {/* Credits highlight */}
                 <div className="flex items-center gap-2 mb-5 px-3 py-2 rounded-lg bg-accent/50">
                   <Coins className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">{p.credits} credits/month</span>
+                  <span className="text-sm font-semibold text-foreground">{p.credits.toLocaleString()} credits/month</span>
                 </div>
 
                 {/* Key features */}
@@ -339,15 +340,10 @@ const Pricing = () => {
             <div className="flex-1">
               <h3 className="text-xl font-bold text-foreground">Need more credits?</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Top up any time — <span className="text-primary font-semibold">₹50 for 20 credits</span>. Top-up credits never
+                Top up any time — <span className="text-primary font-semibold">₹50 for 200 credits</span>. Top-up credits never
                 expire and are used after your monthly plan credits run out.
               </p>
-              {credits && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Current balance: <span className="text-foreground font-semibold">{credits.balance} credits</span>{" "}
-                  ({credits.planCredits} plan + {credits.topupCredits} top-up)
-                </p>
-              )}
+              <CreditTracker className="mt-4" />
             </div>
             <Button
               className="w-full sm:w-auto"
@@ -359,7 +355,7 @@ const Pricing = () => {
               ) : !user ? (
                 "Sign in to top up"
               ) : (
-                <><Coins className="mr-2 h-4 w-4" /> Buy 20 credits ₹50</>
+                <><Coins className="mr-2 h-4 w-4" /> Buy 200 credits ₹50</>
               )}
             </Button>
           </div>
