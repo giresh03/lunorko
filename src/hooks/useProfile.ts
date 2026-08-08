@@ -34,12 +34,9 @@ export function useProfile() {
       return;
     }
     setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, user_id, display_name, avatar_url, username, resume_url, resume_filename, wants_to_join_team, age, dob, stream, interests, onboarded_at")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setProfile((data as ProfileRow) ?? null);
+    const { data } = await supabase.rpc("get_my_profile");
+    const row = Array.isArray(data) ? data[0] : data;
+    setProfile((row as ProfileRow) ?? null);
     setLoading(false);
   }, [user]);
 
