@@ -193,7 +193,7 @@ export function useVoiceAssistant(opts: { onFinalTranscript?: (text: string) => 
         setSpeaking(false);
       }
     }
-  }, [stopSpeaking]);
+  }, [stopSpeaking, speakLocally]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
