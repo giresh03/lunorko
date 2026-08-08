@@ -179,8 +179,11 @@ export function useVoiceAssistant(opts: { onFinalTranscript?: (text: string) => 
       const remaining = Math.max(0, playhead - ctx.currentTime) * 1000 + 150;
       await new Promise((r) => setTimeout(r, remaining));
     } catch (e: any) {
-      if (e?.name !== "AbortError") setError(e?.message || "Voice playback failed");
+      if (e?.name !== "AbortError" && !speakLocally(toSpeakableText(raw))) {
+        setError(e?.message || "Voice playback failed");
+      }
     } finally {
+
       if (abortRef.current === controller) {
         abortRef.current = null;
         if (ctxRef.current) {
