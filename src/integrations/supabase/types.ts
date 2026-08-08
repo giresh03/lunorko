@@ -1319,18 +1319,90 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_profiles: {
+        Row: {
+          avatar_url: string | null
+          display_name: string | null
+          user_id: string | null
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          display_name?: string | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       add_topup_credits: {
         Args: { _credits: number; _user_id: string }
         Returns: Json
       }
+      admin_list_profiles: {
+        Args: never
+        Returns: {
+          age: number | null
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          dob: string | null
+          id: string
+          interests: string[]
+          onboarded_at: string | null
+          resume_filename: string | null
+          resume_url: string | null
+          stream: string | null
+          updated_at: string
+          user_id: string
+          username: string | null
+          wants_to_join_team: boolean
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       consume_ai_credit: {
         Args: { _amount?: number; _feature?: string; _user_id: string }
         Returns: Json
       }
       count_unique_visitors: { Args: never; Returns: number }
+      get_my_profile: {
+        Args: never
+        Returns: {
+          age: number | null
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          dob: string | null
+          id: string
+          interests: string[]
+          onboarded_at: string | null
+          resume_filename: string | null
+          resume_url: string | null
+          stream: string | null
+          updated_at: string
+          user_id: string
+          username: string | null
+          wants_to_join_team: boolean
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_user_plan: { Args: { _user_id: string }; Returns: string }
       get_visitor_trends: {
         Args: never
