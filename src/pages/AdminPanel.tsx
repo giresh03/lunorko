@@ -190,6 +190,7 @@ const AdminPanel = () => {
         .eq("wants_to_join_team", true)
         .order("created_at", { ascending: false });
       setApplicants(applicantData ?? []);
+      await loadChatMessages();
     } catch (e: any) {
       console.error(e);
       toast({
