@@ -899,19 +899,19 @@ serve(async (req) => {
     if (action === "ping") {
       return new Response(
         JSON.stringify({
-          provider: GOOGLE_AI_API_KEY ? "gemini" : "lovable",
+          provider: LOVABLE_API_KEY ? "lovable" : "gemini",
           projectRef,
-          hint: GOOGLE_AI_API_KEY ? "Using Gemini (preferred)." : "Using Lovable AI Gateway.",
+          hint: LOVABLE_API_KEY ? "Using Lovable AI Gateway (preferred)." : "Using Gemini (fallback).",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Log which provider is used
-    if (GOOGLE_AI_API_KEY) {
-      console.log(`[code-engine] Using Gemini/Google AI (preferred)`);
+    if (LOVABLE_API_KEY) {
+      console.log(`[code-engine] Using Lovable AI Gateway (preferred)`);
     } else {
-      console.log(`[code-engine] Using Lovable AI Gateway (fallback)`);
+      console.log(`[code-engine] Using Gemini/Google AI (fallback)`);
     }
 
 
