@@ -28,6 +28,7 @@ serve(async (req) => {
     const { data: creditData, error: creditError } = await adminClient.rpc("consume_ai_credit", {
       _user_id: authUser.id,
       _amount: 1,
+        _feature: 'code-assistant',
     });
     if (creditError) {
       console.error("[code-assistant] credit error:", creditError);

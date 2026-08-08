@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
       const { data: credit, error: creditErr } = await admin.rpc('consume_ai_credit', {
         _user_id: userId,
         _amount: 1,
+        _feature: 'assistant',
       });
       if (creditErr) {
         console.error('consume_ai_credit failed', creditErr);
