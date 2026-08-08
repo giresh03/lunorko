@@ -226,10 +226,10 @@ const AdminPanel = () => {
 
       const { data: applicantData } = await supabase
         .from("profiles")
-        .select("id, username, display_name, resume_url, resume_filename, created_at")
-        .eq("wants_to_join_team", true)
+        .select("id, username, display_name, age, dob, stream, interests, wants_to_join_team, resume_url, resume_filename, created_at")
         .order("created_at", { ascending: false });
       setApplicants(applicantData ?? []);
+
       await loadChatMessages();
     } catch (e: any) {
       console.error(e);
@@ -1229,15 +1229,20 @@ const AdminPanel = () => {
             </div>
           </TabsContent>
 
-          {/* Feedback */}
+          {/* Talent / student profiles */}
           <TabsContent value="talent">
-            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> Team Applicants ({applicants.length})</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> Student Profiles ({applicants.length})</h2>
             <div className="rounded-xl border border-border bg-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Username</TableHead>
                     <TableHead>Display Name</TableHead>
+                    <TableHead>Age</TableHead>
+                    <TableHead>DOB</TableHead>
+                    <TableHead>Stream</TableHead>
+                    <TableHead>Interests</TableHead>
+                    <TableHead>Internship</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Resume</TableHead>
                   </TableRow>
@@ -1247,11 +1252,32 @@ const AdminPanel = () => {
                     <TableRow key={a.id}>
                       <TableCell className="font-medium text-sm">{a.username || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{a.display_name || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{a.age ?? "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{a.dob ? new Date(a.dob).toLocaleDateString() : "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{a.stream || "—"}</TableCell>
+                      <TableCell className="max-w-[240px]">
+                        {a.interests?.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {a.interests.map((i: string) => (
+                              <span key={i} className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] text-foreground">{i}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {a.wants_to_join_team ? (
+                          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">Interested</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
                         {a.resume_url ? (
                           <Button size="sm" variant="outline" onClick={() => viewResume(a.resume_url)}>
-                            <FileText className="mr-1.5 h-3.5 w-3.5" /> View resume
+                            <FileText className="mr-1.5 h-3.5 w-3.5" /> View
                           </Button>
                         ) : (
                           <span className="text-xs text-muted-foreground">No file</span>
@@ -1259,11 +1285,12 @@ const AdminPanel = () => {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {applicants.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No team applicants yet</TableCell></TableRow>}
+                  {applicants.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No student profiles yet</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
           </TabsContent>
+
 
           <TabsContent value="feedback">
             <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary" /> User Feedback ({feedbacks.length})</h2>

@@ -1,17 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Sparkles, Upload, CheckCircle2, XCircle, FileText } from "lucide-react";
+import { Loader2, Sparkles, Upload, CheckCircle2, XCircle, FileText, ArrowRight, ArrowLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useProfile, usernamePattern, USERNAME_RULES } from "@/hooks/useProfile";
+
+const STREAMS = ["CSE", "IT", "ECE", "EEE", "Mechanical", "Civil", "AI & DS", "MCA / BCA", "Other"];
+const INTERESTS = [
+  "Web Development",
+  "App Development",
+  "AI / Machine Learning",
+  "Cybersecurity",
+  "Cloud",
+  "DevOps",
+  "Data Science",
+  "UI / UX Design",
+  "Blockchain",
+  "Embedded / IoT",
+];
 
 const OnboardingDialog = () => {
   const { profile, needsOnboarding, updateProfile, isUsernameAvailable, uploadResume } = useProfile();
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState(1);
   const [username, setUsername] = useState("");
+  const [age, setAge] = useState("");
+  const [dob, setDob] = useState("");
+  const [stream, setStream] = useState("");
+  const [interests, setInterests] = useState<string[]>([]);
   const [wantsTeam, setWantsTeam] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [checking, setChecking] = useState(false);
@@ -48,7 +68,10 @@ const OnboardingDialog = () => {
     };
   }, [username, valid, isUsernameAvailable]);
 
-  const canSubmit = valid && available !== false && !saving;
+  const ageNum = Number(age);
+  const ageOk = !age || (Number.isFinite(ageNum) && ageNum >= 10 && ageNum <= 100);
+  const canContinue = valid && available !== false && ageOk;
+  const canSubmit = canContinue && !saving;
 
   const hint = useMemo(() => {
     if (!username) return USERNAME_RULES;
@@ -59,13 +82,16 @@ const OnboardingDialog = () => {
     return USERNAME_RULES;
   }, [username, valid, checking, available]);
 
+  const toggleInterest = (i: string) =>
+    setInterests((prev) => (prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]));
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSaving(true);
     let resumePath: string | null = null;
     let resumeName: string | null = null;
 
-    if (wantsTeam && file) {
+    if (file) {
       if (file.size > 5 * 1024 * 1024) {
         toast.error("Resume must be under 5MB.");
         setSaving(false);
@@ -82,6 +108,10 @@ const OnboardingDialog = () => {
 
     const { error } = await updateProfile({
       username: username.trim(),
+      age: age ? ageNum : null,
+      dob: dob || null,
+      stream: stream || null,
+      interests,
       wants_to_join_team: wantsTeam,
       onboarded_at: new Date().toISOString(),
       ...(resumePath ? { resume_url: resumePath, resume_filename: resumeName } : {}),
@@ -89,8 +119,13 @@ const OnboardingDialog = () => {
     setSaving(false);
 
     if (error) {
-      toast.error(error.message.includes("profiles_username_lower_key") ? "That username was just taken. Try another." : "Could not save your profile.");
+      toast.error(
+        error.message.includes("profiles_username_lower_key")
+          ? "That username was just taken. Try another."
+          : "Could not save your profile.",
+      );
       setAvailable(false);
+      setStep(1);
       return;
     }
     toast.success(`Welcome aboard, ${username.trim()}!`);
@@ -101,79 +136,167 @@ const OnboardingDialog = () => {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && valid) setOpen(false); }}>
-      <DialogContent className="sm:max-w-md border-border/60 bg-card/95 backdrop-blur-xl" onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className="sm:max-w-lg border-border/60 bg-card/95 backdrop-blur-xl"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary-glow shadow-glow">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
-          <DialogTitle className="text-2xl">Pick your username</DialogTitle>
+          <DialogTitle className="text-2xl">
+            {step === 1 ? "Set up your profile" : "Tell us what you're into"}
+          </DialogTitle>
           <DialogDescription>
-            This is how you'll show up across the community, projects and leaderboards.
+            {step === 1
+              ? "This is how you'll show up across the community, projects and leaderboards."
+              : "Helps us tailor domains, projects and internship opportunities for you."}
           </DialogDescription>
+          <div className="mt-3 flex gap-1.5">
+            {[1, 2].map((s) => (
+              <span
+                key={s}
+                className={`h-1 flex-1 rounded-full transition-colors ${s <= step ? "bg-primary" : "bg-border"}`}
+              />
+            ))}
+          </div>
         </DialogHeader>
 
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="onboard-username">Username</Label>
-            <div className="relative">
-              <Input
-                id="onboard-username"
-                value={username}
-                autoFocus
-                maxLength={20}
-                placeholder="e.g. code_ninja"
-                onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
-                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                className="pr-9"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                {checking && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                {!checking && available === true && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                {!checking && available === false && <XCircle className="h-4 w-4 text-destructive" />}
-              </span>
-            </div>
-            <p className={`text-xs ${available === false ? "text-destructive" : "text-muted-foreground"}`}>{hint}</p>
-          </div>
-
-          <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium">Want to join the Lunor team?</p>
-                <p className="text-xs text-muted-foreground">Totally optional — share a resume and we'll reach out.</p>
-              </div>
-              <Switch checked={wantsTeam} onCheckedChange={setWantsTeam} />
-            </div>
-
-            {wantsTeam && (
-              <div className="mt-4 space-y-2">
-                <label
-                  htmlFor="onboard-resume"
-                  className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
-                >
-                  {file ? <FileText className="h-4 w-4 text-primary" /> : <Upload className="h-4 w-4" />}
-                  <span className="truncate">{file ? file.name : "Upload resume (PDF or DOC, max 5MB)"}</span>
-                </label>
-                <input
-                  id="onboard-resume"
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  className="hidden"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        {step === 1 ? (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="onboard-username">Username</Label>
+              <div className="relative">
+                <Input
+                  id="onboard-username"
+                  value={username}
+                  autoFocus
+                  maxLength={20}
+                  placeholder="e.g. code_ninja"
+                  onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
+                  className="pr-9"
                 />
-                <p className="text-xs text-muted-foreground">Resume is private — only you and the Lunor team can see it.</p>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {checking && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                  {!checking && available === true && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                  {!checking && available === false && <XCircle className="h-4 w-4 text-destructive" />}
+                </span>
               </div>
-            )}
-          </div>
+              <p className={`text-xs ${available === false ? "text-destructive" : "text-muted-foreground"}`}>{hint}</p>
+            </div>
 
-          <Button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="btn-sheen w-full bg-gradient-to-r from-primary to-primary-glow font-semibold text-primary-foreground shadow-glow"
-          >
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {saving ? "Saving…" : "Continue"}
-          </Button>
-        </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="onboard-age">Age <span className="text-muted-foreground">(optional)</span></Label>
+                <Input
+                  id="onboard-age"
+                  type="number"
+                  min={10}
+                  max={100}
+                  value={age}
+                  placeholder="20"
+                  onChange={(e) => setAge(e.target.value)}
+                />
+                {!ageOk && <p className="text-xs text-destructive">Enter an age between 10 and 100.</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="onboard-dob">Date of birth <span className="text-muted-foreground">(optional)</span></Label>
+                <Input id="onboard-dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+              </div>
+            </div>
+
+            <Button
+              onClick={() => setStep(2)}
+              disabled={!canContinue}
+              className="btn-sheen w-full bg-gradient-to-r from-primary to-primary-glow font-semibold text-primary-foreground shadow-glow"
+            >
+              Continue <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label>Stream <span className="text-muted-foreground">(optional)</span></Label>
+              <Select value={stream} onValueChange={setStream}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select your stream" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STREAMS.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Interested in</Label>
+              <div className="flex flex-wrap gap-2">
+                {INTERESTS.map((i) => {
+                  const on = interests.includes(i);
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleInterest(i)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition-all duration-200 ${
+                        on
+                          ? "border-primary bg-primary/15 text-foreground shadow-glow"
+                          : "border-border/70 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      }`}
+                    >
+                      {i}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Open to internships with Lunor?</p>
+                  <p className="text-xs text-muted-foreground">Optional — share a resume and we'll reach out.</p>
+                </div>
+                <Switch checked={wantsTeam} onCheckedChange={setWantsTeam} />
+              </div>
+
+              {wantsTeam && (
+                <div className="mt-4 space-y-2">
+                  <label
+                    htmlFor="onboard-resume"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                  >
+                    {file ? <FileText className="h-4 w-4 text-primary" /> : <Upload className="h-4 w-4" />}
+                    <span className="truncate">{file ? file.name : "Upload resume (PDF or DOC, max 5MB) — not mandatory"}</span>
+                  </label>
+                  <input
+                    id="onboard-resume"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  />
+                  <p className="text-xs text-muted-foreground">Resume is private — only you and the Lunor team can see it.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setStep(1)} disabled={saving}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={!canSubmit}
+                className="btn-sheen flex-1 bg-gradient-to-r from-primary to-primary-glow font-semibold text-primary-foreground shadow-glow"
+              >
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {saving ? "Saving…" : "Finish & enter Lunor"}
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

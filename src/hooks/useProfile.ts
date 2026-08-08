@@ -11,8 +11,13 @@ export interface ProfileRow {
   resume_url: string | null;
   resume_filename: string | null;
   wants_to_join_team: boolean;
+  age: number | null;
+  dob: string | null;
+  stream: string | null;
+  interests: string[];
   onboarded_at: string | null;
 }
+
 
 export const USERNAME_RULES = "3-20 characters — letters, numbers, underscore or dash.";
 export const usernamePattern = /^[a-zA-Z0-9_-]{3,20}$/;
@@ -31,7 +36,7 @@ export function useProfile() {
     setLoading(true);
     const { data } = await supabase
       .from("profiles")
-      .select("id, user_id, display_name, avatar_url, username, resume_url, resume_filename, wants_to_join_team, onboarded_at")
+      .select("id, user_id, display_name, avatar_url, username, resume_url, resume_filename, wants_to_join_team, age, dob, stream, interests, onboarded_at")
       .eq("user_id", user.id)
       .maybeSingle();
     setProfile((data as ProfileRow) ?? null);
