@@ -59,7 +59,31 @@ export function useVoiceAssistant(opts: { onFinalTranscript?: (text: string) => 
       ctxRef.current.close().catch(() => {});
       ctxRef.current = null;
     }
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      /* noop */
+    }
     setSpeaking(false);
+  }, []);
+
+  /** Free browser voice fallback when the server TTS is unavailable (404/402/5xx). */
+  const speakLocally = useCallback((text: string) => {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return false;
+      synth.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "en-US";
+      utter.rate = 1.02;
+      utter.pitch = 1;
+      utter.onend = () => setSpeaking(false);
+      utter.onerror = () => setSpeaking(false);
+      synth.speak(utter);
+      return true;
+    } catch {
+      return false;
+    }
   }, []);
 
   /** Speak text via the Lovable AI TTS edge function (streamed PCM playback). */
@@ -84,8 +108,19 @@ export function useVoiceAssistant(opts: { onFinalTranscript?: (text: string) => 
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
-        throw new Error(`Voice failed (${res.status})`);
+        // Server voice unavailable (missing function, no AI credits, upstream error):
+        // fall back to the browser's built-in voice instead of surfacing an error.
+        if (speakLocally(text)) {
+          abortRef.current = null;
+          return;
+        }
+        throw new Error(
+          res.status === 402
+            ? "Voice needs AI credits. Top up to hear replies."
+            : `Voice unavailable (${res.status})`,
+        );
       }
+
 
       const ctx = new AudioContext({ sampleRate: 24000 });
       ctxRef.current = ctx;
@@ -144,8 +179,11 @@ export function useVoiceAssistant(opts: { onFinalTranscript?: (text: string) => 
       const remaining = Math.max(0, playhead - ctx.currentTime) * 1000 + 150;
       await new Promise((r) => setTimeout(r, remaining));
     } catch (e: any) {
-      if (e?.name !== "AbortError") setError(e?.message || "Voice playback failed");
+      if (e?.name !== "AbortError" && !speakLocally(toSpeakableText(raw))) {
+        setError(e?.message || "Voice playback failed");
+      }
     } finally {
+
       if (abortRef.current === controller) {
         abortRef.current = null;
         if (ctxRef.current) {
@@ -155,7 +193,7 @@ export function useVoiceAssistant(opts: { onFinalTranscript?: (text: string) => 
         setSpeaking(false);
       }
     }
-  }, [stopSpeaking]);
+  }, [stopSpeaking, speakLocally]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();

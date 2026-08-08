@@ -875,9 +875,11 @@ serve(async (req) => {
       }
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
-    const apiKey = LOVABLE_API_KEY || GOOGLE_AI_API_KEY;
+    // Prefer the directly-configured Gemini key; fall back to the Lovable AI Gateway.
+    // (Gateway credits can be exhausted, which surfaces as 402 to users.)
+    const LOVABLE_API_KEY = GOOGLE_AI_API_KEY ? "" : Deno.env.get("LOVABLE_API_KEY");
+    const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "unknown";
 
@@ -885,7 +887,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: "GEMINI_API_KEY or LOVABLE_API_KEY is not configured",
-          hint: "Set: supabase secrets set GEMINI_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj",
+          hint: "Set: supabase secrets set GEMINI_API_KEY=your_key",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -895,20 +897,21 @@ serve(async (req) => {
     if (action === "ping") {
       return new Response(
         JSON.stringify({
-          provider: LOVABLE_API_KEY ? "lovable" : "gemini",
+          provider: GOOGLE_AI_API_KEY ? "gemini" : "lovable",
           projectRef,
-          hint: LOVABLE_API_KEY ? "Lovable AI Gateway is configured." : "Using Gemini fallback.",
+          hint: GOOGLE_AI_API_KEY ? "Using Gemini (preferred)." : "Using Lovable AI Gateway.",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Log which provider is used
-    if (LOVABLE_API_KEY) {
-      console.log(`[code-engine] Using Lovable AI Gateway (preferred)`);
+    if (GOOGLE_AI_API_KEY) {
+      console.log(`[code-engine] Using Gemini/Google AI (preferred)`);
     } else {
-      console.log(`[code-engine] Using Gemini/Google AI (fallback - LOVABLE_API_KEY not set)`);
+      console.log(`[code-engine] Using Lovable AI Gateway (fallback)`);
     }
+
 
     // ============= ACTION: generate (AI code generation with streaming) =============
     if (action === "generate") {
