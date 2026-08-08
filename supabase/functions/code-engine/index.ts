@@ -1047,8 +1047,12 @@ ${stackDirective}`;
         if (!googleResp.ok) {
           const text = await googleResp.text();
           console.error(`[code-engine] Google AI error: ${googleResp.status}`, text);
-          return new Response(JSON.stringify({ error: "AI service error" }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          const msg = googleResp.status === 429
+            ? "AI provider rate limit / quota exceeded. Please try again in a moment."
+            : `AI service error (${googleResp.status})`;
+          return new Response(JSON.stringify({ error: msg }), {
+            status: googleResp.status === 429 ? 429 : 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         let buf = "";
