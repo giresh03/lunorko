@@ -148,6 +148,15 @@ const DomainChat = ({ domainId, channelName }: { domainId: string; channelName?:
           loadProfiles([incoming.user_id]);
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "community_messages" },
+        (payload) => {
+          const removedId = (payload.old as { id?: string })?.id;
+          if (!removedId) return;
+          setMessages((prev) => prev.filter((m) => m.id !== removedId));
+        }
+      )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [domainId, loadProfiles, user?.id]);

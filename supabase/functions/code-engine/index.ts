@@ -875,11 +875,13 @@ serve(async (req) => {
       }
     }
 
-    const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
-    // Prefer the directly-configured Gemini key; fall back to the Lovable AI Gateway.
-    // (Gateway credits can be exhausted, which surfaces as 402 to users.)
-    const LOVABLE_API_KEY = GOOGLE_AI_API_KEY ? "" : Deno.env.get("LOVABLE_API_KEY");
-    const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    // Prefer the Lovable AI Gateway (reliable quota). A directly-configured Gemini key
+    // is only used when no gateway key exists.
+    const GOOGLE_AI_API_KEY = LOVABLE_API_KEY
+      ? ""
+      : (Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY"));
+    const apiKey = LOVABLE_API_KEY || GOOGLE_AI_API_KEY;
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "unknown";
 
@@ -897,19 +899,19 @@ serve(async (req) => {
     if (action === "ping") {
       return new Response(
         JSON.stringify({
-          provider: GOOGLE_AI_API_KEY ? "gemini" : "lovable",
+          provider: LOVABLE_API_KEY ? "lovable" : "gemini",
           projectRef,
-          hint: GOOGLE_AI_API_KEY ? "Using Gemini (preferred)." : "Using Lovable AI Gateway.",
+          hint: LOVABLE_API_KEY ? "Using Lovable AI Gateway (preferred)." : "Using Gemini (fallback).",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Log which provider is used
-    if (GOOGLE_AI_API_KEY) {
-      console.log(`[code-engine] Using Gemini/Google AI (preferred)`);
+    if (LOVABLE_API_KEY) {
+      console.log(`[code-engine] Using Lovable AI Gateway (preferred)`);
     } else {
-      console.log(`[code-engine] Using Lovable AI Gateway (fallback)`);
+      console.log(`[code-engine] Using Gemini/Google AI (fallback)`);
     }
 
 
@@ -1045,8 +1047,12 @@ ${stackDirective}`;
         if (!googleResp.ok) {
           const text = await googleResp.text();
           console.error(`[code-engine] Google AI error: ${googleResp.status}`, text);
-          return new Response(JSON.stringify({ error: "AI service error" }), {
-            status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          const msg = googleResp.status === 429
+            ? "AI provider rate limit / quota exceeded. Please try again in a moment."
+            : `AI service error (${googleResp.status})`;
+          return new Response(JSON.stringify({ error: msg }), {
+            status: googleResp.status === 429 ? 429 : 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         let buf = "";
