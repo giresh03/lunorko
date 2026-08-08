@@ -875,11 +875,13 @@ serve(async (req) => {
       }
     }
 
-    const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
-    // Prefer the directly-configured Gemini key; fall back to the Lovable AI Gateway.
-    // (Gateway credits can be exhausted, which surfaces as 402 to users.)
-    const LOVABLE_API_KEY = GOOGLE_AI_API_KEY ? "" : Deno.env.get("LOVABLE_API_KEY");
-    const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    // Prefer the Lovable AI Gateway (reliable quota). A directly-configured Gemini key
+    // is only used when no gateway key exists.
+    const GOOGLE_AI_API_KEY = LOVABLE_API_KEY
+      ? ""
+      : (Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY"));
+    const apiKey = LOVABLE_API_KEY || GOOGLE_AI_API_KEY;
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "unknown";
 
