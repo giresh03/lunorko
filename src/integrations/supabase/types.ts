@@ -848,39 +848,51 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age: number | null
           avatar_url: string | null
           created_at: string
           display_name: string | null
+          dob: string | null
           id: string
+          interests: string[]
           onboarded_at: string | null
           resume_filename: string | null
           resume_url: string | null
+          stream: string | null
           updated_at: string
           user_id: string
           username: string | null
           wants_to_join_team: boolean
         }
         Insert: {
+          age?: number | null
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          dob?: string | null
           id?: string
+          interests?: string[]
           onboarded_at?: string | null
           resume_filename?: string | null
           resume_url?: string | null
+          stream?: string | null
           updated_at?: string
           user_id: string
           username?: string | null
           wants_to_join_team?: boolean
         }
         Update: {
+          age?: number | null
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
+          dob?: string | null
           id?: string
+          interests?: string[]
           onboarded_at?: string | null
           resume_filename?: string | null
           resume_url?: string | null
+          stream?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
