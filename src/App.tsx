@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,11 +31,25 @@ import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
 import OnboardingDialog from "./components/onboarding/OnboardingDialog";
 import AssistantLauncher from "./components/assistant/AssistantLauncher";
+import LunorLoader from "./components/LunorLoader";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   useVisitorTracking();
+  const [booting, setBooting] = useState(() => !sessionStorage.getItem("lunor_booted"));
+
+  if (booting) {
+    return (
+      <LunorLoader
+        onDone={() => {
+          sessionStorage.setItem("lunor_booted", "1");
+          setBooting(false);
+        }}
+      />
+    );
+  }
+
 
   return (
     <BrowserRouter>
