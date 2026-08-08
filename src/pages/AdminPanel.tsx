@@ -1106,6 +1106,70 @@ const AdminPanel = () => {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Chat messages moderation */}
+            <div className="rounded-xl border border-border bg-card overflow-x-auto mt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" /> Chat Messages ({chatMessages.length})
+                </h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={loadChatMessages}>Refresh</Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={chatMessages.length === 0}
+                    onClick={() => setClearChatsOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" /> Clear all chats
+                  </Button>
+                </div>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Author</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Sent</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {chatMessages.map((m) => (
+                    <TableRow key={m.id}>
+                      <TableCell className="font-medium">{m.author_name}</TableCell>
+                      <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">
+                        {m.message_type && m.message_type !== "text" ? `[${m.message_type}] ` : ""}{m.content || "—"}
+                      </TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{m.domain_id || "—"}</Badge></TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{new Date(m.created_at).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleDeleteChatMessage(m.id)}>
+                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {chatMessages.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No chat messages</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+
+            <AlertDialog open={clearChatsOpen} onOpenChange={setClearChatsOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear all community chats?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes every chat message across all domains. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAllChats}>Delete everything</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </TabsContent>
 
           {/* Guidelines */}
