@@ -49,7 +49,7 @@ const ProjectBuilder = () => {
     if (projectList.length > 0) {
       // Fetch owner profiles
       const ownerIds = [...new Set(projectList.map((p: any) => p.owner_id))];
-      const { data: profs } = await supabase.from("profiles").select("user_id, display_name").in("user_id", ownerIds);
+      const { data: profs } = await supabase.from("public_profiles").select("user_id, display_name").in("user_id", ownerIds);
       const map: Record<string, string> = {};
       (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name || "User"; });
       setProfiles(map);

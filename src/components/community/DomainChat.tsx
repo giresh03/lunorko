@@ -93,7 +93,7 @@ const DomainChat = ({ domainId, channelName }: { domainId: string; channelName?:
     const missing = userIds.filter((id) => id && !profilesRef.current[id]);
     if (missing.length === 0) return;
     const { data } = await supabase
-      .from("profiles")
+      .from("public_profiles")
       .select("user_id, display_name")
       .in("user_id", missing);
     if (!data?.length) return;

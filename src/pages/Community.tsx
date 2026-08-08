@@ -75,7 +75,7 @@ const Community = () => {
     if (data && data.length > 0) {
       const userIds = [...new Set((data as any[]).map((p: any) => p.user_id as string))];
       const { data: profilesData } = await supabase
-        .from("profiles")
+        .from("public_profiles")
         .select("user_id, display_name")
         .in("user_id", userIds);
       const map: Record<string, string> = {};

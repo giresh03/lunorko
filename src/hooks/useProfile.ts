@@ -53,7 +53,7 @@ export function useProfile() {
       const clean = username.trim();
       if (!usernamePattern.test(clean)) return false;
       const { data, error } = await supabase
-        .from("profiles")
+        .from("public_profiles")
         .select("user_id")
         .ilike("username", clean)
         .limit(1);

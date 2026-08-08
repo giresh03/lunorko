@@ -164,7 +164,7 @@ const AdminPanel = () => {
     let nameMap: Record<string, string> = {};
     if (ids.length) {
       const { data: profs } = await supabase
-        .from("profiles")
+        .from("public_profiles")
         .select("user_id, display_name, username")
         .in("user_id", ids);
       nameMap = Object.fromEntries((profs ?? []).map((p: any) => [p.user_id, p.display_name || p.username || "Unknown"]));

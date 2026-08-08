@@ -54,7 +54,7 @@ const ProjectDetailView = ({ projectId, onBack }: ProjectDetailViewProps) => {
     ];
     if (allUserIds.length > 0) {
       const { data: profs } = await supabase
-        .from("profiles")
+        .from("public_profiles")
         .select("user_id, display_name")
         .in("user_id", allUserIds);
       const map: Record<string, string> = {};

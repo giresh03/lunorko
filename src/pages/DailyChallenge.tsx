@@ -103,7 +103,7 @@ const DailyChallenge = () => {
     if (data && data.length > 0) {
       const userIds = data.map((d: any) => d.user_id);
       const { data: profiles } = await supabase
-        .from("profiles")
+        .from("public_profiles")
         .select("user_id, display_name")
         .in("user_id", userIds);
       
