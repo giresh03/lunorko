@@ -1314,12 +1314,10 @@ export type Database = {
         Args: { _credits: number; _user_id: string }
         Returns: Json
       }
-      consume_ai_credit:
-        | { Args: { _amount?: number; _user_id: string }; Returns: Json }
-        | {
-            Args: { _amount?: number; _feature?: string; _user_id: string }
-            Returns: Json
-          }
+      consume_ai_credit: {
+        Args: { _amount?: number; _feature?: string; _user_id: string }
+        Returns: Json
+      }
       count_unique_visitors: { Args: never; Returns: number }
       get_user_plan: { Args: { _user_id: string }; Returns: string }
       get_visitor_trends: {
