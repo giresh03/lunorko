@@ -92,7 +92,7 @@ serve(async (req) => {
 
     // Credit top-up purchase: add credits, no subscription row
     if (plan_id === "topup") {
-      const TOPUP_CREDITS = 20;
+      const TOPUP_CREDITS = 200;
       if (amount !== 5000) {
         return new Response(JSON.stringify({ error: "Invalid top-up amount" }), { status: 400, headers: corsHeaders });
       }

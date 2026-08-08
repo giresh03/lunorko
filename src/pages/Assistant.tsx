@@ -12,6 +12,7 @@ import { useSiteAssistant } from "@/hooks/useSiteAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useGamification } from "@/hooks/useGamification";
 import { useDashboard } from "@/hooks/useDashboard";
+import { CreditTracker } from "@/components/CreditTracker";
 import { Link } from "react-router-dom";
 
 const SUGGESTIONS = [
@@ -243,19 +244,12 @@ const Assistant = () => {
                   onStopSpeaking={voice.stopSpeaking}
                 />
               </div>
-              {credits && (
-                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{credits.balance} AI credits left</span>
-                  <Link to="/pricing" className="font-medium text-primary hover:underline">
-                    Top up
-                  </Link>
-                </div>
-              )}
+              <CreditTracker className="mb-3" />
               {outOfCredits && (
                 <p className="mb-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-foreground">
                   You are out of AI credits.{" "}
                   <Link to="/pricing" className="font-semibold text-primary hover:underline">
-                    Top up for Rs50 / 20 credits
+                    Top up 200 credits for Rs50
                   </Link>{" "}
                   to keep chatting.
                 </p>
