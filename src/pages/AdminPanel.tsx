@@ -153,6 +153,46 @@ const AdminPanel = () => {
     if (isAdmin) fetchAll();
   }, [isAdmin, adminLoading]);
 
+  const loadChatMessages = async () => {
+    const { data } = await supabase
+      .from("community_messages")
+      .select("id, user_id, domain_id, content, message_type, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const rows = data ?? [];
+    const ids = [...new Set(rows.map((r) => r.user_id))];
+    let nameMap: Record<string, string> = {};
+    if (ids.length) {
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("user_id, display_name, username")
+        .in("user_id", ids);
+      nameMap = Object.fromEntries((profs ?? []).map((p: any) => [p.user_id, p.display_name || p.username || "Unknown"]));
+    }
+    setChatMessages(rows.map((r) => ({ ...r, author_name: nameMap[r.user_id] || "Unknown" })));
+  };
+
+  const handleDeleteChatMessage = async (id: string) => {
+    const { error } = await supabase.from("community_messages").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Failed to delete message", description: error.message, variant: "destructive" });
+      return;
+    }
+    setChatMessages((prev) => prev.filter((m) => m.id !== id));
+    toast({ title: "Message deleted" });
+  };
+
+  const handleClearAllChats = async () => {
+    const { error } = await supabase.from("community_messages").delete().not("id", "is", null);
+    if (error) {
+      toast({ title: "Failed to clear chats", description: error.message, variant: "destructive" });
+      return;
+    }
+    setChatMessages([]);
+    setClearChatsOpen(false);
+    toast({ title: "All community chats cleared" });
+  };
+
   const fetchAll = async () => {
     setLoadingData(true);
     try {
