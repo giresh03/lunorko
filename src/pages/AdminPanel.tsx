@@ -453,18 +453,30 @@ const AdminPanel = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Admin Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-xl sticky top-0 z-50">
+      <header className="sticky top-0 z-50 border-b border-border/80 bg-background/70 backdrop-blur-xl">
         <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
-            <h1 className="text-sm sm:text-lg font-bold text-foreground truncate">Lunor.AI Admin</h1>
-            <Badge variant="outline" className="text-xs hidden sm:inline-flex">Admin Panel</Badge>
+            <div className="relative shrink-0 rounded-lg border border-primary/30 bg-primary/10 p-1.5 glow-primary">
+              <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold font-display text-foreground truncate">
+                Lunor.AI <span className="text-muted-foreground font-normal">· Control Center</span>
+              </h1>
+              <p className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
+                </span>
+                System healthy · {users.length} users tracked
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
-            <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3 text-xs sm:text-sm" asChild>
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="btn-outline-glow h-8 px-2 sm:px-3 text-xs sm:text-sm" asChild>
               <Link to="/"><ArrowLeft className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Back to Site</span><span className="sm:hidden">Back</span></Link>
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 px-2 sm:px-3 text-xs sm:text-sm" onClick={signOut}>
+            <Button variant="outline" size="sm" className="btn-outline-glow h-8 px-2 sm:px-3 text-xs sm:text-sm" onClick={signOut}>
               <LogOut className="mr-1 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
@@ -476,40 +488,50 @@ const AdminPanel = () => {
         {stats && (
           <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-5 mb-6 sm:mb-8">
             {[
-              { label: "Site Visitors", value: stats.totalVisitors, icon: Eye, color: "text-primary" },
-              { label: "Registered Users", value: stats.totalUsers, icon: Users, color: "text-primary" },
-              { label: "Paid Users", value: stats.totalPaidUsers, icon: UserCheck, color: "text-green-400" },
-              { label: "Revenue (₹)", value: `₹${Number(stats.totalRevenue ?? 0).toLocaleString()}`, icon: TrendingUp, color: "text-yellow-400" },
-              { label: "Bookings", value: stats.totalBookings, icon: Calendar, color: "text-pink-400" },
+              { label: "Site Visitors", value: Number(stats.totalVisitors ?? 0), icon: Eye, tone: "text-primary", series: visitorSeries, delta: visitorDelta },
+              { label: "Registered Users", value: Number(stats.totalUsers ?? 0), icon: Users, tone: "text-primary" },
+              { label: "Paid Users", value: Number(stats.totalPaidUsers ?? 0), icon: UserCheck, tone: "text-green-400" },
+              { label: "Revenue", value: Number(stats.totalRevenue ?? 0), prefix: "₹", icon: TrendingUp, tone: "text-yellow-400" },
+              { label: "Bookings", value: Number(stats.totalBookings ?? 0), icon: Calendar, tone: "text-pink-400" },
             ].map((s, i) => (
-              <div key={i} className="rounded-xl border border-border bg-card p-3 sm:p-5 hover:border-primary/20 transition-all">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <s.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${s.color} shrink-0`} />
-                  <div className="min-w-0">
-                    <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider truncate">{s.label}</p>
-                    <p className="text-lg sm:text-2xl font-bold text-foreground">{s.value}</p>
-                  </div>
-                </div>
-              </div>
+              <AdminStatCard key={s.label} index={i} {...s} />
             ))}
           </div>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6">
-            <TabsList className="inline-flex w-max sm:w-auto">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3"><LayoutDashboard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Overview</span><span className="sm:hidden">Stats</span></TabsTrigger>
-              <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3"><Users className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Users</TabsTrigger>
-              <TabsTrigger value="subscriptions" className="text-xs sm:text-sm px-2 sm:px-3"><CreditCard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Subscriptions</span><span className="sm:hidden">Subs</span></TabsTrigger>
-              <TabsTrigger value="payment-requests" className="text-xs sm:text-sm px-2 sm:px-3"><Receipt className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Payments</span><span className="sm:hidden">Pay</span>{paymentRequests.filter(p => p.status === 'pending').length > 0 && ` (${paymentRequests.filter(p => p.status === 'pending').length})`}</TabsTrigger>
-              <TabsTrigger value="resources" className="text-xs sm:text-sm px-2 sm:px-3"><Video className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Resources</span><span className="sm:hidden">Res</span></TabsTrigger>
-              <TabsTrigger value="pop-ads" className="text-xs sm:text-sm px-2 sm:px-3"><Megaphone className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> Ads</TabsTrigger>
-              <TabsTrigger value="community" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Community</span><span className="sm:hidden">Com</span></TabsTrigger>
-              <TabsTrigger value="guidelines" className="text-xs sm:text-sm px-2 sm:px-3"><Shield className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Guidelines</span><span className="sm:hidden">Rules</span></TabsTrigger>
-              <TabsTrigger value="talent" className="text-xs sm:text-sm px-2 sm:px-3"><Briefcase className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Talent</span><span className="sm:hidden">Team</span>{applicants.length > 0 && ` (${applicants.length})`}</TabsTrigger>
-              <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3"><MessageSquare className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Feedback</span><span className="sm:hidden">FB</span>{feedbacks.length > 0 && ` (${feedbacks.length})`}</TabsTrigger>
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 mb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList className="inline-flex w-max gap-1 rounded-full border border-border/70 bg-card/60 p-1 backdrop-blur-xl">
+              {[
+                { value: "overview", label: "Overview", short: "Stats", Icon: LayoutDashboard },
+                { value: "users", label: "Users", short: "Users", Icon: Users },
+                { value: "subscriptions", label: "Subscriptions", short: "Subs", Icon: CreditCard },
+                { value: "payment-requests", label: "Payments", short: "Pay", Icon: Receipt, count: paymentRequests.filter((p) => p.status === "pending").length },
+                { value: "resources", label: "Resources", short: "Res", Icon: Video },
+                { value: "pop-ads", label: "Ads", short: "Ads", Icon: Megaphone },
+                { value: "community", label: "Community", short: "Com", Icon: MessageSquare },
+                { value: "guidelines", label: "Guidelines", short: "Rules", Icon: Shield },
+                { value: "talent", label: "Talent", short: "Team", Icon: Briefcase, count: applicants.length },
+                { value: "feedback", label: "Feedback", short: "FB", Icon: MessageSquare, count: feedbacks.length },
+              ].map(({ value, label, short, Icon, count }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="rounded-full px-3 py-1.5 text-xs sm:text-sm transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-glow"
+                >
+                  <Icon className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">{label}</span>
+                  <span className="sm:hidden">{short}</span>
+                  {!!count && (
+                    <span className="ml-1.5 rounded-full bg-primary/20 px-1.5 text-[10px] font-semibold text-primary data-[state=active]:bg-background/20">
+                      {count}
+                    </span>
+                  )}
+                </TabsTrigger>
+              ))}
             </TabsList>
           </div>
+
 
           {/* Overview */}
           <TabsContent value="overview">
