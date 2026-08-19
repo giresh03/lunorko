@@ -81,6 +81,7 @@ const AppContent = () => {
         <Route path="/github/callback" element={<GitHubCallback />} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/assistant/:threadId" element={<Assistant />} />
+        <Route path="/studio" element={<Studio />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
