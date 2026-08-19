@@ -1,7 +1,9 @@
-import React from "react";
-import { Copy, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { Copy, Trash2, Paintbrush, Sparkles } from "lucide-react";
 import { useVisualBuilderStore } from "../state/store";
 import type { PageElement } from "../state/schema";
+import { AnimationPanel } from "./AnimationPanel";
+
 
 const COLOR_PRESETS = [
   "#ffffff",
@@ -39,7 +41,9 @@ function collectElements(elements: PageElement[], depth = 0): { el: PageElement;
 export function PropertiesPanel() {
   const { page, selectedId, updateElement, deleteElement, duplicateElement, selectElement } =
     useVisualBuilderStore();
+  const [tab, setTab] = useState<"style" | "animate">("style");
   const element = selectedId ? findElement(page.elements, selectedId) : null;
+
 
   if (!element || !selectedId) {
     return (
@@ -88,8 +92,30 @@ export function PropertiesPanel() {
       <div className="p-4 border-b border-muted-foreground">
         <h3 className="font-semibold text-white text-base">Properties</h3>
         <p className="text-sm text-foreground mt-0.5 capitalize">{element.type}</p>
+        <div className="mt-3 flex gap-1 rounded-full border border-border/70 bg-background/50 p-1">
+          {([
+            { id: "style", label: "Style", Icon: Paintbrush },
+            { id: "animate", label: "Animate", Icon: Sparkles },
+          ] as const).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold transition-all ${
+                tab === id
+                  ? "bg-primary text-primary-foreground shadow-glow"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {tab === "style" && (
+          <>
+
         {page.elements.length > 0 && (
           <div>
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Layers</h4>
@@ -257,7 +283,11 @@ export function PropertiesPanel() {
             </div>
           </div>
         </div>
+          </>
+        )}
+        {tab === "animate" && <AnimationPanel />}
       </div>
     </div>
+
   );
 }

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import LockGate from "@/components/LockGate";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -610,6 +611,7 @@ const DomainDetail = () => {
 
           {/* Videos Tab */}
           <TabsContent value="videos">
+            <LockGate lockKey="videos" name="Video Library" compact>
             {videos.length > 0 ? (
               domainId === "app-development" ? (
                 <VideoLearningHub videos={videos} domainColor={domain.color} />
@@ -685,10 +687,12 @@ const DomainDetail = () => {
                 <p className="mt-4 text-muted-foreground">Videos coming soon. Check back later!</p>
               </div>
             )}
+            </LockGate>
           </TabsContent>
 
           {/* Materials Tab */}
           <TabsContent value="materials">
+            <LockGate lockKey="materials" name="Learning Materials" compact>
             {pdfs.length > 0 && (
               <div className="mb-8">
                 <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
@@ -720,6 +724,7 @@ const DomainDetail = () => {
                 <p className="mt-4 text-muted-foreground">Materials coming soon. Check back later!</p>
               </div>
             ) : null}
+            </LockGate>
           </TabsContent>
         </Tabs>
       </main>

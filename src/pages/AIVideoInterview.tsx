@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FeatureGate from "@/components/FeatureGate";
+import LockGate from "@/components/LockGate";
 import InterviewRoom from "@/components/interview/InterviewRoom";
 import { useAuth } from "@/hooks/useAuth";
 import { domains } from "@/lib/domains";
@@ -20,7 +21,7 @@ const AIVideoInterview = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <FeatureGate feature="interview-prep" featureName="AI Video Interview" requiredPlan="premium">
+      <LockGate lockKey="ai_interview" name="AI Video Interview"><FeatureGate feature="interview-prep" featureName="AI Video Interview" requiredPlan="premium">
         <main className="container mx-auto px-4 pt-24 pb-20">
           {!inInterview ? (
             <>
@@ -118,7 +119,7 @@ const AIVideoInterview = () => {
             </div>
           )}
         </main>
-      </FeatureGate>
+      </FeatureGate></LockGate>
       <Footer />
     </div>
   );

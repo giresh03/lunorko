@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Navbar from "@/components/Navbar";
+import LockGate from "@/components/LockGate";
 import DomainChat from "@/components/community/DomainChat";
 import PostCard from "@/components/community/PostCard";
 import CreatePostDialog from "@/components/community/CreatePostDialog";
@@ -135,6 +136,7 @@ const Community = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <LockGate lockKey="community" name="Community Hub">
       <main className="pt-16">
         <div className="flex h-[calc(100vh-4rem)] overflow-hidden border-t border-border">
           {/* Channel sidebar */}
@@ -237,6 +239,7 @@ const Community = () => {
           </section>
         </div>
       </main>
+      </LockGate>
 
       <CreatePostDialog
         open={showCreate}

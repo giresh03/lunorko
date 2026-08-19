@@ -6,6 +6,7 @@ import { PropertiesPanel } from "../editor/PropertiesPanel";
 import { EditableCanvas } from "../canvas/EditableCanvas";
 import { useVisualBuilderStore } from "../state/store";
 import { pageToHtml } from "../utils/renderToHtml";
+import LockGate from "@/components/LockGate";
 
 function ExportButton() {
   const page = useVisualBuilderStore((s) => s.page);
@@ -85,6 +86,7 @@ export default function VisualBuilderPage() {
   }, [selectedId, deleteElement, undo, redo]);
 
   return (
+    <LockGate lockKey="visual_builder" name="Visual UI/UX Builder">
     <div className="h-screen flex flex-col bg-card">
       {/* Top toolbar */}
       <header className="h-14 flex items-center justify-between px-4 bg-card border-b border-muted-foreground shrink-0">
@@ -135,5 +137,6 @@ export default function VisualBuilderPage() {
         <PropertiesPanel />
       </div>
     </div>
+    </LockGate>
   );
 }

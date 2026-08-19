@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
+import LockGate from "@/components/LockGate";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { domains } from "@/lib/domains";
@@ -156,6 +157,7 @@ const DailyChallenge = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
+      <LockGate lockKey="challenges" name="Daily Challenges">
       <main className="container mx-auto px-4 pt-24 pb-20">
         <Link to={`/domain/${domainId}`} className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back to {domain.name}
@@ -343,6 +345,7 @@ const DailyChallenge = () => {
           </div>
         )}
       </main>
+      </LockGate>
       <Footer />
     </div>
   );

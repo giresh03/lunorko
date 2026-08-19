@@ -3,7 +3,12 @@
  * Each element can be a container (section) or a leaf (text, image, button).
  */
 
+import type { ElementAnimation } from "./animations";
+
+export type { ElementAnimation };
+
 export type ElementType =
+
   | "section"
   | "hero"
   | "navbar"
@@ -47,8 +52,11 @@ export interface BaseElement {
     alignSelf?: string;
     border?: string;
   };
+  /** Animation config (CSS keyframes in-canvas, GSAP on export when requested) */
+  animation?: ElementAnimation;
   children?: PageElement[];
 }
+
 
 export interface TextElement extends BaseElement {
   type: "text" | "heading";
