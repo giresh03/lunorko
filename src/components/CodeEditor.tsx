@@ -388,14 +388,16 @@ function resolveTargetPath(
 
 
 // -- File Explorer Item --
-const FileItem = ({
-  node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
-}: {
+interface FileItemProps {
   node: FileNode; depth: number; activeFileId: string | null;
   onSelect: (node: FileNode) => void; onToggle: (id: string) => void;
   onDelete: (id: string) => void; onRename: (id: string, name: string) => void;
   themeColors: EditorTheme["uiColors"];
-}) => {
+}
+
+const FileItem = forwardRef<HTMLDivElement, FileItemProps>(function FileItem({
+  node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
+}, ref) {
   const isActive = node.id === activeFileId;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(node.name);
@@ -412,7 +414,7 @@ const FileItem = ({
   };
 
   return (
-    <div>
+    <div ref={ref}>
       <div
         className="group flex items-center gap-1 px-2 py-[3px] cursor-pointer text-xs transition-colors"
         style={{
@@ -456,7 +458,7 @@ const FileItem = ({
       ))}
     </div>
   );
-};
+});
 
 // -- Main Component --
 export interface CodeEditorHandle {
@@ -521,10 +523,34 @@ const LAYOUT_SUGGESTIONS = [
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   const { credits, refetch: refetchCredits } = useCredits();
+  const initialWorkspace = useMemo(() => {
+    const saved = getSavedProjects()
+      .filter((project) => project.domain === domainName && project.fileTree.length > 0)
+      .sort((a, b) => b.lastOpened - a.lastOpened)[0];
+    const tree = saved?.fileTree || createDefaultProject(domainName);
+    const findFirstHtml = (nodes: FileNode[]): FileNode | null => {
+      for (const node of nodes) {
+        if (node.type === "file" && (node.language === "html" || node.name.endsWith(".html"))) return node;
+        if (node.children) {
+          const match = findFirstHtml(node.children);
+          if (match) return match;
+        }
+      }
+      return null;
+    };
+    const firstHtml = findFirstHtml(tree);
+    return { saved, tree, firstHtml };
+  }, [domainName]);
   // File tree state
-  const [fileTree, setFileTree] = useState<FileNode[]>([]);
-  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [fileTree, setFileTree] = useState<FileNode[]>(initialWorkspace.tree);
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>(() => initialWorkspace.firstHtml ? [{
+    id: initialWorkspace.firstHtml.id,
+    name: initialWorkspace.firstHtml.name,
+    language: initialWorkspace.firstHtml.language || getLang(initialWorkspace.firstHtml.name),
+    content: initialWorkspace.firstHtml.content || "",
+    isModified: false,
+  }] : []);
+  const [activeTabId, setActiveTabId] = useState<string | null>(initialWorkspace.firstHtml?.id || null);
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
@@ -624,8 +650,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   }, []);
 
   // Project management
-  const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj-${Date.now()}`);
-  const [currentProjectName, setCurrentProjectName] = useState<string>(`${domainName} Workspace`);
+  const [currentProjectId, setCurrentProjectId] = useState<string>(() => initialWorkspace.saved?.id || `proj-${Date.now()}`);
+  const [currentProjectName, setCurrentProjectName] = useState<string>(() => initialWorkspace.saved?.name || `${domainName} Workspace`);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -654,6 +680,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [newItemName, setNewItemName] = useState("");
 
   const activeTab = openTabs.find((t) => t.id === activeTabId);
+  const activeTabRef = useRef(activeTab);
+  const activeTabIdRef = useRef(activeTabId);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    activeTabIdRef.current = activeTabId;
+  }, [activeTab, activeTabId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1282,18 +1315,23 @@ ${jsCode}
   useEffect(() => {
     const onEdit = (e: MessageEvent) => {
       const d = e.data as { __lunorVisualEdit?: boolean; op?: VisualEditOp } | null;
-      if (!d || !d.__lunorVisualEdit || !d.op || !activeTabId || !activeTab) return;
-      const next = applyVisualEdit(activeTab.content, d.op);
-      if (next && next !== activeTab.content) {
-        skipPreviewRebuildRef.current = true;
-        setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: next, isModified: true } : t));
-        setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: next })));
-        toast.success(`${activeTab.name} updated (${d.op.kind})`);
+      const currentTab = activeTabRef.current;
+      const currentId = activeTabIdRef.current;
+      if (!d || !d.__lunorVisualEdit || !d.op || !currentId || !currentTab) return;
+      if (iframeRef.current?.contentWindow && e.source !== iframeRef.current.contentWindow) return;
+      const next = applyVisualEdit(currentTab.content, d.op);
+      if (next && next !== currentTab.content) {
+        if (d.op.kind !== "move" && d.op.kind !== "delete") skipPreviewRebuildRef.current = true;
+        const updatedTab = { ...currentTab, content: next, isModified: true };
+        activeTabRef.current = updatedTab;
+        setOpenTabs((prev) => prev.map((t) => t.id === currentId ? updatedTab : t));
+        setFileTree((prev) => updateNode(prev, currentId, (n) => ({ ...n, content: next })));
+        toast.success(`${currentTab.name} updated (${d.op.kind})`);
       }
     };
     window.addEventListener("message", onEdit);
     return () => window.removeEventListener("message", onEdit);
-  }, [activeTab, activeTabId]);
+  }, [updateNode]);
 
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
