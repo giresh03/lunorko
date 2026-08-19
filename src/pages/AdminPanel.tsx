@@ -5,11 +5,12 @@ import {
   LayoutDashboard, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
   CheckCircle, XCircle, Receipt, Video, Megaphone,
-  MessageSquare, Ban, UserPlus, Briefcase, FileText
+  MessageSquare, Ban, UserPlus, Briefcase, FileText, Lock
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminPanelCard, VisitorsAreaChart, RevenueBarChart, PlanDonutChart } from "@/components/admin/AdminCharts";
+import { SystemControl } from "@/components/admin/SystemControl";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -551,6 +552,7 @@ const AdminPanel = () => {
             <TabsList className="inline-flex w-max gap-1 rounded-full border border-border/70 bg-card/60 p-1 backdrop-blur-xl">
               {[
                 { value: "overview", label: "Overview", short: "Stats", Icon: LayoutDashboard },
+                { value: "system", label: "System", short: "Locks", Icon: Lock },
                 { value: "users", label: "Users", short: "Users", Icon: Users },
                 { value: "subscriptions", label: "Subscriptions", short: "Subs", Icon: CreditCard },
                 { value: "payment-requests", label: "Payments", short: "Pay", Icon: Receipt, count: paymentRequests.filter((p) => p.status === "pending").length },
@@ -579,6 +581,10 @@ const AdminPanel = () => {
             </TabsList>
           </div>
 
+
+          <TabsContent value="system">
+            <SystemControl />
+          </TabsContent>
 
           {/* Overview */}
           <TabsContent value="overview">
