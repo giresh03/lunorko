@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
 
     // ---- Personal context (RLS-scoped to this user) ----
     const [profileRes, xpRes, progressRes, bookmarkRes, activityRes] = await Promise.all([
-      supabase.from('profiles').select('username, display_name, wants_to_join_team').eq('user_id', userId).maybeSingle(),
+      supabase.rpc('get_my_profile').maybeSingle(),
       supabase.from('user_xp').select('total_xp, level, current_streak, longest_streak, last_activity_date').eq('user_id', userId).maybeSingle(),
       supabase.from('domain_progress').select('domain_id, completed_topics, last_accessed_at').eq('user_id', userId).order('last_accessed_at', { ascending: false }).limit(12),
       supabase.from('bookmarks').select('domain_id, resource_title, resource_type').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
