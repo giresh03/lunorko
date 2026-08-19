@@ -7,7 +7,8 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github,
+  History as HistoryIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +29,11 @@ import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useCredits } from "@/hooks/useCredits";
+import GenerationHistoryPanel from "@/components/editor/GenerationHistoryPanel";
+import {
+  getHistory, addHistoryEntry, deleteHistoryEntry, clearHistory, isFullStackFiles,
+  type GenerationEntry,
+} from "@/lib/generationHistory";
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
@@ -492,7 +498,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons">("files");
+  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons" | "history">("files");
+  const [genHistory, setGenHistory] = useState<GenerationEntry[]>(() => getHistory());
   const [showAIPanel, setShowAIPanel] = useState(true);
   const [showGitHub, setShowGitHub] = useState(false);
   const { status: githubStatus, push: githubPush } = useGitHub();
@@ -1699,6 +1706,25 @@ ${jsCode}
       const jsFile = newFiles.find(f => ["javascript", "typescript"].includes(f.lang) || /\.(js|jsx|ts|tsx)$/.test(f.name));
       const bestFile = htmlFile || jsFile || newFiles[0];
       if (bestFile) setActiveTabId(bestFile.id);
+
+      // Record this generation in the history feed (snapshot = existing files + new files)
+      try {
+        const snapshotMap = new Map<string, { path: string; language?: string; content: string }>();
+        existingForResolve.forEach((f) => snapshotMap.set(f.path, { path: f.path, language: f.language, content: f.content || "" }));
+        newFiles.forEach((f) => snapshotMap.set(f.id, { path: f.id, language: f.lang, content: f.code }));
+        const snapshot = Array.from(snapshotMap.values());
+        addHistoryEntry({
+          domain: domainName,
+          projectId: currentProjectId,
+          projectName: currentProjectName,
+          prompt: (userPrompt || "(no prompt)").slice(0, 2000),
+          isFullStack: isFullStackFiles(snapshot.map((f) => f.path)),
+          files: snapshot,
+        });
+        setGenHistory(getHistory());
+      } catch (e) {
+        console.warn("[editor] could not record generation history", e);
+      }
 
       // Auto-open preview and build it directly from the code blocks (don't rely on stale state)
       const hasWebCode = newFiles.some(f => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(f.lang));
