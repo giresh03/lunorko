@@ -1316,6 +1316,56 @@ ${jsCode}
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
 
+  // Write a specific content string into a file + its open tab
+  const writeFileContent = useCallback((fileId: string, name: string, content: string) => {
+    setFileTree((prev) => updateNode(prev, fileId, (n) => ({ ...n, content })));
+    setOpenTabs((prev) => prev.some((t) => t.id === fileId)
+      ? prev.map((t) => t.id === fileId ? { ...t, content, isModified: true } : t)
+      : [...prev, { id: fileId, name, language: getLang(name), content, isModified: true }]);
+    if (activeTabIdRef.current === fileId && activeTabRef.current) {
+      activeTabRef.current = { ...activeTabRef.current, content, isModified: true };
+    }
+  }, [updateNode]);
+
+  const pushVisualSnapshot = useCallback((snap: VisualSnapshot) => {
+    setVisualUndo((s) => [...s.slice(-49), snap]);
+    setVisualRedo([]);
+  }, []);
+
+  const undoVisualEdit = useCallback(() => {
+    setVisualUndo((stack) => {
+      const snap = stack[stack.length - 1];
+      if (!snap) { toast.info("Nothing to undo"); return stack; }
+      writeFileContent(snap.fileId, snap.fileName, snap.before);
+      setVisualRedo((r) => [...r, snap]);
+      toast.success(`Undid ${snap.kind} in ${snap.fileName}`);
+      return stack.slice(0, -1);
+    });
+  }, [writeFileContent]);
+
+  const redoVisualEdit = useCallback(() => {
+    setVisualRedo((stack) => {
+      const snap = stack[stack.length - 1];
+      if (!snap) { toast.info("Nothing to redo"); return stack; }
+      writeFileContent(snap.fileId, snap.fileName, snap.after);
+      setVisualUndo((u) => [...u, snap]);
+      toast.success(`Redid ${snap.kind} in ${snap.fileName}`);
+      return stack.slice(0, -1);
+    });
+  }, [writeFileContent]);
+
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z while Visual Edit is active
+  useEffect(() => {
+    if (!visualEditMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) redoVisualEdit(); else undoVisualEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visualEditMode, undoVisualEdit, redoVisualEdit]);
+
   // Cursor / drag-and-drop edits made inside the preview -> patch the real source file
   useEffect(() => {
     const onEdit = (e: MessageEvent) => {
@@ -1328,6 +1378,7 @@ ${jsCode}
       if (next && next !== currentTab.content) {
         if (d.op.kind !== "move" && d.op.kind !== "delete") skipPreviewRebuildRef.current = true;
         const updatedTab = { ...currentTab, content: next, isModified: true };
+        pushVisualSnapshot({ fileId: currentId, fileName: currentTab.name, before: currentTab.content, after: next, kind: d.op.kind });
         activeTabRef.current = updatedTab;
         setOpenTabs((prev) => prev.map((t) => t.id === currentId ? updatedTab : t));
         setFileTree((prev) => updateNode(prev, currentId, (n) => ({ ...n, content: next })));
@@ -1347,7 +1398,7 @@ ${jsCode}
           const owner = candidates[0];
           const ownerContent = owner.content || "";
           const updatedContent = ownerContent.replace(previousText, nextText);
-          const updatedOwner = { ...owner, content: updatedContent };
+          pushVisualSnapshot({ fileId: owner.id, fileName: owner.name, before: ownerContent, after: updatedContent, kind: "dynamic text" });
           setFileTree((prev) => updateNode(prev, owner.id, (node) => ({ ...node, content: updatedContent })));
           setOpenTabs((prev) => prev.some((tab) => tab.id === owner.id)
             ? prev.map((tab) => tab.id === owner.id ? { ...tab, content: updatedContent, isModified: true } : tab)
@@ -1364,7 +1415,7 @@ ${jsCode}
     };
     window.addEventListener("message", onEdit);
     return () => window.removeEventListener("message", onEdit);
-  }, [fileTree, updateNode]);
+  }, [fileTree, updateNode, pushVisualSnapshot]);
 
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
