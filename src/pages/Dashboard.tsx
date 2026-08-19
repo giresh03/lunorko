@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useProfile } from "@/hooks/useProfile";
 import { domains } from "@/lib/domains";
 import { formatDistanceToNow } from "date-fns";
 
