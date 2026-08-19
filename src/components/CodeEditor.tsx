@@ -1330,18 +1330,20 @@ ${jsCode}
         setFileTree((prev) => updateNode(prev, currentId, (n) => ({ ...n, content: next })));
         toast.success(`${currentTab.name} updated (${d.op.kind})`);
       } else if (d.op.kind === "text" && d.op.previous && d.op.previous !== d.op.value) {
+        const previousText = d.op.previous;
+        const nextText = d.op.value;
         const candidates: FileNode[] = [];
         const visit = (nodes: FileNode[]) => {
           nodes.forEach((node) => {
             if (node.type === "folder") visit(node.children || []);
-            else if (/\.(html?|jsx?|tsx?)$/i.test(node.name) && (node.content?.split(d.op.previous || "").length || 0) === 2) candidates.push(node);
+            else if (/\.(html?|jsx?|tsx?)$/i.test(node.name) && (node.content?.split(previousText).length || 0) === 2) candidates.push(node);
           });
         };
         visit(fileTree);
         if (candidates.length === 1) {
           const owner = candidates[0];
           const ownerContent = owner.content || "";
-          const updatedContent = ownerContent.replace(d.op.previous, d.op.value);
+          const updatedContent = ownerContent.replace(previousText, nextText);
           const updatedOwner = { ...owner, content: updatedContent };
           setFileTree((prev) => updateNode(prev, owner.id, (node) => ({ ...node, content: updatedContent })));
           setOpenTabs((prev) => prev.some((tab) => tab.id === owner.id)
