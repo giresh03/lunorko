@@ -148,6 +148,11 @@ const Navbar = () => {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <Link to="/studio" className="cursor-pointer">
+                          <Sparkles className="mr-2 h-4 w-4" /> Lunor Studio
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <Link to="/assistant" className="cursor-pointer">
                           <Sparkles className="mr-2 h-4 w-4" /> AI Assistant
                         </Link>
