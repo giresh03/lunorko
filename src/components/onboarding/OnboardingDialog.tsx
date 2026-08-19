@@ -313,18 +313,28 @@ const OnboardingDialog = () => {
                 <div className="mt-4 space-y-2">
                   <label
                     htmlFor="onboard-resume"
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-3 text-sm transition-colors hover:text-foreground ${
+                      fileError
+                        ? "border-destructive/60 text-destructive"
+                        : "border-border/70 text-muted-foreground hover:border-primary/60"
+                    }`}
                   >
                     {file ? <FileText className="h-4 w-4 text-primary" /> : <Upload className="h-4 w-4" />}
-                    <span className="truncate">{file ? file.name : "Upload resume (PDF or DOC, max 5MB) — not mandatory"}</span>
+                    <span className="truncate">{file ? file.name : "Upload resume (PDF, DOC or DOCX, max 5MB) — not mandatory"}</span>
                   </label>
                   <input
                     id="onboard-resume"
                     type="file"
-                    accept=".pdf,.doc,.docx"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     className="hidden"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => handlePickFile(e.target.files?.[0] ?? null)}
                   />
+                  {fileError && <p className="text-xs text-destructive">{fileError}</p>}
+                  {file && !fileError && (
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)}MB — ready to upload
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">Resume is private — only you and the Lunor team can see it.</p>
                 </div>
               )}
