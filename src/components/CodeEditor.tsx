@@ -2668,7 +2668,14 @@ ${jsCode}
                   )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
-                    onClick={() => setVisualEditMode((v) => !v)}
+                    onClick={() => {
+                      const isHtml = !!activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html"));
+                      if (!isHtml && !visualEditMode) {
+                        toast.error("Open an .html page to use Visual Edit");
+                        return;
+                      }
+                      setVisualEditMode((v) => !v);
+                    }}
                     className={`p-0.5 transition-all duration-200 ${visualEditMode ? "text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary))]" : "text-muted-foreground hover:text-foreground"}`}
                     title="Visual Edit — click text to edit, drag to reorder, drop images"
                   >
