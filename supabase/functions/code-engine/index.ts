@@ -835,13 +835,16 @@ serve(async (req) => {
   let requestUserId: string | null = null;
   let isAdminUser = false;
   if (!isAnonKey) {
-    const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL")!, anonKey, { global: { headers: { Authorization: authHeader } } });
-    const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
-    if (authError || !authUser) {
+    const token = authHeader.slice("Bearer ".length).trim();
+    const supabaseAuth = createClient(Deno.env.get("SUPABASE_URL")!, anonKey);
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    const claims = claimsData?.claims as { sub?: string; email?: string } | undefined;
+    if (claimsError || !claims?.sub) {
+      console.error("[code-engine] auth error:", claimsError?.message ?? "missing claims");
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    requestUserId = authUser.id;
-    isAdminUser = (authUser.email || "").toLowerCase() === ADMIN_EMAIL;
+    requestUserId = claims.sub;
+    isAdminUser = (claims.email || "").toLowerCase() === ADMIN_EMAIL;
   }
 
   try {
