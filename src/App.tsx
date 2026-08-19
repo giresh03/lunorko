@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
 import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
 import Community from "./pages/Community";
 
 import About from "./pages/About";
