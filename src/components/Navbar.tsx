@@ -45,6 +45,7 @@ const Navbar = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const { user, loading, signOut } = useAuth();
   const { isAdmin } = useAdmin();
+  const { profile } = useProfile();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
