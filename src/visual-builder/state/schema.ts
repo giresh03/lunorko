@@ -3,7 +3,12 @@
  * Each element can be a container (section) or a leaf (text, image, button).
  */
 
+import type { ElementAnimation } from "./animations";
+
+export type { ElementAnimation };
+
 export type ElementType =
+
   | "section"
   | "hero"
   | "navbar"
