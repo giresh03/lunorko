@@ -41,7 +41,9 @@ function collectElements(elements: PageElement[], depth = 0): { el: PageElement;
 export function PropertiesPanel() {
   const { page, selectedId, updateElement, deleteElement, duplicateElement, selectElement } =
     useVisualBuilderStore();
+  const [tab, setTab] = useState<"style" | "animate">("style");
   const element = selectedId ? findElement(page.elements, selectedId) : null;
+
 
   if (!element || !selectedId) {
     return (
