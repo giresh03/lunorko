@@ -64,6 +64,7 @@ const AppContent = () => {
         <Route path="/domains" element={<Domains />} />
         <Route path="/domain/:domainId" element={<DomainDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/community" element={<Community />} />
         
         <Route path="/about" element={<About />} />
