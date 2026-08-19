@@ -261,6 +261,9 @@ const Navbar = () => {
               {!loading && (
                 user ? (
                   <>
+                    <Link to="/profile" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <User className="h-4 w-4" /> My Profile
+                    </Link>
                     <Link to="/dashboard" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <LayoutDashboard className="h-4 w-4" /> Dashboard
                     </Link>
