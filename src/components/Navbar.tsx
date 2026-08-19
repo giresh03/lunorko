@@ -130,9 +130,9 @@ const Navbar = () => {
                     <DropdownMenuTrigger asChild>
                       <button className="flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                         <Avatar className="h-8 w-8 border-2 border-border hover:border-primary transition-colors cursor-pointer">
-                          <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.display_name || "User"} />
+                          <AvatarImage src={profile?.avatar_url ?? user.user_metadata?.avatar_url} alt={profile?.username || user.user_metadata?.display_name || "User"} />
                           <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                            {(user.user_metadata?.display_name || user.email || "U").charAt(0).toUpperCase()}
+                            {(profile?.username || profile?.display_name || user.user_metadata?.display_name || user.email || "U").charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       </button>
@@ -140,11 +140,17 @@ const Navbar = () => {
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                          <p className="text-sm font-medium leading-none">{user.user_metadata?.display_name || "User"}</p>
+                          <p className="text-sm font-medium leading-none">{profile?.display_name || profile?.username || user.user_metadata?.display_name || "User"}</p>
+                          {profile?.username && <p className="text-xs font-medium leading-none text-primary">@{profile.username}</p>}
                           <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                         </div>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link to="/profile" className="cursor-pointer">
+                          <User className="mr-2 h-4 w-4" /> My Profile
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link to="/dashboard" className="cursor-pointer">
                           <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
