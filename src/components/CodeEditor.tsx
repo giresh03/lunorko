@@ -7,7 +7,8 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github,
+  History as HistoryIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +29,11 @@ import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useCredits } from "@/hooks/useCredits";
+import GenerationHistoryPanel from "@/components/editor/GenerationHistoryPanel";
+import {
+  getHistory, addHistoryEntry, deleteHistoryEntry, clearHistory, isFullStackFiles,
+  type GenerationEntry,
+} from "@/lib/generationHistory";
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
@@ -89,6 +95,34 @@ function saveProject(project: SavedProject) {
 function deleteProject(id: string) {
   const projects = getSavedProjects().filter(p => p.id !== id);
   localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+
+// Build a FileNode tree from a flat path/content snapshot (used by generation history)
+function buildTreeFromSnapshot(files: { path: string; language?: string; content: string }[]): FileNode[] {
+  const root: FileNode[] = [];
+  files.forEach((f) => {
+    const parts = f.path.split("/").filter(Boolean);
+    let level = root;
+    let prefix = "";
+    parts.forEach((part, idx) => {
+      prefix = prefix ? `${prefix}/${part}` : part;
+      if (idx === parts.length - 1) {
+        if (!level.some((n) => n.id === prefix)) {
+          level.push({ id: prefix, name: part, type: "file", language: f.language || getLang(part), content: f.content });
+        }
+      } else {
+        let folder = level.find((n) => n.id === prefix && n.type === "folder");
+        if (!folder) {
+          folder = { id: prefix, name: part, type: "folder", isOpen: true, children: [] };
+          level.push(folder);
+        }
+        folder.children = folder.children || [];
+        level = folder.children;
+      }
+    });
+  });
+  return root;
 }
 
 // -- Project templates --
@@ -492,7 +526,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons">("files");
+  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons" | "history">("files");
+  const [genHistory, setGenHistory] = useState<GenerationEntry[]>(() => getHistory());
   const [showAIPanel, setShowAIPanel] = useState(true);
   const [showGitHub, setShowGitHub] = useState(false);
   const { status: githubStatus, push: githubPush } = useGitHub();
@@ -1700,6 +1735,25 @@ ${jsCode}
       const bestFile = htmlFile || jsFile || newFiles[0];
       if (bestFile) setActiveTabId(bestFile.id);
 
+      // Record this generation in the history feed (snapshot = existing files + new files)
+      try {
+        const snapshotMap = new Map<string, { path: string; language?: string; content: string }>();
+        existingForResolve.forEach((f) => snapshotMap.set(f.path, { path: f.path, language: f.language, content: f.content || "" }));
+        newFiles.forEach((f) => snapshotMap.set(f.id, { path: f.id, language: f.lang, content: f.code }));
+        const snapshot = Array.from(snapshotMap.values());
+        addHistoryEntry({
+          domain: domainName,
+          projectId: currentProjectId,
+          projectName: currentProjectName,
+          prompt: (userPrompt || "(no prompt)").slice(0, 2000),
+          isFullStack: isFullStackFiles(snapshot.map((f) => f.path)),
+          files: snapshot,
+        });
+        setGenHistory(getHistory());
+      } catch (e) {
+        console.warn("[editor] could not record generation history", e);
+      }
+
       // Auto-open preview and build it directly from the code blocks (don't rely on stale state)
       const hasWebCode = newFiles.some(f => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(f.lang));
       if (hasWebCode) {
@@ -1865,6 +1919,49 @@ ${jsCode}
     setRecentProjects(getSavedProjects());
     setNewProjectName("");
   }, [newProjectName, newProjectTemplate, domainName, handleSaveProject]);
+
+  const handleRevisitGeneration = useCallback((entry: GenerationEntry) => {
+    const tree = buildTreeFromSnapshot(entry.files);
+    setFileTree(tree);
+    setCurrentProjectId(entry.projectId || `proj-${Date.now()}`);
+    setCurrentProjectName(entry.projectName || "Restored project");
+    setOpenTabs([]);
+    setActiveTabId(null);
+    setShowWelcome(false);
+    const first = entry.files.find((f) => f.path.endsWith(".html")) || entry.files[0];
+    if (first) {
+      setOpenTabs([{ id: first.path, name: first.path.split("/").pop() || first.path, language: first.language || getLang(first.path), content: first.content, isModified: false }]);
+      setActiveTabId(first.path);
+    }
+    setOutput((prev) => [...prev, `🕘 Restored generation from ${new Date(entry.createdAt).toLocaleString()} (${entry.files.length} files).`]);
+    setShowTerminal(true);
+  }, []);
+
+  const handleRerunGeneration = useCallback((entry: GenerationEntry) => {
+    setShowAIPanel(true);
+    handleChatSend(entry.prompt);
+  }, [handleChatSend]);
+
+  const handleOpenHistoryFile = useCallback((entry: GenerationEntry, path: string) => {
+    const file = entry.files.find((f) => f.path === path);
+    if (!file) return;
+    const name = path.split("/").pop() || path;
+    setOpenTabs((prev) => (prev.some((t) => t.id === path)
+      ? prev.map((t) => (t.id === path ? { ...t, content: file.content } : t))
+      : [...prev, { id: path, name, language: file.language || getLang(name), content: file.content, isModified: false }]));
+    setActiveTabId(path);
+    setShowWelcome(false);
+  }, []);
+
+  const handleDeleteHistoryEntry = useCallback((id: string) => {
+    deleteHistoryEntry(id);
+    setGenHistory(getHistory());
+  }, []);
+
+  const handleClearHistory = useCallback(() => {
+    clearHistory();
+    setGenHistory(getHistory());
+  }, []);
 
   const handleDeleteProject = useCallback((id: string) => {
     deleteProject(id);
@@ -2176,6 +2273,9 @@ ${jsCode}
           <button onClick={() => { setShowSidebar(true); setSidebarTab("snippets"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "snippets" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Offline Snippets">
             <FileCode2 className="h-4 w-4" />
           </button>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab("history"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "history" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Generation History">
+            <HistoryIcon className="h-4 w-4" />
+          </button>
           <button onClick={() => { setShowSidebar(true); setSidebarTab("lessons"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "lessons" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Lesson Instructions">
             <BookOpen className="h-4 w-4" />
           </button>
@@ -2201,7 +2301,7 @@ ${jsCode}
           <div className="flex flex-col w-56 border-r shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border }}>
               <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
-                {sidebarTab === "files" ? "Explorer" : sidebarTab === "snippets" ? "Snippets" : sidebarTab === "lessons" ? "Lessons" : "Search"}
+                {sidebarTab === "files" ? "Explorer" : sidebarTab === "snippets" ? "Snippets" : sidebarTab === "lessons" ? "Lessons" : sidebarTab === "history" ? "History" : "Search"}
               </span>
               {!online && <span className="text-[8px] px-1 py-0.5 rounded" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>OFFLINE</span>}
               {sidebarTab === "files" && (
@@ -2215,7 +2315,17 @@ ${jsCode}
                 </div>
               )}
             </div>
-            {sidebarTab === "files" ? (
+            {sidebarTab === "history" ? (
+              <GenerationHistoryPanel
+                entries={genHistory}
+                colors={currentTheme.uiColors as any}
+                onRevisit={handleRevisitGeneration}
+                onRerun={handleRerunGeneration}
+                onDelete={handleDeleteHistoryEntry}
+                onClearAll={handleClearHistory}
+                onOpenFile={handleOpenHistoryFile}
+              />
+            ) : sidebarTab === "files" ? (
               <div className="flex-1 overflow-y-auto py-1 text-xs">
                 {newItemParent !== null && (
                   <div className="flex items-center gap-1 px-3 py-1">
