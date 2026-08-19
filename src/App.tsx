@@ -27,6 +27,7 @@ import AIVideoInterview from "./pages/AIVideoInterview";
 import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
 import GitHubCallback from "./pages/GitHubCallback";
 import Assistant from "./pages/Assistant";
+import Studio from "./pages/Studio";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
 import OnboardingDialog from "./components/onboarding/OnboardingDialog";
