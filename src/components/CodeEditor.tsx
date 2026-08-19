@@ -1255,6 +1255,7 @@ ${jsCode}
   // Debounced preview update when content or active tab changes
   useEffect(() => {
     if (!showPreview || !activeTab) return;
+    if (skipPreviewRebuildRef.current) { skipPreviewRebuildRef.current = false; return; }
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     previewTimerRef.current = setTimeout(updatePreview, 300);
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
