@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useProfile } from "@/hooks/useProfile";
 import logo from "@/assets/logo.jpeg";
 import { signInWithGoogle } from "@/lib/auth";
 
@@ -44,6 +45,7 @@ const Navbar = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const { user, loading, signOut } = useAuth();
   const { isAdmin } = useAdmin();
+  const { profile } = useProfile();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -128,9 +130,9 @@ const Navbar = () => {
                     <DropdownMenuTrigger asChild>
                       <button className="flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                         <Avatar className="h-8 w-8 border-2 border-border hover:border-primary transition-colors cursor-pointer">
-                          <AvatarImage src={user.user_metadata?.avatar_url} alt={user.user_metadata?.display_name || "User"} />
+                          <AvatarImage src={profile?.avatar_url ?? user.user_metadata?.avatar_url} alt={profile?.username || user.user_metadata?.display_name || "User"} />
                           <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                            {(user.user_metadata?.display_name || user.email || "U").charAt(0).toUpperCase()}
+                            {(profile?.username || profile?.display_name || user.user_metadata?.display_name || user.email || "U").charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                       </button>
@@ -138,11 +140,17 @@ const Navbar = () => {
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
-                          <p className="text-sm font-medium leading-none">{user.user_metadata?.display_name || "User"}</p>
+                          <p className="text-sm font-medium leading-none">{profile?.display_name || profile?.username || user.user_metadata?.display_name || "User"}</p>
+                          {profile?.username && <p className="text-xs font-medium leading-none text-primary">@{profile.username}</p>}
                           <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                         </div>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link to="/profile" className="cursor-pointer">
+                          <User className="mr-2 h-4 w-4" /> My Profile
+                        </Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem asChild>
                         <Link to="/dashboard" className="cursor-pointer">
                           <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
@@ -253,6 +261,9 @@ const Navbar = () => {
               {!loading && (
                 user ? (
                   <>
+                    <Link to="/profile" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <User className="h-4 w-4" /> My Profile
+                    </Link>
                     <Link to="/dashboard" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <LayoutDashboard className="h-4 w-4" /> Dashboard
                     </Link>
@@ -284,7 +295,7 @@ const Navbar = () => {
                     )}
                     <div className="h-px bg-border my-1" />
                     <span className="text-sm text-muted-foreground py-2 px-3">
-                      {user.user_metadata?.display_name || user.email?.split("@")[0]}
+                      {profile?.username ? `@${profile.username}` : profile?.display_name || user.email?.split("@")[0]}
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => { signOut(); setOpen(false); }}>
                       <LogOut className="mr-1.5 h-4 w-4" /> Sign Out

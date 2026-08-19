@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
 import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
 import Community from "./pages/Community";
 
 import About from "./pages/About";
@@ -63,6 +64,7 @@ const AppContent = () => {
         <Route path="/domains" element={<Domains />} />
         <Route path="/domain/:domainId" element={<DomainDetail />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/community" element={<Community />} />
         
         <Route path="/about" element={<About />} />
