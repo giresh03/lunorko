@@ -350,7 +350,7 @@ const OnboardingDialog = () => {
                 className="btn-sheen flex-1 bg-gradient-to-r from-primary to-primary-glow font-semibold text-primary-foreground shadow-glow"
               >
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {saving ? "Saving…" : "Finish & enter Lunor"}
+                {uploading ? "Uploading resume…" : saving ? "Saving…" : "Finish & enter Lunor"}
               </Button>
             </div>
           </div>
