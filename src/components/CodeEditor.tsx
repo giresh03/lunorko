@@ -8,7 +8,7 @@ import {
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
   Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github,
-  History as HistoryIcon, MousePointerClick, ZoomIn, ZoomOut
+  History as HistoryIcon, MousePointerClick, ZoomIn, ZoomOut, Undo2, Redo2
 } from "lucide-react";
 import { annotateHtml, applyVisualEdit, VISUAL_EDIT_AGENT, type VisualEditOp } from "@/lib/visualEdit";
 import { toast } from "sonner";
@@ -597,7 +597,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
+  type VisualSnapshot = { fileId: string; fileName: string; before: string; after: string; kind: string };
   const [visualEditMode, setVisualEditMode] = useState(false);
+  const [visualUndo, setVisualUndo] = useState<VisualSnapshot[]>([]);
+  const [visualRedo, setVisualRedo] = useState<VisualSnapshot[]>([]);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [showChecklist, setShowChecklist] = useState(false);
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
@@ -1313,6 +1316,56 @@ ${jsCode}
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
 
+  // Write a specific content string into a file + its open tab
+  const writeFileContent = useCallback((fileId: string, name: string, content: string) => {
+    setFileTree((prev) => updateNode(prev, fileId, (n) => ({ ...n, content })));
+    setOpenTabs((prev) => prev.some((t) => t.id === fileId)
+      ? prev.map((t) => t.id === fileId ? { ...t, content, isModified: true } : t)
+      : [...prev, { id: fileId, name, language: getLang(name), content, isModified: true }]);
+    if (activeTabIdRef.current === fileId && activeTabRef.current) {
+      activeTabRef.current = { ...activeTabRef.current, content, isModified: true };
+    }
+  }, [updateNode]);
+
+  const pushVisualSnapshot = useCallback((snap: VisualSnapshot) => {
+    setVisualUndo((s) => [...s.slice(-49), snap]);
+    setVisualRedo([]);
+  }, []);
+
+  const undoVisualEdit = useCallback(() => {
+    setVisualUndo((stack) => {
+      const snap = stack[stack.length - 1];
+      if (!snap) { toast.info("Nothing to undo"); return stack; }
+      writeFileContent(snap.fileId, snap.fileName, snap.before);
+      setVisualRedo((r) => [...r, snap]);
+      toast.success(`Undid ${snap.kind} in ${snap.fileName}`);
+      return stack.slice(0, -1);
+    });
+  }, [writeFileContent]);
+
+  const redoVisualEdit = useCallback(() => {
+    setVisualRedo((stack) => {
+      const snap = stack[stack.length - 1];
+      if (!snap) { toast.info("Nothing to redo"); return stack; }
+      writeFileContent(snap.fileId, snap.fileName, snap.after);
+      setVisualUndo((u) => [...u, snap]);
+      toast.success(`Redid ${snap.kind} in ${snap.fileName}`);
+      return stack.slice(0, -1);
+    });
+  }, [writeFileContent]);
+
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z while Visual Edit is active
+  useEffect(() => {
+    if (!visualEditMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) redoVisualEdit(); else undoVisualEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visualEditMode, undoVisualEdit, redoVisualEdit]);
+
   // Cursor / drag-and-drop edits made inside the preview -> patch the real source file
   useEffect(() => {
     const onEdit = (e: MessageEvent) => {
@@ -1325,6 +1378,7 @@ ${jsCode}
       if (next && next !== currentTab.content) {
         if (d.op.kind !== "move" && d.op.kind !== "delete") skipPreviewRebuildRef.current = true;
         const updatedTab = { ...currentTab, content: next, isModified: true };
+        pushVisualSnapshot({ fileId: currentId, fileName: currentTab.name, before: currentTab.content, after: next, kind: d.op.kind });
         activeTabRef.current = updatedTab;
         setOpenTabs((prev) => prev.map((t) => t.id === currentId ? updatedTab : t));
         setFileTree((prev) => updateNode(prev, currentId, (n) => ({ ...n, content: next })));
@@ -1344,7 +1398,7 @@ ${jsCode}
           const owner = candidates[0];
           const ownerContent = owner.content || "";
           const updatedContent = ownerContent.replace(previousText, nextText);
-          const updatedOwner = { ...owner, content: updatedContent };
+          pushVisualSnapshot({ fileId: owner.id, fileName: owner.name, before: ownerContent, after: updatedContent, kind: "dynamic text" });
           setFileTree((prev) => updateNode(prev, owner.id, (node) => ({ ...node, content: updatedContent })));
           setOpenTabs((prev) => prev.some((tab) => tab.id === owner.id)
             ? prev.map((tab) => tab.id === owner.id ? { ...tab, content: updatedContent, isModified: true } : tab)
@@ -1361,7 +1415,7 @@ ${jsCode}
     };
     window.addEventListener("message", onEdit);
     return () => window.removeEventListener("message", onEdit);
-  }, [fileTree, updateNode]);
+  }, [fileTree, updateNode, pushVisualSnapshot]);
 
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
@@ -2749,6 +2803,26 @@ ${jsCode}
                   >
                     <MousePointerClick className="h-3 w-3" />
                   </button>
+                  {visualEditMode && (
+                    <>
+                      <button
+                        onClick={undoVisualEdit}
+                        disabled={!visualUndo.length}
+                        className="p-0.5 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
+                        title="Undo visual edit (Ctrl+Z)"
+                      >
+                        <Undo2 className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={redoVisualEdit}
+                        disabled={!visualRedo.length}
+                        className="p-0.5 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
+                        title="Redo visual edit (Ctrl+Shift+Z)"
+                      >
+                        <Redo2 className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))}
                     className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
@@ -2825,7 +2899,7 @@ ${jsCode}
                   <div className="flex items-center gap-2 px-2 py-1 shrink-0 border-b border-primary/30 bg-primary/10 animate-in fade-in slide-in-from-top-1">
                     <MousePointerClick className="h-3 w-3 text-primary animate-pulse" />
                     <span className="text-[9px] text-primary font-medium">
-                      Visual Edit ON — click text to type · drag to reorder · drop an image to swap · Del to remove. Code updates live.
+                      Visual Edit ON — click text to type · drag to reorder · drop an image to swap · Del to remove · Ctrl+Z undo / Ctrl+Shift+Z redo. Code updates live.
                     </span>
                   </div>
                 )}
