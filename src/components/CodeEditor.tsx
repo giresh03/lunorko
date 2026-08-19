@@ -597,6 +597,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
+  type VisualSnapshot = { fileId: string; fileName: string; before: string; after: string; kind: string };
   const [visualEditMode, setVisualEditMode] = useState(false);
   const [visualUndo, setVisualUndo] = useState<VisualSnapshot[]>([]);
   const [visualRedo, setVisualRedo] = useState<VisualSnapshot[]>([]);
