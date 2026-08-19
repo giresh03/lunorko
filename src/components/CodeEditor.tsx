@@ -1329,11 +1329,37 @@ ${jsCode}
         setOpenTabs((prev) => prev.map((t) => t.id === currentId ? updatedTab : t));
         setFileTree((prev) => updateNode(prev, currentId, (n) => ({ ...n, content: next })));
         toast.success(`${currentTab.name} updated (${d.op.kind})`);
+      } else if (d.op.kind === "text" && d.op.previous && d.op.previous !== d.op.value) {
+        const candidates: FileNode[] = [];
+        const visit = (nodes: FileNode[]) => {
+          nodes.forEach((node) => {
+            if (node.type === "folder") visit(node.children || []);
+            else if (/\.(html?|jsx?|tsx?)$/i.test(node.name) && (node.content?.split(d.op.previous || "").length || 0) === 2) candidates.push(node);
+          });
+        };
+        visit(fileTree);
+        if (candidates.length === 1) {
+          const owner = candidates[0];
+          const ownerContent = owner.content || "";
+          const updatedContent = ownerContent.replace(d.op.previous, d.op.value);
+          const updatedOwner = { ...owner, content: updatedContent };
+          setFileTree((prev) => updateNode(prev, owner.id, (node) => ({ ...node, content: updatedContent })));
+          setOpenTabs((prev) => prev.some((tab) => tab.id === owner.id)
+            ? prev.map((tab) => tab.id === owner.id ? { ...tab, content: updatedContent, isModified: true } : tab)
+            : [...prev, { id: owner.id, name: owner.name, language: owner.language || getLang(owner.name), content: updatedContent, isModified: true }]);
+          activeTabRef.current = { id: owner.id, name: owner.name, language: owner.language || getLang(owner.name), content: updatedContent, isModified: true };
+          activeTabIdRef.current = owner.id;
+          setActiveTabId(owner.id);
+          skipPreviewRebuildRef.current = true;
+          toast.success(`${owner.name} updated (dynamic text)`);
+        } else {
+          toast.error(candidates.length > 1 ? "That text appears in multiple files; edit it in code." : "Could not locate this dynamic text in project source.");
+        }
       }
     };
     window.addEventListener("message", onEdit);
     return () => window.removeEventListener("message", onEdit);
-  }, [updateNode]);
+  }, [fileTree, updateNode]);
 
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
