@@ -8,8 +8,10 @@ import {
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
   Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github,
-  History as HistoryIcon
+  History as HistoryIcon, MousePointerClick, ZoomIn, ZoomOut
 } from "lucide-react";
+import { annotateHtml, applyVisualEdit, VISUAL_EDIT_AGENT, type VisualEditOp } from "@/lib/visualEdit";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import GitHubPushDialog from "@/components/GitHubPushDialog";
