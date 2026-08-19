@@ -610,6 +610,36 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_locks: {
+        Row: {
+          category: string
+          key: string
+          label: string
+          locked: boolean
+          message: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category?: string
+          key: string
+          label: string
+          locked?: boolean
+          message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string
+          key?: string
+          label?: string
+          locked?: boolean
+          message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           created_at: string
