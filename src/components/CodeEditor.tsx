@@ -2803,6 +2803,26 @@ ${jsCode}
                   >
                     <MousePointerClick className="h-3 w-3" />
                   </button>
+                  {visualEditMode && (
+                    <>
+                      <button
+                        onClick={undoVisualEdit}
+                        disabled={!visualUndo.length}
+                        className="p-0.5 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
+                        title="Undo visual edit (Ctrl+Z)"
+                      >
+                        <Undo2 className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={redoVisualEdit}
+                        disabled={!visualRedo.length}
+                        className="p-0.5 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
+                        title="Redo visual edit (Ctrl+Shift+Z)"
+                      >
+                        <Redo2 className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))}
                     className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
