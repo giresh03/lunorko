@@ -239,6 +239,7 @@ const Community = () => {
           </section>
         </div>
       </main>
+      </LockGate>
 
       <CreatePostDialog
         open={showCreate}

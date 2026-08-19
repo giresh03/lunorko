@@ -345,6 +345,7 @@ const DailyChallenge = () => {
           </div>
         )}
       </main>
+      </LockGate>
       <Footer />
     </div>
   );
