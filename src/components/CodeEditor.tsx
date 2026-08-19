@@ -1096,14 +1096,16 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       const pages: Record<string, string> = {};
       for (const name of pageNames) {
         const short = name.split("/").pop() || name;
-        pages[short] = assemblePage(allFiles[name], allFiles, short);
+        const pageHtml = assemblePage(allFiles[name], allFiles, short);
+        pages[short] = btoa(unescape(encodeURIComponent(pageHtml)));
       }
 
       const shim = `<script>(function(){
-  var PAGES = ${JSON.stringify(pages).replace(/<\/script>/gi, "<\\/script>")};
+  var PAGES = ${JSON.stringify(pages)};
   function nav(name){
-    var doc = PAGES[name];
-    if(!doc) return;
+    var encoded = PAGES[name];
+    if(!encoded) return;
+    var doc = decodeURIComponent(escape(atob(encoded)));
     document.open(); document.write(doc); document.close();
     if (window.__attachPreviewNav) window.__attachPreviewNav();
   }
