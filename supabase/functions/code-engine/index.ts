@@ -983,9 +983,15 @@ comments, chat, admin, CRUD, or "backend"):
         : "";
       const systemPrompt = `${basePrompt}
 
+OPERATING MODE (decide this FIRST, before writing anything):
+- If the user message contains a "[CURRENT PROJECT STATE ...]" section -> **EDIT MODE**.
+  Change ONLY what was asked. Return only the touched files, complete, with byte-identical
+  untouched regions. No redesigns, no renames, no new scaffolding.
+- Otherwise -> **BUILD MODE**. Design the full architecture (pages + data + API) and emit the
+  whole cohesive project in one response.
+
 Rules:
 - Always use markdown formatting with fenced code blocks and syntax highlighting
-- Be concise but thorough
 - When generating code, include comments explaining key parts
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity
