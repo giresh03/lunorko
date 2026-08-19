@@ -104,10 +104,10 @@ const DailyChallenge = () => {
       const userIds = data.map((d: any) => d.user_id);
       const { data: profiles } = await supabase
         .from("public_profiles")
-        .select("user_id, display_name")
+        .select("user_id, display_name, username")
         .in("user_id", userIds);
       
-      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p.display_name]));
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p.username || p.display_name]));
       setLeaderboard(data.map((d: any) => ({ ...d, display_name: profileMap.get(d.user_id) || "Anonymous" })));
     }
   };

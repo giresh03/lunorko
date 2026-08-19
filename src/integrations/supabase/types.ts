@@ -1377,6 +1377,7 @@ export type Database = {
         Returns: Json
       }
       count_unique_visitors: { Args: never; Returns: number }
+      generate_username: { Args: { _seed: string }; Returns: string }
       get_my_profile: {
         Args: never
         Returns: {

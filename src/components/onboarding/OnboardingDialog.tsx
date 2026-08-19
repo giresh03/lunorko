@@ -78,7 +78,7 @@ const OnboardingDialog = () => {
   useEffect(() => {
     if (needsOnboarding) {
       setOpen(true);
-      setUsername(profile?.username || (profile?.display_name || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 20));
+      setUsername(profile?.username || "");
     }
   }, [needsOnboarding, profile?.username, profile?.display_name]);
 

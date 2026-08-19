@@ -94,12 +94,12 @@ const DomainChat = ({ domainId, channelName }: { domainId: string; channelName?:
     if (missing.length === 0) return;
     const { data } = await supabase
       .from("public_profiles")
-      .select("user_id, display_name")
+      .select("user_id, display_name, username")
       .in("user_id", missing);
     if (!data?.length) return;
     setProfiles((prev) => {
       const next = { ...prev };
-      data.forEach((p) => { next[p.user_id] = p.display_name || "User"; });
+      data.forEach((p: any) => { next[p.user_id] = p.username || p.display_name || "User"; });
       return next;
     });
   }, []);
