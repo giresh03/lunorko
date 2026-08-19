@@ -2785,10 +2785,11 @@ ${jsCode}
                           </div>
                         </div>
                         <iframe
+                          key={previewKey}
                           ref={iframeRef}
                           srcDoc={previewContent}
                           className="border-0 w-full"
-                          style={{ height: "calc(100% - 48px)" }}
+                          style={{ height: "calc(100% - 48px)", zoom: previewZoom / 100 }}
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
@@ -2844,10 +2845,11 @@ ${jsCode}
                           <div className="flex items-center gap-1"><span>📶</span><span>🔋</span></div>
                         </div>
                         <iframe
+                          key={previewKey}
                           ref={iframeRef}
                           srcDoc={previewContent}
                           className="border-0 w-full"
-                          style={{ height: "calc(100% - 32px)" }}
+                          style={{ height: "calc(100% - 32px)", zoom: previewZoom / 100 }}
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
@@ -2882,6 +2884,7 @@ ${jsCode}
                     </div>
                   ) : (
                     <iframe
+                      key={previewKey}
                       ref={iframeRef}
                       srcDoc={previewContent}
                       className="border-0 bg-white transition-all duration-200"
@@ -2889,6 +2892,7 @@ ${jsCode}
                         width: currentDevice.type === "phone" ? `${currentDevice.w}px` : currentDevice.type === "tablet" ? `${currentDevice.w}px` : "100%",
                         height: "100%",
                         maxWidth: "100%",
+                        zoom: previewZoom / 100,
                       }}
                       sandbox="allow-scripts allow-modals allow-forms allow-popups"
                       title="Web Preview"
