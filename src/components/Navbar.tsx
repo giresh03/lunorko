@@ -30,6 +30,7 @@ const navLinks = [
   { to: "/domains", label: "Domains" },
   { to: "/community", label: "Community" },
   { to: "/projects", label: "Projects" },
+  { to: "/studio", label: "Studio" },
   { to: "/visual-builder", label: "Visual Builder" },
   { to: "/ai-interview", label: "AI Interview" },
   { to: "/pricing", label: "Pricing" },

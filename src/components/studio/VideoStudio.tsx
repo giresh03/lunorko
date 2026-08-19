@@ -6,7 +6,12 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useStudio } from "@/hooks/useStudio";
 
-const DURATIONS = ["4", "6", "8"];
+const DURATIONS = [
+  { id: "30", label: "30s" },
+  { id: "45", label: "45s" },
+  { id: "60", label: "1 min" },
+  { id: "120", label: "2 min" },
+];
 const ORIENTATIONS = [
   { id: "1280x720", label: "Landscape 16:9" },
   { id: "720x1280", label: "Portrait 9:16" },
@@ -16,7 +21,7 @@ const VideoStudio = () => {
   const { toast } = useToast();
   const { startVideo, pollVideo, fetchCreations } = useStudio();
   const [prompt, setPrompt] = useState("");
-  const [seconds, setSeconds] = useState("8");
+  const [seconds, setSeconds] = useState("30");
   const [size, setSize] = useState("1280x720");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -100,15 +105,15 @@ const VideoStudio = () => {
           <div className="mt-2 flex gap-2">
             {DURATIONS.map((d) => (
               <button
-                key={d}
-                onClick={() => setSeconds(d)}
+                key={d.id}
+                onClick={() => setSeconds(d.id)}
                 className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-all duration-300 ${
-                  seconds === d
+                  seconds === d.id
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/40"
                 }`}
               >
-                {d}s
+                {d.label}
               </button>
             ))}
           </div>

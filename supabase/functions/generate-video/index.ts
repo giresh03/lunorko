@@ -39,7 +39,14 @@ Deno.serve(async (req) => {
 
     if (action === "create") {
       const prompt: string = typeof body.prompt === "string" ? body.prompt.trim() : "";
-      const seconds: string = ["4", "6", "8"].includes(String(body.seconds)) ? String(body.seconds) : "8";
+      // UI offers 30s / 45s / 1min / 2min. The video model renders clips of 4, 6 or 8 seconds,
+      // so we keep the requested length in metadata and render the longest supported clip.
+      const requestedSeconds: string = ["30", "45", "60", "120"].includes(String(body.seconds))
+        ? String(body.seconds)
+        : ["4", "6", "8"].includes(String(body.seconds))
+          ? String(body.seconds)
+          : "30";
+      const seconds: string = ["4", "6", "8"].includes(requestedSeconds) ? requestedSeconds : "8";
       const size: string = body.size === "720x1280" ? "720x1280" : "1280x720";
       if (prompt.length < 3) return json({ error: "Please describe the video you want." }, 400);
 
@@ -87,7 +94,7 @@ Deno.serve(async (req) => {
           kind: "video",
           prompt,
           status: "in_progress",
-          meta: { job_id: job.id, seconds, size, model: VIDEO_MODEL },
+          meta: { job_id: job.id, seconds, requested_seconds: requestedSeconds, size, model: VIDEO_MODEL },
         })
         .select("id")
         .maybeSingle();
