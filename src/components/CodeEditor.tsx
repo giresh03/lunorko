@@ -2665,12 +2665,56 @@ ${jsCode}
                   )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
-                    onClick={updatePreview}
+                    onClick={() => setVisualEditMode((v) => !v)}
+                    className={`p-0.5 transition-all duration-200 ${visualEditMode ? "text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary))]" : "text-muted-foreground hover:text-foreground"}`}
+                    title="Visual Edit — click text to edit, drag to reorder, drop images"
+                  >
+                    <MousePointerClick className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))}
                     className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Refresh Preview"
+                    title="Zoom out"
+                  >
+                    <ZoomOut className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewZoom(100)}
+                    className="text-[9px] font-mono text-muted-foreground hover:text-foreground transition-colors px-0.5"
+                    title="Reset zoom"
+                  >
+                    {previewZoom}%
+                  </button>
+                  <button
+                    onClick={() => setPreviewZoom((z) => Math.min(150, z + 10))}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Zoom in"
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={copyPreviewHtml}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Copy preview HTML"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={downloadPreviewHtml}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Download page as .html"
+                  >
+                    <Download className="h-3 w-3" />
+                  </button>
+                  <div className="w-px h-3.5 bg-border mx-0.5" />
+                  <button
+                    onClick={hardRefreshPreview}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-transform duration-300 hover:rotate-180"
+                    title="Refresh Preview (hard reload)"
                   >
                     <RefreshCw className="h-3 w-3" />
                   </button>
+
                   <button
                     onClick={() => setPreviewFullscreen(!previewFullscreen)}
                     className={`p-0.5 transition-colors ${previewFullscreen ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
