@@ -1,6 +1,9 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import type { PageElement, TextElement, ImageElement, ButtonElement } from "../state/schema";
 import { useVisualBuilderStore } from "../state/store";
+import { animationStyleFor } from "../state/animations";
+import { ensureAnimationStyles } from "../utils/animationStyles";
+
 
 interface ElementRendererProps {
   element: PageElement;
