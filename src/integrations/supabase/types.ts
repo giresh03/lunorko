@@ -703,6 +703,42 @@ export type Database = {
         }
         Relationships: []
       }
+      media_generations: {
+        Row: {
+          asset_path: string | null
+          created_at: string
+          id: string
+          kind: string
+          meta: Json
+          prompt: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_path?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          meta?: Json
+          prompt: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_path?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          prompt?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mentor_slots: {
         Row: {
           created_at: string

@@ -148,6 +148,11 @@ const Navbar = () => {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
+                        <Link to="/studio" className="cursor-pointer">
+                          <Sparkles className="mr-2 h-4 w-4" /> Lunor Studio
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
                         <Link to="/assistant" className="cursor-pointer">
                           <Sparkles className="mr-2 h-4 w-4" /> AI Assistant
                         </Link>
@@ -249,6 +254,9 @@ const Navbar = () => {
                   <>
                     <Link to="/dashboard" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <LayoutDashboard className="h-4 w-4" /> Dashboard
+                    </Link>
+                    <Link to="/studio" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
+                      <Sparkles className="h-4 w-4" /> Lunor Studio
                     </Link>
                     <Link to="/assistant" className="text-sm text-muted-foreground py-2 px-3 rounded-lg hover:bg-muted/50 flex items-center gap-2" onClick={() => setOpen(false)}>
                       <Sparkles className="h-4 w-4" /> AI Assistant
