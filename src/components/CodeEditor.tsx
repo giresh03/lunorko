@@ -395,9 +395,9 @@ interface FileItemProps {
   themeColors: EditorTheme["uiColors"];
 }
 
-const FileItem = forwardRef<HTMLDivElement, FileItemProps>(function FileItem({
+const FileItem = ({
   node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
-}, ref) {
+}: FileItemProps) => {
   const isActive = node.id === activeFileId;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(node.name);
@@ -414,7 +414,7 @@ const FileItem = forwardRef<HTMLDivElement, FileItemProps>(function FileItem({
   };
 
   return (
-    <div ref={ref}>
+    <div>
       <div
         className="group flex items-center gap-1 px-2 py-[3px] cursor-pointer text-xs transition-colors"
         style={{
@@ -458,7 +458,7 @@ const FileItem = forwardRef<HTMLDivElement, FileItemProps>(function FileItem({
       ))}
     </div>
   );
-});
+};
 
 // -- Main Component --
 export interface CodeEditorHandle {
