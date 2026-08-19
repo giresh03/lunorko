@@ -926,7 +926,8 @@ serve(async (req) => {
       const stackDirective = domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- Start from index.html + styles.css + script.js, but there is NO file limit: add as many pages,
+  stylesheets, scripts, and backend files as the prompt implies (screens, dashboards, admin, api).
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
