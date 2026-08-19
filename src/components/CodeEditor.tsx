@@ -577,6 +577,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipPreviewRebuildRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Preview runtime errors reported by the sandboxed iframe
