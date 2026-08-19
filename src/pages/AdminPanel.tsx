@@ -535,84 +535,111 @@ const AdminPanel = () => {
 
           {/* Overview */}
           <TabsContent value="overview">
-            {/* Visitor Trends Chart */}
-            <div className="rounded-xl border border-border bg-card p-6 mb-6">
-              <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" /> Visitor Trends (Last 30 Days)
-              </h3>
-              {visitorTrends.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={visitorTrends} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="visitorGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="visit_date"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={11}
-                      tickFormatter={(v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} allowDecimals={false} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        color: "hsl(var(--foreground))",
-                        fontSize: "12px",
-                      }}
-                      labelFormatter={(v) => new Date(v).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                      formatter={(value: number) => [value, "Visitors"]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="visitor_count"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      fill="url(#visitorGradient)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <p className="text-sm text-muted-foreground">No visitor data yet</p>
-              )}
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 mb-4 sm:mb-6">
+              <AdminPanelCard
+                className="lg:col-span-2"
+                title="Visitor Trends"
+                subtitle="Last 30 days"
+                icon={<TrendingUp className="h-4 w-4 text-primary" />}
+              >
+                <VisitorsAreaChart data={visitorTrends} />
+              </AdminPanelCard>
+
+              <AdminPanelCard
+                title="Plan Mix"
+                subtitle="Active distribution"
+                icon={<CreditCard className="h-4 w-4 text-primary" />}
+              >
+                <PlanDonutChart data={planMix} />
+              </AdminPanelCard>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border border-border bg-card p-6">
-                <h3 className="text-lg font-bold text-foreground mb-4">Recent Users</h3>
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 mb-4 sm:mb-6">
+              <AdminPanelCard
+                className="lg:col-span-2"
+                title="Revenue by Day"
+                subtitle="Confirmed subscriptions"
+                icon={<Receipt className="h-4 w-4 text-primary" />}
+              >
+                <RevenueBarChart data={revenueByDay} />
+              </AdminPanelCard>
+
+              <AdminPanelCard
+                title="Quick Actions"
+                subtitle="Jump to a section"
+                icon={<LayoutDashboard className="h-4 w-4 text-primary" />}
+              >
+                <div className="grid gap-2">
+                  {[
+                    { label: "Review pending payments", tab: "payment-requests", Icon: Receipt },
+                    { label: "Moderate community", tab: "community", Icon: MessageSquare },
+                    { label: "Review talent applications", tab: "talent", Icon: Briefcase },
+                    { label: "Manage resources", tab: "resources", Icon: Video },
+                  ].map(({ label, tab, Icon }) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className="group flex items-center justify-between rounded-lg border border-border/70 bg-secondary/40 px-3 py-2.5 text-left text-xs sm:text-sm text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-secondary"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-primary" /> {label}
+                      </span>
+                      <ArrowLeft className="h-3.5 w-3.5 rotate-180 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                    </button>
+                  ))}
+                </div>
+              </AdminPanelCard>
+            </div>
+
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+              <AdminPanelCard
+                title="Recent Users"
+                subtitle={`${users.length} total`}
+                icon={<Users className="h-4 w-4 text-primary" />}
+                action={
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setActiveTab("users")}>
+                    View all
+                  </Button>
+                }
+              >
                 {users.slice(0, 5).map((u) => (
-                  <div key={u.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
+                  <div key={u.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50 border-b border-border/60 last:border-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 ring-1 ring-primary/25 flex items-center justify-center overflow-hidden shrink-0">
                         {u.avatar_url ? (
                           <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <User className="h-4 w-4 text-primary" />
                         )}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{u.display_name || "Unnamed"}</p>
-                        <p className="text-xs text-muted-foreground">{u.email || "—"} · {new Date(u.created_at).toLocaleDateString()}</p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{u.display_name || u.username || "Unnamed"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{u.email || "—"} · {new Date(u.created_at).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs capitalize">{u.provider === "google" ? "Google" : "Email"}</Badge>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="text-xs capitalize hidden sm:inline-flex">{u.provider === "google" ? "Google" : "Email"}</Badge>
                       <Badge variant={u.active_subscription ? "default" : "outline"} className="text-xs">
                         {u.active_subscription ? u.active_subscription.plan_id : "Free"}
                       </Badge>
                     </div>
                   </div>
                 ))}
-              </div>
-              <div className="rounded-xl border border-border bg-card p-6">
-                <h3 className="text-lg font-bold text-foreground mb-4">Recent Subscriptions</h3>
+                {users.length === 0 && <p className="text-sm text-muted-foreground">No users yet</p>}
+              </AdminPanelCard>
+
+              <AdminPanelCard
+                title="Recent Subscriptions"
+                subtitle={`${subscriptions.length} total`}
+                icon={<CreditCard className="h-4 w-4 text-primary" />}
+                action={
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setActiveTab("subscriptions")}>
+                    View all
+                  </Button>
+                }
+              >
                 {subscriptions.slice(0, 5).map((s) => (
-                  <div key={s.id} className="flex items-center justify-between py-3 border-b border-border last:border-0">
+                  <div key={s.id} className="flex items-center justify-between rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50 border-b border-border/60 last:border-0">
                     <div>
                       <Badge className="text-xs">{s.plan_id}</Badge>
                       <p className="text-xs text-muted-foreground mt-1">₹{(s.amount / 100).toFixed(0)}</p>
@@ -624,8 +651,9 @@ const AdminPanel = () => {
                   </div>
                 ))}
                 {subscriptions.length === 0 && <p className="text-sm text-muted-foreground">No subscriptions yet</p>}
-              </div>
+              </AdminPanelCard>
             </div>
+
           </TabsContent>
 
           {/* Users */}
