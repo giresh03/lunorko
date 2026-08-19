@@ -13,6 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { progress, bookmarks, activity, loading, toggleBookmark } = useDashboard();
+  const { profile } = useProfile();
 
   if (!authLoading && !user) return <Navigate to="/auth" replace />;
 
