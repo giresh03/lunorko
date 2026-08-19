@@ -9,7 +9,7 @@
  */
 
 export type VisualEditOp =
-  | { kind: "text"; id: string; value: string }
+  | { kind: "text"; id: string; value: string; previous?: string }
   | { kind: "src"; id: string; value: string }
   | { kind: "style"; id: string; prop: string; value: string }
   | { kind: "move"; id: string; targetId: string; position: "before" | "after" | "inside" }
@@ -126,6 +126,7 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
 
   var selected = null;
   var editing = null;
+  var editingOriginal = '';
   var dragArmed = false;
   var TEXTY = { P:1, H1:1, H2:1, H3:1, H4:1, H5:1, H6:1, SPAN:1, A:1, BUTTON:1, LI:1, LABEL:1, STRONG:1, EM:1, TD:1, TH:1, BLOCKQUOTE:1, FIGCAPTION:1, DIV:1, SMALL:1, DT:1, DD:1, CAPTION:1, LEGEND:1 };
 
@@ -160,7 +161,8 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
     var el = editing; editing = null;
     el.removeAttribute('contenteditable');
     var id = idOf(el);
-    if (id) send({ kind:'text', id: id, value: el.innerText });
+    if (id) send({ kind:'text', id: id, value: el.innerText, previous: editingOriginal });
+    editingOriginal = '';
     say('Text saved to code');
   }
 
@@ -176,6 +178,7 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
     select(el);
     if (isTexty(el)) {
       editing = el;
+      editingOriginal = el.innerText;
       el.removeAttribute('draggable');
       el.setAttribute('contenteditable', 'true');
       el.focus();
@@ -190,6 +193,26 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
   }, true);
 
   document.addEventListener('submit', function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+
+  // Scripts can add content after the source HTML was annotated. Stamp those nodes too,
+  // then let the parent map their original text back to the owning JS/JSX source file.
+  var dynamicId = 0;
+  function annotateDynamic(root){
+    var nodes = [];
+    if (root && root.nodeType === 1) nodes.push(root);
+    if (root && root.querySelectorAll) nodes = nodes.concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+    nodes.forEach(function(el){
+      if (!idOf(el) && !/^(SCRIPT|STYLE|META|LINK|TITLE|HEAD|HTML|BODY)$/.test(el.tagName)) {
+        el.setAttribute('data-lunor-id', 'ld' + (++dynamicId));
+      }
+    });
+  }
+  annotateDynamic(document.body);
+  new MutationObserver(function(records){
+    records.forEach(function(record){
+      Array.prototype.forEach.call(record.addedNodes || [], annotateDynamic);
+    });
+  }).observe(document.documentElement, { childList:true, subtree:true });
 
   document.addEventListener('focusout', function(e){
     if (editing && e.target === editing) commit();
