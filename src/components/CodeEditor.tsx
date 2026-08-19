@@ -1207,7 +1207,14 @@ ${jsCode}
     const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
-      setPreview(buildPreviewHtml(activeTab.content, allFiles, activeTab.name));
+      const src = visualEditMode ? annotateHtml(activeTab.content) : activeTab.content;
+      let html = buildPreviewHtml(src, allFiles, activeTab.name);
+      if (visualEditMode) {
+        html = /<\/body>/i.test(html)
+          ? html.replace(/<\/body>/i, `${VISUAL_EDIT_AGENT}</body>`)
+          : html + VISUAL_EDIT_AGENT;
+      }
+      setPreview(html);
     } else if (isJsLike && hasJSXContent) {
       setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
@@ -1219,7 +1226,31 @@ ${jsCode}
       // Pure JS without DOM — run and capture console output
       setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     }
-  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain]);
+  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain, visualEditMode]);
+
+  // Hard refresh: rebuild the document AND remount the iframe (works even when nothing changed)
+  const hardRefreshPreview = useCallback(() => {
+    setPreviewError(null);
+    setPreviewKey((k) => k + 1);
+    updatePreview();
+  }, [updatePreview]);
+
+  const copyPreviewHtml = useCallback(() => {
+    if (!previewContent) return;
+    navigator.clipboard.writeText(previewContent).then(() => toast.success("Preview HTML copied"));
+  }, [previewContent]);
+
+  const downloadPreviewHtml = useCallback(() => {
+    if (!previewContent) return;
+    const blob = new Blob([previewContent], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (activeTab?.name || "preview").replace(/\.[^.]+$/, "") + ".html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success("Page downloaded");
+  }, [previewContent, activeTab?.name]);
+
 
   // Debounced preview update when content or active tab changes
   useEffect(() => {
