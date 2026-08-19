@@ -445,6 +445,50 @@ const AdminPanel = () => {
 
   const [deleteUserDialog, setDeleteUserDialog] = useState(false);
 
+  /* ---- Derived chart data (presentation only) ---- */
+  const visitorSeries = useMemo(
+    () => visitorTrends.slice(-14).map((v) => Number(v.visitor_count) || 0),
+    [visitorTrends]
+  );
+
+  const visitorDelta = useMemo(() => {
+    if (visitorSeries.length < 4) return null;
+    const half = Math.floor(visitorSeries.length / 2);
+    const prev = visitorSeries.slice(0, half).reduce((a, b) => a + b, 0);
+    const curr = visitorSeries.slice(half).reduce((a, b) => a + b, 0);
+    if (!prev) return null;
+    return ((curr - prev) / prev) * 100;
+  }, [visitorSeries]);
+
+  const planMix = useMemo(() => {
+    const counts: Record<string, number> = { Free: 0 };
+    users.forEach((u) => {
+      const plan = u.active_subscription?.plan_id;
+      const key = plan ? String(plan).charAt(0).toUpperCase() + String(plan).slice(1) : "Free";
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .filter(([, v]) => v > 0)
+      .map(([name, value]) => ({ name, value }));
+  }, [users]);
+
+  const revenueByDay = useMemo(() => {
+    const byDay = new Map<string, number>();
+    subscriptions.forEach((s) => {
+      if (!s?.created_at) return;
+      const key = new Date(s.created_at).toISOString().slice(0, 10);
+      byDay.set(key, (byDay.get(key) || 0) + Number(s.amount || 0) / 100);
+    });
+    return [...byDay.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-10)
+      .map(([day, amount]) => ({
+        label: new Date(day).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        amount: Math.round(amount),
+      }));
+  }, [subscriptions]);
+
+
   if (adminLoading || !isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
