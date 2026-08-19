@@ -8,8 +8,10 @@ import {
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
   Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github,
-  History as HistoryIcon
+  History as HistoryIcon, MousePointerClick, ZoomIn, ZoomOut
 } from "lucide-react";
+import { annotateHtml, applyVisualEdit, VISUAL_EDIT_AGENT, type VisualEditOp } from "@/lib/visualEdit";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import GitHubPushDialog from "@/components/GitHubPushDialog";
@@ -568,6 +570,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+  const [visualEditMode, setVisualEditMode] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
   const [showChecklist, setShowChecklist] = useState(false);
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
@@ -1202,7 +1207,14 @@ ${jsCode}
     const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
-      setPreview(buildPreviewHtml(activeTab.content, allFiles, activeTab.name));
+      const src = visualEditMode ? annotateHtml(activeTab.content) : activeTab.content;
+      let html = buildPreviewHtml(src, allFiles, activeTab.name);
+      if (visualEditMode) {
+        html = /<\/body>/i.test(html)
+          ? html.replace(/<\/body>/i, `${VISUAL_EDIT_AGENT}</body>`)
+          : html + VISUAL_EDIT_AGENT;
+      }
+      setPreview(html);
     } else if (isJsLike && hasJSXContent) {
       setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
@@ -1214,7 +1226,31 @@ ${jsCode}
       // Pure JS without DOM — run and capture console output
       setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     }
-  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain]);
+  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain, visualEditMode]);
+
+  // Hard refresh: rebuild the document AND remount the iframe (works even when nothing changed)
+  const hardRefreshPreview = useCallback(() => {
+    setPreviewError(null);
+    setPreviewKey((k) => k + 1);
+    updatePreview();
+  }, [updatePreview]);
+
+  const copyPreviewHtml = useCallback(() => {
+    if (!previewContent) return;
+    navigator.clipboard.writeText(previewContent).then(() => toast.success("Preview HTML copied"));
+  }, [previewContent]);
+
+  const downloadPreviewHtml = useCallback(() => {
+    if (!previewContent) return;
+    const blob = new Blob([previewContent], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (activeTab?.name || "preview").replace(/\.[^.]+$/, "") + ".html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success("Page downloaded");
+  }, [previewContent, activeTab?.name]);
+
 
   // Debounced preview update when content or active tab changes
   useEffect(() => {
@@ -1239,6 +1275,23 @@ ${jsCode}
     setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: val || "", isModified: true } : t));
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
+
+  // Cursor / drag-and-drop edits made inside the preview -> patch the real source file
+  useEffect(() => {
+    const onEdit = (e: MessageEvent) => {
+      const d = e.data as { __lunorVisualEdit?: boolean; op?: VisualEditOp } | null;
+      if (!d || !d.__lunorVisualEdit || !d.op || !activeTabId || !activeTab) return;
+      const next = applyVisualEdit(activeTab.content, d.op);
+      if (next && next !== activeTab.content) {
+        setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: next, isModified: true } : t));
+        setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: next })));
+        toast.success(`${activeTab.name} updated (${d.op.kind})`);
+      }
+    };
+    window.addEventListener("message", onEdit);
+    return () => window.removeEventListener("message", onEdit);
+  }, [activeTab, activeTabId]);
+
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
@@ -2612,12 +2665,56 @@ ${jsCode}
                   )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
-                    onClick={updatePreview}
+                    onClick={() => setVisualEditMode((v) => !v)}
+                    className={`p-0.5 transition-all duration-200 ${visualEditMode ? "text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary))]" : "text-muted-foreground hover:text-foreground"}`}
+                    title="Visual Edit — click text to edit, drag to reorder, drop images"
+                  >
+                    <MousePointerClick className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))}
                     className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Refresh Preview"
+                    title="Zoom out"
+                  >
+                    <ZoomOut className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => setPreviewZoom(100)}
+                    className="text-[9px] font-mono text-muted-foreground hover:text-foreground transition-colors px-0.5"
+                    title="Reset zoom"
+                  >
+                    {previewZoom}%
+                  </button>
+                  <button
+                    onClick={() => setPreviewZoom((z) => Math.min(150, z + 10))}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Zoom in"
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={copyPreviewHtml}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Copy preview HTML"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={downloadPreviewHtml}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Download page as .html"
+                  >
+                    <Download className="h-3 w-3" />
+                  </button>
+                  <div className="w-px h-3.5 bg-border mx-0.5" />
+                  <button
+                    onClick={hardRefreshPreview}
+                    className="p-0.5 text-muted-foreground hover:text-foreground transition-transform duration-300 hover:rotate-180"
+                    title="Refresh Preview (hard reload)"
                   >
                     <RefreshCw className="h-3 w-3" />
                   </button>
+
                   <button
                     onClick={() => setPreviewFullscreen(!previewFullscreen)}
                     className={`p-0.5 transition-colors ${previewFullscreen ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
@@ -2646,6 +2743,14 @@ ${jsCode}
                     <X className="h-3 w-3" />
                   </button>
                 </div>
+                {visualEditMode && (
+                  <div className="flex items-center gap-2 px-2 py-1 shrink-0 border-b border-primary/30 bg-primary/10 animate-in fade-in slide-in-from-top-1">
+                    <MousePointerClick className="h-3 w-3 text-primary animate-pulse" />
+                    <span className="text-[9px] text-primary font-medium">
+                      Visual Edit ON — click text to type · drag to reorder · drop an image to swap · Del to remove. Code updates live.
+                    </span>
+                  </div>
+                )}
                 <div className={`flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
                   {showSandpackPreview ? (
                     <SandpackPreviewPanel
@@ -2680,10 +2785,11 @@ ${jsCode}
                           </div>
                         </div>
                         <iframe
+                          key={previewKey}
                           ref={iframeRef}
                           srcDoc={previewContent}
                           className="border-0 w-full"
-                          style={{ height: "calc(100% - 48px)" }}
+                          style={{ height: "calc(100% - 48px)", zoom: previewZoom / 100 }}
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
@@ -2739,10 +2845,11 @@ ${jsCode}
                           <div className="flex items-center gap-1"><span>📶</span><span>🔋</span></div>
                         </div>
                         <iframe
+                          key={previewKey}
                           ref={iframeRef}
                           srcDoc={previewContent}
                           className="border-0 w-full"
-                          style={{ height: "calc(100% - 32px)" }}
+                          style={{ height: "calc(100% - 32px)", zoom: previewZoom / 100 }}
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
@@ -2777,6 +2884,7 @@ ${jsCode}
                     </div>
                   ) : (
                     <iframe
+                      key={previewKey}
                       ref={iframeRef}
                       srcDoc={previewContent}
                       className="border-0 bg-white transition-all duration-200"
@@ -2784,6 +2892,7 @@ ${jsCode}
                         width: currentDevice.type === "phone" ? `${currentDevice.w}px` : currentDevice.type === "tablet" ? `${currentDevice.w}px` : "100%",
                         height: "100%",
                         maxWidth: "100%",
+                        zoom: previewZoom / 100,
                       }}
                       sandbox="allow-scripts allow-modals allow-forms allow-popups"
                       title="Web Preview"
