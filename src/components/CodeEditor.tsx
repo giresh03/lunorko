@@ -577,6 +577,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipPreviewRebuildRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Preview runtime errors reported by the sandboxed iframe
@@ -1255,6 +1256,7 @@ ${jsCode}
   // Debounced preview update when content or active tab changes
   useEffect(() => {
     if (!showPreview || !activeTab) return;
+    if (skipPreviewRebuildRef.current) { skipPreviewRebuildRef.current = false; return; }
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     previewTimerRef.current = setTimeout(updatePreview, 300);
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
@@ -1283,6 +1285,7 @@ ${jsCode}
       if (!d || !d.__lunorVisualEdit || !d.op || !activeTabId || !activeTab) return;
       const next = applyVisualEdit(activeTab.content, d.op);
       if (next && next !== activeTab.content) {
+        skipPreviewRebuildRef.current = true;
         setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: next, isModified: true } : t));
         setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: next })));
         toast.success(`${activeTab.name} updated (${d.op.kind})`);
@@ -2665,7 +2668,14 @@ ${jsCode}
                   )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
-                    onClick={() => setVisualEditMode((v) => !v)}
+                    onClick={() => {
+                      const isHtml = !!activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html"));
+                      if (!isHtml && !visualEditMode) {
+                        toast.error("Open an .html page to use Visual Edit");
+                        return;
+                      }
+                      setVisualEditMode((v) => !v);
+                    }}
                     className={`p-0.5 transition-all duration-200 ${visualEditMode ? "text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary))]" : "text-muted-foreground hover:text-foreground"}`}
                     title="Visual Edit — click text to edit, drag to reorder, drop images"
                   >
