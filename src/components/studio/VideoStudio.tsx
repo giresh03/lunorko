@@ -6,7 +6,12 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useStudio } from "@/hooks/useStudio";
 
-const DURATIONS = ["4", "6", "8"];
+const DURATIONS = [
+  { id: "30", label: "30s" },
+  { id: "45", label: "45s" },
+  { id: "60", label: "1 min" },
+  { id: "120", label: "2 min" },
+];
 const ORIENTATIONS = [
   { id: "1280x720", label: "Landscape 16:9" },
   { id: "720x1280", label: "Portrait 9:16" },
