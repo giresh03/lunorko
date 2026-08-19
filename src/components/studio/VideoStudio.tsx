@@ -7,10 +7,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useStudio } from "@/hooks/useStudio";
 
 const DURATIONS = [
-  { id: "30", label: "30s" },
-  { id: "45", label: "45s" },
-  { id: "60", label: "1 min" },
-  { id: "120", label: "2 min" },
+  { id: "8", label: "8s" },
+  { id: "15", label: "15s" },
 ];
 const ORIENTATIONS = [
   { id: "1280x720", label: "Landscape 16:9" },
