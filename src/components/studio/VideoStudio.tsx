@@ -105,15 +105,15 @@ const VideoStudio = () => {
           <div className="mt-2 flex gap-2">
             {DURATIONS.map((d) => (
               <button
-                key={d}
-                onClick={() => setSeconds(d)}
+                key={d.id}
+                onClick={() => setSeconds(d.id)}
                 className={`flex-1 rounded-lg border px-3 py-2 text-xs transition-all duration-300 ${
-                  seconds === d
+                  seconds === d.id
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/40"
                 }`}
               >
-                {d}s
+                {d.label}
               </button>
             ))}
           </div>
