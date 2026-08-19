@@ -31,7 +31,7 @@ const Dashboard = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="mt-1 text-muted-foreground">
-            Welcome back, {user?.user_metadata?.display_name || user?.email?.split("@")[0]}
+            Welcome back, {profile?.display_name || (profile?.username ? `@${profile.username}` : null) || user?.email?.split("@")[0]}
           </p>
         </div>
 
