@@ -2743,6 +2743,14 @@ ${jsCode}
                     <X className="h-3 w-3" />
                   </button>
                 </div>
+                {visualEditMode && (
+                  <div className="flex items-center gap-2 px-2 py-1 shrink-0 border-b border-primary/30 bg-primary/10 animate-in fade-in slide-in-from-top-1">
+                    <MousePointerClick className="h-3 w-3 text-primary animate-pulse" />
+                    <span className="text-[9px] text-primary font-medium">
+                      Visual Edit ON — click text to type · drag to reorder · drop an image to swap · Del to remove. Code updates live.
+                    </span>
+                  </div>
+                )}
                 <div className={`flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
                   {showSandpackPreview ? (
                     <SandpackPreviewPanel
