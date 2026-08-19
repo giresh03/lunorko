@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
+import { useProfile } from "@/hooks/useProfile";
 import logo from "@/assets/logo.jpeg";
 import { signInWithGoogle } from "@/lib/auth";
 
