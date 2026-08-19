@@ -104,6 +104,7 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
   STYLE.textContent = [
     '[data-lunor-id]:hover{outline:1px dashed #ef4444 !important;outline-offset:1px;}',
     '.__lunor-sel{outline:2px solid #ef4444 !important;outline-offset:1px;}',
+    '[contenteditable]{cursor:text !important;}',
     '.__lunor-drop-before{box-shadow:0 -3px 0 0 #ef4444 !important;}',
     '.__lunor-drop-after{box-shadow:0 3px 0 0 #ef4444 !important;}',
     '.__lunor-drop-inside{outline:2px dotted #ef4444 !important;}',
@@ -113,7 +114,8 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
 
   var hud = document.createElement('div');
   hud.id = '__lunor-hud';
-  hud.textContent = 'Visual Edit: click text to type - drag to reorder - drop image to swap - Del to remove';
+  var HINT = 'Visual Edit: click text to type - Alt+drag to reorder - drop image to swap - Del to remove';
+  hud.textContent = HINT;
   document.body && document.body.appendChild(hud);
   function say(m){ hud.textContent = m; }
 
@@ -122,23 +124,63 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
   function pick(t){ while (t && t !== document.body && !idOf(t)) t = t.parentElement; return idOf(t) ? t : null; }
 
   var selected = null;
-  var TEXTY = { P:1, H1:1, H2:1, H3:1, H4:1, H5:1, H6:1, SPAN:1, A:1, BUTTON:1, LI:1, LABEL:1, STRONG:1, EM:1, TD:1, TH:1, BLOCKQUOTE:1, FIGCAPTION:1 };
+  var editing = null;
+  var dragArmed = false;
+  var TEXTY = { P:1, H1:1, H2:1, H3:1, H4:1, H5:1, H6:1, SPAN:1, A:1, BUTTON:1, LI:1, LABEL:1, STRONG:1, EM:1, TD:1, TH:1, BLOCKQUOTE:1, FIGCAPTION:1, DIV:1, SMALL:1, DT:1, DD:1, CAPTION:1, LEGEND:1 };
+
+  function isTexty(el){
+    if (!el || el.tagName === 'IMG') return false;
+    if (el.children.length > 0) return false;
+    if (!TEXTY[el.tagName]) return false;
+    return (el.textContent || '').trim().length > 0 || TEXTY[el.tagName] === 1;
+  }
+
+  function placeCaret(el, x, y){
+    try {
+      var r = null;
+      if (document.caretRangeFromPoint) r = document.caretRangeFromPoint(x, y);
+      else if (document.caretPositionFromPoint) {
+        var p = document.caretPositionFromPoint(x, y);
+        if (p) { r = document.createRange(); r.setStart(p.offsetNode, p.offset); r.collapse(true); }
+      }
+      if (r) { var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+    } catch(e){}
+  }
 
   function select(el){
     if (selected === el) return;
     if (selected) { selected.classList.remove('__lunor-sel'); }
     selected = el;
-    if (el) { el.classList.add('__lunor-sel'); say('Selected <' + el.tagName.toLowerCase() + '>' + (TEXTY[el.tagName] ? ' - type to edit' : '')); }
+    if (el) { el.classList.add('__lunor-sel'); say('Selected <' + el.tagName.toLowerCase() + '>' + (isTexty(el) ? ' - type to edit' : '')); }
   }
+
+  function commit(){
+    if (!editing) return;
+    var el = editing; editing = null;
+    el.removeAttribute('contenteditable');
+    var id = idOf(el);
+    if (id) send({ kind:'text', id: id, value: el.innerText });
+    say('Text saved to code');
+  }
+
+  document.addEventListener('mousedown', function(e){
+    if (editing && !editing.contains(e.target)) commit();
+  }, true);
 
   document.addEventListener('click', function(e){
     var el = pick(e.target);
     if (!el) return;
+    if (editing === el) return;           // let the caret work while typing
     e.preventDefault(); e.stopPropagation();
     select(el);
-    if (TEXTY[el.tagName] && el.children.length === 0) {
+    if (isTexty(el)) {
+      editing = el;
+      el.removeAttribute('draggable');
       el.setAttribute('contenteditable', 'true');
       el.focus();
+      placeCaret(el, e.clientX, e.clientY);
+      say('Editing text - Esc or click away to save');
+      return;
     }
     if (el.tagName === 'IMG') {
       var url = prompt('Image URL (or cancel and drop an image file here):', el.getAttribute('src') || '');
@@ -146,16 +188,17 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
     }
   }, true);
 
-  document.addEventListener('blur', function(e){
-    var el = e.target;
-    if (!el || !el.getAttribute || el.getAttribute('contenteditable') !== 'true') return;
-    el.removeAttribute('contenteditable');
-    send({ kind:'text', id: idOf(el), value: el.innerText });
-    say('Text saved to code');
+  document.addEventListener('focusout', function(e){
+    if (editing && e.target === editing) commit();
   }, true);
 
   document.addEventListener('keydown', function(e){
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selected && selected.getAttribute('contenteditable') !== 'true') {
+    if (e.altKey) dragArmed = true;
+    if (editing) {
+      if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) { e.preventDefault(); commit(); }
+      return;                              // never hijack keys while typing
+    }
+    if (e.key === 'Delete' && selected) {
       e.preventDefault();
       var id = idOf(selected);
       selected.remove(); selected = null;
@@ -163,15 +206,18 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
       say('Element deleted');
     }
   }, true);
+  document.addEventListener('keyup', function(){ dragArmed = false; }, true);
 
-  // ---- drag & drop reorder + image file drop ----
+  // ---- drag & drop reorder (Alt+drag) + image file drop ----
   var dragEl = null;
   function clearMarks(el){ if(!el) return; el.classList.remove('__lunor-drop-before','__lunor-drop-after','__lunor-drop-inside'); }
   var lastOver = null;
 
   document.addEventListener('mouseover', function(e){
     var el = pick(e.target);
-    if (el) el.setAttribute('draggable', 'true');
+    if (!el) return;
+    if (editing || !dragArmed) el.removeAttribute('draggable');   // keep the caret usable
+    else el.setAttribute('draggable', 'true');
   }, true);
 
   document.addEventListener('dragstart', function(e){
