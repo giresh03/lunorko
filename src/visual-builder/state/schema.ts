@@ -52,8 +52,11 @@ export interface BaseElement {
     alignSelf?: string;
     border?: string;
   };
+  /** Animation config (CSS keyframes in-canvas, GSAP on export when requested) */
+  animation?: ElementAnimation;
   children?: PageElement[];
 }
+
 
 export interface TextElement extends BaseElement {
   type: "text" | "heading";
