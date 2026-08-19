@@ -32,6 +32,10 @@ export function ElementRenderer({
   const updateElement = useVisualBuilderStore((s) => s.updateElement);
   const el = ensureId(element, "el");
 
+  useEffect(() => {
+    ensureAnimationStyles();
+  }, []);
+
   const handleTextChange = useCallback(
     (e: React.FormEvent<HTMLDivElement>, id: string) => {
       const text = (e.target as HTMLDivElement).innerText;
@@ -41,8 +45,12 @@ export function ElementRenderer({
   );
 
   const styles = el.styles || {};
+  const anim = el.animation;
+  // Hover/click triggered animations should not auto-play in the canvas.
+  const previewAnim = anim && (anim.trigger === "load" || anim.trigger === "scroll") ? anim : undefined;
   const styleObj: React.CSSProperties = {
     ...styles,
+    ...animationStyleFor(previewAnim),
     position: "relative",
     cursor: "pointer",
     outline: el.id === selectedId ? "2px solid #3b82f6" : el.id === hoveredId ? "1px dashed #94a3b8" : "none",
@@ -51,13 +59,16 @@ export function ElementRenderer({
   };
 
   const commonProps = {
+    key: anim ? `${el.id}-${anim.preset}-${anim.duration}-${anim.delay}-${anim.easing}-${anim.repeat}` : el.id,
     onClick: (e: React.MouseEvent) => { e.stopPropagation(); onSelect(e, el.id); },
     onDragStart: (e: React.DragEvent) => onDragStart(e, el.id),
     draggable: true,
     "data-element-id": el.id,
+    "data-anim-id": el.id,
     style: styleObj,
     className: "visual-builder-element",
   };
+
 
   if (el.type === "text" || el.type === "heading") {
     const tag = el.type === "heading" ? "h2" : "p";
