@@ -1285,6 +1285,7 @@ ${jsCode}
       if (!d || !d.__lunorVisualEdit || !d.op || !activeTabId || !activeTab) return;
       const next = applyVisualEdit(activeTab.content, d.op);
       if (next && next !== activeTab.content) {
+        skipPreviewRebuildRef.current = true;
         setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: next, isModified: true } : t));
         setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: next })));
         toast.success(`${activeTab.name} updated (${d.op.kind})`);
