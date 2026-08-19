@@ -710,7 +710,7 @@ const AdminPanel = () => {
                 <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
                   <ArrowLeft className="mr-1 h-4 w-4" /> Back to Users
                 </Button>
-                <div className="rounded-xl border border-border bg-card p-6">
+                <div className="rounded-xl border border-border gradient-card p-6">
                   <div className="flex items-center gap-4 mb-6">
                     <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
                       {selectedUser.avatar_url ? (
@@ -794,7 +794,7 @@ const AdminPanel = () => {
                 </div>
 
                 {/* Subscription History */}
-                <div className="rounded-xl border border-border bg-card p-6">
+                <div className="rounded-xl border border-border gradient-card p-6">
                   <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2"><CreditCard className="h-5 w-5" /> Subscription History</h3>
                   {(selectedUser.subscriptions || []).length > 0 ? (
                     <div className="overflow-x-auto"><Table>
@@ -829,7 +829,7 @@ const AdminPanel = () => {
                 </div>
               </div>
             ) : (
-              <div className="rounded-xl border border-border bg-card overflow-x-auto">
+              <div className="rounded-xl border border-border gradient-card overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -879,7 +879,7 @@ const AdminPanel = () => {
 
           {/* Subscriptions */}
           <TabsContent value="subscriptions">
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -912,7 +912,7 @@ const AdminPanel = () => {
 
           {/* Payment Requests */}
           <TabsContent value="payment-requests">
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1063,7 +1063,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1128,7 +1128,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1164,7 +1164,7 @@ const AdminPanel = () => {
 
           {/* Community Moderation */}
           <TabsContent value="community">
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <h3 className="text-lg font-bold text-foreground p-4 flex items-center gap-2"><MessageSquare className="h-5 w-5" /> Community Posts Moderation</h3>
               <Table>
                 <TableHeader>
@@ -1202,7 +1202,7 @@ const AdminPanel = () => {
             </div>
 
             {/* Chat messages moderation */}
-            <div className="rounded-xl border border-border bg-card overflow-x-auto mt-6">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto mt-6">
               <div className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                   <MessageSquare className="h-5 w-5" /> Chat Messages ({chatMessages.length})
@@ -1293,7 +1293,7 @@ const AdminPanel = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1326,7 +1326,7 @@ const AdminPanel = () => {
           {/* Talent / student profiles */}
           <TabsContent value="talent">
             <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> Student Profiles ({applicants.length})</h2>
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1388,7 +1388,7 @@ const AdminPanel = () => {
 
           <TabsContent value="feedback">
             <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary" /> User Feedback ({feedbacks.length})</h2>
-            <div className="rounded-xl border border-border bg-card overflow-x-auto">
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
