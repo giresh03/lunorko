@@ -120,6 +120,7 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
   function say(m){ hud.textContent = m; }
 
   function send(op){ try { parent.postMessage({ __lunorVisualEdit: true, op: op }, '*'); } catch(e){} }
+  function ready(){ try { parent.postMessage({ __lunorVisualEdit: true, type: 'ready' }, '*'); } catch(e){} }
   function idOf(el){ return el && el.getAttribute && el.getAttribute('data-lunor-id'); }
   function pick(t){ while (t && t !== document.body && !idOf(t)) t = t.parentElement; return idOf(t) ? t : null; }
 
@@ -188,6 +189,8 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
     }
   }, true);
 
+  document.addEventListener('submit', function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+
   document.addEventListener('focusout', function(e){
     if (editing && e.target === editing) commit();
   }, true);
@@ -207,6 +210,7 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
     }
   }, true);
   document.addEventListener('keyup', function(){ dragArmed = false; }, true);
+  window.addEventListener('blur', function(){ dragArmed = false; if (editing) commit(); });
 
   // ---- drag & drop reorder (Alt+drag) + image file drop ----
   var dragEl = null;
@@ -278,5 +282,6 @@ export const VISUAL_EDIT_AGENT = `<script>(function(){
     dragEl = null;
   }, true);
 
-  document.addEventListener('dragend', function(){ dragEl = null; clearMarks(lastOver); }, true);
+  document.addEventListener('dragend', function(){ dragEl = null; clearMarks(lastOver); lastOver = null; }, true);
+  ready();
 })();<\/script>`;
