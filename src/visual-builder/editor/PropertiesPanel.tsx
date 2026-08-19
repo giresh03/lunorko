@@ -1,7 +1,9 @@
-import React from "react";
-import { Copy, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { Copy, Trash2, Paintbrush, Sparkles } from "lucide-react";
 import { useVisualBuilderStore } from "../state/store";
 import type { PageElement } from "../state/schema";
+import { AnimationPanel } from "./AnimationPanel";
+
 
 const COLOR_PRESETS = [
   "#ffffff",
