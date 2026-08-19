@@ -23,6 +23,14 @@ const INTERESTS = [
   "Embedded / IoT",
 ];
 
+const MAX_RESUME_BYTES = 5 * 1024 * 1024;
+const ALLOWED_RESUME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+const ALLOWED_RESUME_EXTS = [".pdf", ".doc", ".docx"];
+
 const OnboardingDialog = () => {
   const { profile, needsOnboarding, updateProfile, isUsernameAvailable, uploadResume } = useProfile();
   const [open, setOpen] = useState(false);
@@ -34,9 +42,38 @@ const OnboardingDialog = () => {
   const [interests, setInterests] = useState<string[]>([]);
   const [wantsTeam, setWantsTeam] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const handlePickFile = (f: File | null) => {
+    setFileError(null);
+    if (!f) {
+      setFile(null);
+      return;
+    }
+    const ext = "." + (f.name.split(".").pop()?.toLowerCase() ?? "");
+    const extOk = ALLOWED_RESUME_EXTS.includes(ext);
+    const typeOk = f.type ? ALLOWED_RESUME_TYPES.includes(f.type) : true;
+    if (!extOk || !typeOk) {
+      setFile(null);
+      setFileError("Unsupported file — please upload a PDF, DOC or DOCX.");
+      return;
+    }
+    if (f.size > MAX_RESUME_BYTES) {
+      setFile(null);
+      setFileError(`That file is ${(f.size / 1024 / 1024).toFixed(1)}MB — the limit is 5MB.`);
+      return;
+    }
+    if (f.size === 0) {
+      setFile(null);
+      setFileError("That file appears to be empty.");
+      return;
+    }
+    setFile(f);
+  };
 
   useEffect(() => {
     if (needsOnboarding) {
@@ -92,14 +129,25 @@ const OnboardingDialog = () => {
     let resumeName: string | null = null;
 
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Resume must be under 5MB.");
+      if (fileError) {
         setSaving(false);
         return;
       }
+      setUploading(true);
       const { error, path } = await uploadResume(file);
+      setUploading(false);
       if (error) {
-        toast.error("Resume upload failed. You can add it later from your dashboard.");
+        const m = (error.message || "").toLowerCase();
+        const msg =
+          m.includes("exceeded") || m.includes("too large")
+            ? "Resume is too large for upload (max 5MB)."
+            : m.includes("mime") || m.includes("type")
+              ? "That file type isn't accepted. Use PDF, DOC or DOCX."
+              : m.includes("network") || m.includes("fetch")
+                ? "Upload failed — check your connection and try again."
+                : "Resume upload failed. You can add it later from your dashboard.";
+        setFileError(msg);
+        toast.error(msg);
       } else {
         resumePath = path;
         resumeName = file.name;
@@ -265,18 +313,28 @@ const OnboardingDialog = () => {
                 <div className="mt-4 space-y-2">
                   <label
                     htmlFor="onboard-resume"
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-3 text-sm transition-colors hover:text-foreground ${
+                      fileError
+                        ? "border-destructive/60 text-destructive"
+                        : "border-border/70 text-muted-foreground hover:border-primary/60"
+                    }`}
                   >
                     {file ? <FileText className="h-4 w-4 text-primary" /> : <Upload className="h-4 w-4" />}
-                    <span className="truncate">{file ? file.name : "Upload resume (PDF or DOC, max 5MB) — not mandatory"}</span>
+                    <span className="truncate">{file ? file.name : "Upload resume (PDF, DOC or DOCX, max 5MB) — not mandatory"}</span>
                   </label>
                   <input
                     id="onboard-resume"
                     type="file"
-                    accept=".pdf,.doc,.docx"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     className="hidden"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => handlePickFile(e.target.files?.[0] ?? null)}
                   />
+                  {fileError && <p className="text-xs text-destructive">{fileError}</p>}
+                  {file && !fileError && (
+                    <p className="text-xs text-muted-foreground">
+                      {(file.size / 1024 / 1024).toFixed(2)}MB — ready to upload
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">Resume is private — only you and the Lunor team can see it.</p>
                 </div>
               )}
@@ -292,7 +350,7 @@ const OnboardingDialog = () => {
                 className="btn-sheen flex-1 bg-gradient-to-r from-primary to-primary-glow font-semibold text-primary-foreground shadow-glow"
               >
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {saving ? "Saving…" : "Finish & enter Lunor"}
+                {uploading ? "Uploading resume…" : saving ? "Saving…" : "Finish & enter Lunor"}
               </Button>
             </div>
           </div>
