@@ -259,7 +259,11 @@ export function PropertiesPanel() {
             </div>
           </div>
         </div>
+          </>
+        )}
+        {tab === "animate" && <AnimationPanel />}
       </div>
     </div>
+
   );
 }
