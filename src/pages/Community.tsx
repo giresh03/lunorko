@@ -76,11 +76,11 @@ const Community = () => {
       const userIds = [...new Set((data as any[]).map((p: any) => p.user_id as string))];
       const { data: profilesData } = await supabase
         .from("public_profiles")
-        .select("user_id, display_name")
+        .select("user_id, display_name, username")
         .in("user_id", userIds);
       const map: Record<string, string> = {};
-      (profilesData || []).forEach((p) => {
-        map[p.user_id] = p.display_name || "User";
+      (profilesData || []).forEach((p: any) => {
+        map[p.user_id] = p.username || p.display_name || "User";
       });
       setProfiles(map);
     }

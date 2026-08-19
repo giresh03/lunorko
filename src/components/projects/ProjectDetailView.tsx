@@ -55,10 +55,10 @@ const ProjectDetailView = ({ projectId, onBack }: ProjectDetailViewProps) => {
     if (allUserIds.length > 0) {
       const { data: profs } = await supabase
         .from("public_profiles")
-        .select("user_id, display_name")
+        .select("user_id, display_name, username")
         .in("user_id", allUserIds);
       const map: Record<string, string> = {};
-      (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name || "User"; });
+      (profs || []).forEach((p: any) => { map[p.user_id] = p.username || p.display_name || "User"; });
       setProfiles(map);
     }
     setLoading(false);
