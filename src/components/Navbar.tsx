@@ -295,7 +295,7 @@ const Navbar = () => {
                     )}
                     <div className="h-px bg-border my-1" />
                     <span className="text-sm text-muted-foreground py-2 px-3">
-                      {user.user_metadata?.display_name || user.email?.split("@")[0]}
+                      {profile?.username ? `@${profile.username}` : profile?.display_name || user.email?.split("@")[0]}
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => { signOut(); setOpen(false); }}>
                       <LogOut className="mr-1.5 h-4 w-4" /> Sign Out
