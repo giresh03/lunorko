@@ -19,7 +19,7 @@ const VideoStudio = () => {
   const { toast } = useToast();
   const { startVideo, pollVideo, fetchCreations } = useStudio();
   const [prompt, setPrompt] = useState("");
-  const [seconds, setSeconds] = useState("30");
+  const [seconds, setSeconds] = useState("8");
   const [size, setSize] = useState("1280x720");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
