@@ -40,11 +40,17 @@ Deno.serve(async (req) => {
   const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  const authClient = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user }, error: authError } = await authClient.auth.getUser();
-  if (authError || !user) return json({ error: "Unauthorized" }, 401);
+  const token = authHeader.slice("Bearer ".length).trim();
+  if (!token || token === "null" || token === "undefined") return json({ error: "Unauthorized" }, 401);
+
+  const authClient = createClient(SUPABASE_URL, ANON_KEY);
+  const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+  const claims = claimsData?.claims as { sub?: string; email?: string } | undefined;
+  if (claimsError || !claims?.sub) {
+    console.error("[github-oauth] auth error:", claimsError?.message ?? "missing claims");
+    return json({ error: "Unauthorized" }, 401);
+  }
+  const user = { id: claims.sub, email: claims.email ?? "" };
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
