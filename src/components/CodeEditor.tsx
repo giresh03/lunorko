@@ -1276,6 +1276,23 @@ ${jsCode}
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
 
+  // Cursor / drag-and-drop edits made inside the preview -> patch the real source file
+  useEffect(() => {
+    const onEdit = (e: MessageEvent) => {
+      const d = e.data as { __lunorVisualEdit?: boolean; op?: VisualEditOp } | null;
+      if (!d || !d.__lunorVisualEdit || !d.op || !activeTabId || !activeTab) return;
+      const next = applyVisualEdit(activeTab.content, d.op);
+      if (next && next !== activeTab.content) {
+        setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: next, isModified: true } : t));
+        setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: next })));
+        toast.success(`${activeTab.name} updated (${d.op.kind})`);
+      }
+    };
+    window.addEventListener("message", onEdit);
+    return () => window.removeEventListener("message", onEdit);
+  }, [activeTab, activeTabId]);
+
+
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
     const activeLanguage = activeTab?.language;
