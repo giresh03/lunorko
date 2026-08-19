@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users, CreditCard, TrendingUp, UserCheck, Calendar,
@@ -8,6 +8,9 @@ import {
   MessageSquare, Ban, UserPlus, Briefcase, FileText
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { AdminStatCard } from "@/components/admin/AdminStatCard";
+import { AdminPanelCard, VisitorsAreaChart, RevenueBarChart, PlanDonutChart } from "@/components/admin/AdminCharts";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
