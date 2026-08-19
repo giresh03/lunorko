@@ -41,11 +41,11 @@ Deno.serve(async (req) => {
       const prompt: string = typeof body.prompt === "string" ? body.prompt.trim() : "";
       // UI offers 30s / 45s / 1min / 2min. The video model renders clips of 4, 6 or 8 seconds,
       // so we keep the requested length in metadata and render the longest supported clip.
-      const requestedSeconds: string = ["30", "45", "60", "120"].includes(String(body.seconds))
+      const requestedSeconds: string = ["15"].includes(String(body.seconds))
         ? String(body.seconds)
         : ["4", "6", "8"].includes(String(body.seconds))
           ? String(body.seconds)
-          : "30";
+          : "8";
       const seconds: string = ["4", "6", "8"].includes(requestedSeconds) ? requestedSeconds : "8";
       const size: string = body.size === "720x1280" ? "720x1280" : "1280x720";
       if (prompt.length < 3) return json({ error: "Please describe the video you want." }, 400);
