@@ -578,6 +578,7 @@ const AdminPanel = () => {
                 { value: "community", label: "Community", short: "Com", Icon: MessageSquare },
                 { value: "guidelines", label: "Guidelines", short: "Rules", Icon: Shield },
                 { value: "talent", label: "Talent", short: "Team", Icon: Briefcase, count: applicants.length },
+                { value: "internships", label: "Internships", short: "Interns", Icon: UserPlus, count: internshipApps.filter((a) => a.status === "pending").length },
                 { value: "feedback", label: "Feedback", short: "FB", Icon: MessageSquare, count: feedbacks.length },
               ].map(({ value, label, short, Icon, count }) => (
                 <TabsTrigger
