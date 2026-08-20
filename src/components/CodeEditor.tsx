@@ -2601,6 +2601,21 @@ ${jsCode}
             ))}
             <div className="flex-1" />
             <div className="flex items-center gap-1 px-2 shrink-0">
+              {credits && (
+                <span
+                  className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    color: credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444",
+                    backgroundColor: (credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444") + "15",
+                  }}
+                  title={`${credits.planCredits} plan + ${credits.topupCredits} top-up credits`}
+                >
+                  <Coins className="h-3 w-3" />
+                  {credits.balance} credits
+                  {credits.balance === 0 && <a href="/pricing" className="underline">Top up</a>}
+                </span>
+              )}
+
               <button onClick={handleCopy} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Copy">
                 {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
               </button>
