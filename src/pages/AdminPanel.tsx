@@ -73,6 +73,16 @@ const AdminPanel = () => {
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
+  const setInternshipStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from("internship_applications").update({ status }).eq("id", id);
+    if (error) {
+      toast({ title: "Could not update status", description: error.message, variant: "destructive" });
+      return;
+    }
+    setInternshipApps((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    toast({ title: `Application marked ${status}` });
+  };
+
   // Resource form
   const [resourceDialog, setResourceDialog] = useState(false);
   const [editingResource, setEditingResource] = useState<any>(null);
