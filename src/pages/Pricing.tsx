@@ -344,6 +344,8 @@ const Pricing = () => {
                 expire and are used after your monthly plan credits run out.
               </p>
               <CreditTracker className="mt-4" />
+              <CreditHistoryPanel className="mt-4" />
+
             </div>
             <Button
               className="w-full sm:w-auto"
