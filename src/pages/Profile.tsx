@@ -320,6 +320,11 @@ const Profile = () => {
               </div>
             </div>
 
+            {/* Credits */}
+            <CreditHistoryPanel />
+
+
+
             <div className="flex items-center gap-3">
               <Button onClick={save} disabled={saving}>
                 {saving ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
