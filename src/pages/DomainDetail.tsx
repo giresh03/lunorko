@@ -604,10 +604,20 @@ const DomainDetail = () => {
                       : `Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant — all tuned for ${domain.name}.`
                     }
                   </p>
+                  {isTrialWorkspace && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+                      <span className="font-semibold text-primary">Free trial</span>{" "}
+                      <span className="text-muted-foreground">
+                        · {trialCreditsLeft} of {FREE_TRIAL_CREDITS} credits left. Full advanced AI engine — upgrade
+                        anytime for 1,500 credits.
+                      </span>
+                    </div>
+                  )}
                   <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
                     <Maximize2 className="mr-2 h-4 w-4" />
                     {isUIUXDomain ? 'Launch Design Studio' : 'Launch Full-Screen Editor'}
                   </Button>
+
                 </div>
               </div>
             ) : (
