@@ -55,11 +55,13 @@ const ProjectBuilder = () => {
       (profs || []).forEach((p: any) => { map[p.user_id] = p.username || p.display_name || "User"; });
       setProfiles(map);
 
-      // Fetch member counts
-      const projectIds = projectList.map((p: any) => p.id);
-      const { data: mems } = await supabase.from("team_members").select("project_id").in("project_id", projectIds);
+      // Fetch member counts via security-definer RPC (membership rows are private)
+      const projectIds = new Set(projectList.map((p: any) => p.id));
+      const { data: countRows } = await supabase.rpc("team_member_counts");
       const counts: Record<string, number> = {};
-      (mems || []).forEach((m: any) => { counts[m.project_id] = (counts[m.project_id] || 0) + 1; });
+      (countRows || []).forEach((r: any) => {
+        if (projectIds.has(r.project_id)) counts[r.project_id] = Number(r.member_count) || 0;
+      });
       setMemberCounts(counts);
     }
     setLoading(false);
