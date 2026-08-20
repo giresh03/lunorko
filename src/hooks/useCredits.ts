@@ -20,11 +20,15 @@ export interface CreditState {
 }
 
 export const PLAN_ALLOWANCE: Record<string, number> = {
-  free: 100,
+  free: 10,
   pro: 1500,
   premium: 4000,
   professional: 10000,
 };
+
+/** Credits a brand-new free account gets to try the AI workspace. */
+export const FREE_TRIAL_CREDITS = PLAN_ALLOWANCE.free;
+
 
 export const allowanceFor = (planId: string) => PLAN_ALLOWANCE[planId] ?? PLAN_ALLOWANCE.free;
 
