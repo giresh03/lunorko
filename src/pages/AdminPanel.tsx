@@ -1347,6 +1347,83 @@ const AdminPanel = () => {
             </div>
           </TabsContent>
 
+          {/* Internship applications */}
+          <TabsContent value="internships">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" /> Internship Applications ({internshipApps.length})
+            </h2>
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>College</TableHead>
+                    <TableHead>Skills</TableHead>
+                    <TableHead>Links</TableHead>
+                    <TableHead>Applied</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Resume</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {internshipApps.map((a: any) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="text-sm font-medium">{a.full_name}</TableCell>
+                      <TableCell className="text-xs">
+                        <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-primary whitespace-nowrap">
+                          {String(a.role || "").replace(/-/g, " ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <div>{a.email}</div>
+                        {a.phone && <div>{a.phone}</div>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {a.college || "—"}{a.year_of_study ? ` · ${a.year_of_study}` : ""}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] text-xs text-muted-foreground truncate">{a.skills || "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex flex-col gap-0.5">
+                          {a.github_url && <a href={a.github_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">GitHub</a>}
+                          {a.portfolio_url && <a href={a.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Portfolio</a>}
+                          {a.linkedin_url && <a href={a.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">LinkedIn</a>}
+                          {!a.github_url && !a.portfolio_url && !a.linkedin_url && <span className="text-muted-foreground">—</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <select
+                          value={a.status}
+                          onChange={(e) => setInternshipStatus(a.id, e.target.value)}
+                          className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        >
+                          <option value="pending">pending</option>
+                          <option value="shortlisted">shortlisted</option>
+                          <option value="selected">selected</option>
+                          <option value="rejected">rejected</option>
+                        </select>
+                      </TableCell>
+                      <TableCell>
+                        {a.resume_url ? (
+                          <Button size="sm" variant="outline" onClick={() => viewResume(a.resume_url)}>
+                            <FileText className="mr-1 h-3.5 w-3.5" /> View
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {internshipApps.length === 0 && (
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No internship applications yet</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
           {/* Talent / student profiles */}
           <TabsContent value="talent">
             <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> Student Profiles ({applicants.length})</h2>
