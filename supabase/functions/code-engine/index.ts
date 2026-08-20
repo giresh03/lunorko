@@ -812,7 +812,10 @@ async function chargeCredit(userId: string | null, isAdmin: boolean): Promise<{ 
     return {
       ok: false,
       body: {
-        error: "You've used all your AI credits for this month. Top up 20 credits for ₹50 or upgrade your plan.",
+        error:
+          (result?.plan_id ?? "free") === "free"
+            ? "Your free workspace credits are used up. Upgrade to Pro (₹150/mo, 1,500 credits) or top up 200 credits for ₹50 to keep building."
+            : "You've used all your AI credits for this month. Top up 200 credits for ₹50 or upgrade your plan.",
         code: "credits_exhausted",
         balance: result?.balance ?? 0,
         plan_id: result?.plan_id ?? "free",
