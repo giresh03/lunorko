@@ -57,6 +57,7 @@ const AdminPanel = () => {
   const [communityGuidelines, setCommunityGuidelines] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [applicants, setApplicants] = useState<any[]>([]);
+  const [internshipApps, setInternshipApps] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
