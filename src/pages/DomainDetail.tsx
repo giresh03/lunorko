@@ -231,7 +231,13 @@ const DomainDetail = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { hasEditorAccessForDomain } = useSubscription();
-  const hasEditorAccess = domainId ? hasEditorAccessForDomain(domainId) : false;
+  const { credits } = useCredits();
+  const paidEditorAccess = domainId ? hasEditorAccessForDomain(domainId) : false;
+  // Free users get a credit-metered trial of the workspace.
+  const trialCreditsLeft = credits?.planId === "free" ? credits.balance : 0;
+  const isTrialWorkspace = !paidEditorAccess && trialCreditsLeft > 0;
+  const hasEditorAccess = paidEditorAccess || isTrialWorkspace;
+
   const { progress, bookmarks, activity, bookings, updateProgress, logActivity } = useDashboard();
 
   const handleSendToEditor = (code: string, language: string) => {
