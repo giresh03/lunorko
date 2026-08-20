@@ -733,6 +733,72 @@ export type Database = {
         }
         Relationships: []
       }
+      internship_applications: {
+        Row: {
+          admin_notes: string | null
+          college: string | null
+          created_at: string
+          email: string
+          full_name: string
+          github_url: string | null
+          id: string
+          linkedin_url: string | null
+          phone: string | null
+          portfolio_url: string | null
+          resume_filename: string | null
+          resume_url: string | null
+          role: string
+          skills: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+          why_join: string | null
+          year_of_study: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          college?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          github_url?: string | null
+          id?: string
+          linkedin_url?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          resume_filename?: string | null
+          resume_url?: string | null
+          role: string
+          skills?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          why_join?: string | null
+          year_of_study?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          college?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          github_url?: string | null
+          id?: string
+          linkedin_url?: string | null
+          phone?: string | null
+          portfolio_url?: string | null
+          resume_filename?: string | null
+          resume_url?: string | null
+          role?: string
+          skills?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          why_join?: string | null
+          year_of_study?: string | null
+        }
+        Relationships: []
+      }
       media_generations: {
         Row: {
           asset_path: string | null
