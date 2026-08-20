@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CreditHistoryPanel } from "@/components/CreditHistoryPanel";
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -319,6 +321,11 @@ const Profile = () => {
                 />
               </div>
             </div>
+
+            {/* Credits */}
+            <CreditHistoryPanel />
+
+
 
             <div className="flex items-center gap-3">
               <Button onClick={save} disabled={saving}>
