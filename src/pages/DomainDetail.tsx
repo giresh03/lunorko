@@ -20,6 +20,8 @@ import LockGate from "@/components/LockGate";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useCredits, FREE_TRIAL_CREDITS } from "@/hooks/useCredits";
+
 import { useDashboard } from "@/hooks/useDashboard";
 import { domains, type Resource } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
@@ -231,7 +233,13 @@ const DomainDetail = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { hasEditorAccessForDomain } = useSubscription();
-  const hasEditorAccess = domainId ? hasEditorAccessForDomain(domainId) : false;
+  const { credits } = useCredits();
+  const paidEditorAccess = domainId ? hasEditorAccessForDomain(domainId) : false;
+  // Free users get a credit-metered trial of the workspace.
+  const trialCreditsLeft = credits?.planId === "free" ? credits.balance : 0;
+  const isTrialWorkspace = !paidEditorAccess && trialCreditsLeft > 0;
+  const hasEditorAccess = paidEditorAccess || isTrialWorkspace;
+
   const { progress, bookmarks, activity, bookings, updateProgress, logActivity } = useDashboard();
 
   const handleSendToEditor = (code: string, language: string) => {
@@ -596,10 +604,20 @@ const DomainDetail = () => {
                       : `Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant — all tuned for ${domain.name}.`
                     }
                   </p>
+                  {isTrialWorkspace && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+                      <span className="font-semibold text-primary">Free trial</span>{" "}
+                      <span className="text-muted-foreground">
+                        · {trialCreditsLeft} of {FREE_TRIAL_CREDITS} credits left. Full advanced AI engine — upgrade
+                        anytime for 1,500 credits.
+                      </span>
+                    </div>
+                  )}
                   <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
                     <Maximize2 className="mr-2 h-4 w-4" />
                     {isUIUXDomain ? 'Launch Design Studio' : 'Launch Full-Screen Editor'}
                   </Button>
+
                 </div>
               </div>
             ) : (

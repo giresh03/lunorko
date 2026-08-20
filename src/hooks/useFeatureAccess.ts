@@ -13,7 +13,8 @@ export type Feature =
   | "domains";
 
 const PLAN_FEATURES: Record<string, Feature[]> = {
-  free: [],
+  // Free users get a credit-metered trial of the AI workspace + domains.
+  free: ["code-editor", "domains"],
   pro: ["videos", "code-editor", "notes", "community", "domains"],
   premium: ["videos", "code-editor", "notes", "community", "domains", "projects", "skill-radar", "interview-prep"],
   professional: [
@@ -23,11 +24,12 @@ const PLAN_FEATURES: Record<string, Feature[]> = {
 };
 
 const PLAN_CREDITS: Record<string, number> = {
-  free: 4,
-  pro: 60,
-  premium: 100,
-  professional: 150,
+  free: 10,
+  pro: 1500,
+  premium: 4000,
+  professional: 10000,
 };
+
 
 export const useFeatureAccess = () => {
   const { plan, loading } = useSubscription();
@@ -37,7 +39,9 @@ export const useFeatureAccess = () => {
     return features.includes(feature);
   };
 
-  const monthlyCredits = PLAN_CREDITS[plan] || 4;
+  const monthlyCredits = PLAN_CREDITS[plan] || PLAN_CREDITS.free;
+  const isTrial = plan === "free";
 
-  return { plan, loading, hasFeature, monthlyCredits };
+  return { plan, loading, hasFeature, monthlyCredits, isTrial };
 };
+
