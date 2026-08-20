@@ -83,3 +83,45 @@ export const useCredits = () => {
 
   return { credits, loading, refetch: fetchCredits };
 };
+
+export type CreditTransactionKind = "usage" | "topup" | "grant" | "adjustment";
+
+export interface CreditTransaction {
+  id: string;
+  kind: CreditTransactionKind;
+  amount: number;
+  description: string;
+  balance_after: number;
+  created_at: string;
+}
+
+/** Full ledger of credit usage, top-ups, monthly grants and adjustments. */
+export const useCreditHistory = (limit = 60) => {
+  const { user } = useAuth();
+  const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    if (!user) {
+      setTransactions([]);
+      return;
+    }
+    setLoading(true);
+    const { data, error } = await (supabase as any)
+      .from("credit_transactions")
+      .select("id, kind, amount, description, balance_after, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    setLoading(false);
+    if (error) return;
+    setTransactions((data as CreditTransaction[]) ?? []);
+  }, [user, limit]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  return { transactions, loading, refetch: fetchHistory };
+};
+
