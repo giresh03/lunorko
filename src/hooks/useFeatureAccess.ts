@@ -39,7 +39,9 @@ export const useFeatureAccess = () => {
     return features.includes(feature);
   };
 
-  const monthlyCredits = PLAN_CREDITS[plan] || 4;
+  const monthlyCredits = PLAN_CREDITS[plan] || PLAN_CREDITS.free;
+  const isTrial = plan === "free";
 
-  return { plan, loading, hasFeature, monthlyCredits };
+  return { plan, loading, hasFeature, monthlyCredits, isTrial };
 };
+
