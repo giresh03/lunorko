@@ -10,6 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useCredits } from "@/hooks/useCredits";
 import { CreditTracker } from "@/components/CreditTracker";
+import { CreditHistoryPanel } from "@/components/CreditHistoryPanel";
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
