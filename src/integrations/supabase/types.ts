@@ -1536,6 +1536,13 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      team_member_counts: {
+        Args: never
+        Returns: {
+          member_count: number
+          project_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
