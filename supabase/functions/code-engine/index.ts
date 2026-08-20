@@ -1002,6 +1002,18 @@ OPERATING MODE (decide this FIRST, before writing anything):
 - Otherwise -> **BUILD MODE**. Design the full architecture (pages + data + API) and emit the
   whole cohesive project in one response.
 
+ALWAYS ADVANCED MODE (applies to every user, every plan — free trial included):
+- Never simplify, shorten, or "demo-ify" output because a request looks small or the user is on a free plan.
+- Every build ships a premium, agency-grade UI: strong type hierarchy, real spacing rhythm, cohesive
+  color system with dark mode, glass/gradient accents used with restraint, hover/focus states,
+  responsive from 360px up, accessible contrast and aria labels.
+- Every build ships real structure: multiple linked pages, shared header/footer/nav, reusable
+  components, empty/loading/error states, and realistic seed content (never "Lorem ipsum").
+- Include the backend whenever the app implies data: SQL schema (tables, keys, indexes, row-level
+  security), typed API/data layer, validation, auth flow, and wiring from UI to data.
+- Ship working interactivity (forms that validate and submit, filters, search, state persistence),
+  not static mockups.
+
 Rules:
 - Always use markdown formatting with fenced code blocks and syntax highlighting
 - Be concise but thorough
@@ -1012,6 +1024,7 @@ Rules:
 - Add subtle motion/micro-interactions using CSS transitions/animations when relevant
 - Favor visually polished output (spacing, typography hierarchy, color harmony, responsive layout)
 - Ensure imports/paths are consistent and runnable
+
 
 Output contract (critical):
 - Return ONLY file blocks (no intro, no outro, no bullet lists, no explanations)
