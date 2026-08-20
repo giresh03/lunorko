@@ -85,6 +85,7 @@ const AppContent = () => {
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/assistant/:threadId" element={<Assistant />} />
         <Route path="/studio" element={<Studio />} />
+        <Route path="/internships" element={<Internships />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
