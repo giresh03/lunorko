@@ -20,6 +20,8 @@ import LockGate from "@/components/LockGate";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useCredits, FREE_TRIAL_CREDITS } from "@/hooks/useCredits";
+
 import { useDashboard } from "@/hooks/useDashboard";
 import { domains, type Resource } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
