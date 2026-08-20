@@ -232,6 +232,12 @@ const AdminPanel = () => {
       const { data: applicantData } = await supabase.rpc("admin_list_profiles");
       setApplicants((applicantData as any[]) ?? []);
 
+      const { data: internshipData } = await supabase
+        .from("internship_applications")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setInternshipApps((internshipData as any[]) ?? []);
+
       await loadChatMessages();
     } catch (e: any) {
       console.error(e);
