@@ -34,6 +34,7 @@ const navLinks = [
   { to: "/studio", label: "Studio" },
   { to: "/visual-builder", label: "Visual Builder" },
   { to: "/ai-interview", label: "AI Interview" },
+  { to: "/internships", label: "Internships" },
   { to: "/pricing", label: "Pricing" },
   { to: "/about", label: "About" },
 ];

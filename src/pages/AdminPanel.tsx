@@ -57,6 +57,7 @@ const AdminPanel = () => {
   const [communityGuidelines, setCommunityGuidelines] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [applicants, setApplicants] = useState<any[]>([]);
+  const [internshipApps, setInternshipApps] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -70,6 +71,16 @@ const AdminPanel = () => {
       return;
     }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const setInternshipStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from("internship_applications").update({ status }).eq("id", id);
+    if (error) {
+      toast({ title: "Could not update status", description: error.message, variant: "destructive" });
+      return;
+    }
+    setInternshipApps((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    toast({ title: `Application marked ${status}` });
   };
 
   // Resource form
@@ -230,6 +241,12 @@ const AdminPanel = () => {
 
       const { data: applicantData } = await supabase.rpc("admin_list_profiles");
       setApplicants((applicantData as any[]) ?? []);
+
+      const { data: internshipData } = await supabase
+        .from("internship_applications")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setInternshipApps((internshipData as any[]) ?? []);
 
       await loadChatMessages();
     } catch (e: any) {
@@ -561,6 +578,7 @@ const AdminPanel = () => {
                 { value: "community", label: "Community", short: "Com", Icon: MessageSquare },
                 { value: "guidelines", label: "Guidelines", short: "Rules", Icon: Shield },
                 { value: "talent", label: "Talent", short: "Team", Icon: Briefcase, count: applicants.length },
+                { value: "internships", label: "Internships", short: "Interns", Icon: UserPlus, count: internshipApps.filter((a) => a.status === "pending").length },
                 { value: "feedback", label: "Feedback", short: "FB", Icon: MessageSquare, count: feedbacks.length },
               ].map(({ value, label, short, Icon, count }) => (
                 <TabsTrigger
@@ -1324,6 +1342,83 @@ const AdminPanel = () => {
                     </TableRow>
                   ))}
                   {communityGuidelines.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No guidelines yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Internship applications */}
+          <TabsContent value="internships">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" /> Internship Applications ({internshipApps.length})
+            </h2>
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>College</TableHead>
+                    <TableHead>Skills</TableHead>
+                    <TableHead>Links</TableHead>
+                    <TableHead>Applied</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Resume</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {internshipApps.map((a: any) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="text-sm font-medium">{a.full_name}</TableCell>
+                      <TableCell className="text-xs">
+                        <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-primary whitespace-nowrap">
+                          {String(a.role || "").replace(/-/g, " ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        <div>{a.email}</div>
+                        {a.phone && <div>{a.phone}</div>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {a.college || "—"}{a.year_of_study ? ` · ${a.year_of_study}` : ""}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] text-xs text-muted-foreground truncate">{a.skills || "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        <div className="flex flex-col gap-0.5">
+                          {a.github_url && <a href={a.github_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">GitHub</a>}
+                          {a.portfolio_url && <a href={a.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Portfolio</a>}
+                          {a.linkedin_url && <a href={a.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">LinkedIn</a>}
+                          {!a.github_url && !a.portfolio_url && !a.linkedin_url && <span className="text-muted-foreground">—</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <select
+                          value={a.status}
+                          onChange={(e) => setInternshipStatus(a.id, e.target.value)}
+                          className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        >
+                          <option value="pending">pending</option>
+                          <option value="shortlisted">shortlisted</option>
+                          <option value="selected">selected</option>
+                          <option value="rejected">rejected</option>
+                        </select>
+                      </TableCell>
+                      <TableCell>
+                        {a.resume_url ? (
+                          <Button size="sm" variant="outline" onClick={() => viewResume(a.resume_url)}>
+                            <FileText className="mr-1 h-3.5 w-3.5" /> View
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {internshipApps.length === 0 && (
+                    <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No internship applications yet</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

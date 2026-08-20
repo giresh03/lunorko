@@ -29,6 +29,7 @@ import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
 import GitHubCallback from "./pages/GitHubCallback";
 import Assistant from "./pages/Assistant";
 import Studio from "./pages/Studio";
+import Internships from "./pages/Internships";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
 import OnboardingDialog from "./components/onboarding/OnboardingDialog";
@@ -84,6 +85,7 @@ const AppContent = () => {
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/assistant/:threadId" element={<Assistant />} />
         <Route path="/studio" element={<Studio />} />
+        <Route path="/internships" element={<Internships />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
