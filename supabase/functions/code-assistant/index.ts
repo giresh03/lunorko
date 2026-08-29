@@ -113,7 +113,9 @@ Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .
     };
 
     const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-    let systemPrompt = `${basePrompt}
+    let systemPrompt = `${LUNOR_AGENT_CHARTER}
+
+${basePrompt}
 
 Rules:
 - Always use markdown formatting with code blocks and syntax highlighting
