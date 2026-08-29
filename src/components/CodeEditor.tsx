@@ -1782,6 +1782,15 @@ ${jsCode}
         `[EDIT RULES: This is a TARGETED EDIT to the live project above. Change ONLY the exact part the user asked about; keep all other layout, structure, markup, ids, classes, styling, spacing, colors, fonts, animations, content and behavior byte-identical. Do NOT redesign, refactor, reorder or regenerate untouched sections, and do NOT add unrequested sections or files. Reuse the EXACT file paths above. Return the COMPLETE updated content of only the files that actually change (never diffs, never "// rest unchanged"). Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
       : "";
 
+    // Attach captured preview runtime errors when the user is asking for a fix
+    const fixIntent = /\b(error|errors|not working|doesn'?t work|isn'?t working|broken|fix|debug|solve|issue|fails?|failing|crash|blank|white screen|can'?t (log|sign) ?in|login)\b/i.test(input);
+    const capturedErrors = previewErrorLogRef.current;
+    const errorContext = fixIntent && capturedErrors.length
+      ? `\n\n---\n[CAPTURED RUNTIME ERRORS FROM THE LIVE PREVIEW — these are real, authoritative errors thrown by the code above. Fix their ROOT CAUSE, not the symptom.]\n` +
+        capturedErrors.map((e, i) => `${i + 1}. ${e}`).join("\n") +
+        `\n\n[FIX REQUIREMENTS: Trace each error to the exact file and line in the project above and fix it properly. Return the COMPLETE updated content of every file you change, using the EXACT existing file paths (format: path/to/file.ext followed by a fenced code block). Do not answer with prose only, explanations only, TODOs or placeholders. After fixing, confirm in one short line that each listed error can no longer occur.]\n---`
+      : "";
+
     const userMsg: Message = { role: "user", content: input };
     const updated = [...messages, userMsg];
     setMessages(updated);
