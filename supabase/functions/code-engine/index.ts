@@ -516,12 +516,21 @@ RULES:
 1. **HTML only** — semantic HTML5, no JSX or React. No import statements. No components.
 2. **CSS only** — styles.css with modern animations (transitions, keyframes, hover effects, gradients).
 3. **Vanilla JS only** — plain JavaScript, no import/export, no modules, no require, no npm packages.
-4. **IMAGES ARE MANDATORY** — Every website MUST include high-quality images. Use these image sources:
+4. **LIGHT / WHITE THEME BY DEFAULT** — Unless the user explicitly asks for dark mode, every site
+   uses a clean white/light UI: --bg:#ffffff, --surface:#f7f8fa, --text:#0f1115, --muted:#5b6472,
+   soft borders (#e6e8ec), light shadows, dark text on light surfaces. Never ship a dark-background
+   site by default. Do NOT add dark starfield/neon backgrounds unless requested.
+4b. **IMAGES ARE MANDATORY AND MUST ALWAYS RENDER** — Use these image sources:
    - **Unsplash (primary)**: <img src="https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80"> — use real Unsplash photo IDs for relevant topics.
    - **Picsum (random beautiful photos)**: <img src="https://picsum.photos/WIDTH/HEIGHT?random=N"> where N is a unique number per image.
    - **Hero images**: Use full-width background images with CSS: background-image: url('https://images.unsplash.com/photo-ID?w=1920&h=1080&fit=crop&q=80');
-   - Include AT LEAST 3-5 images per website (hero banner, feature images, team/product photos, gallery items).
+   - Include AT LEAST 6-10 images per page (hero banner, feature images, team/product photos, gallery items).
    - Use object-fit: cover on all images. Add loading="lazy" for below-fold images.
+   - EVERY <img> MUST carry a fallback + self-remove so a broken image is never shown:
+     <img src="URL" alt="..." loading="lazy"
+          onerror="if(!this.dataset.f){this.dataset.f=1;this.src='https://picsum.photos/800/600?random=7';}else{this.closest('.media,figure,.card')?.classList.add('no-img');this.remove();}">
+     Add CSS: .no-img{background:linear-gradient(135deg,#f2f4f7,#e8ebf0);}
+   - Never leave an empty image frame, gray box, or alt-text placeholder visible.
    - For icons, use inline SVGs or emoji — NOT external icon libraries.
    
    **Common Unsplash photo IDs by topic:**
