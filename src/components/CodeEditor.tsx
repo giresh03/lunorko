@@ -646,7 +646,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // Automated verification: does the app actually load and does login work?
   const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
   const selfTestResolveRef = useRef<((r: SelfTestResult[]) => void) | null>(null);
+  const verifyPendingRef = useRef(false);
+  const verificationMessageRef = useRef(false);
   const autoRepairRoundsRef = useRef(0);
+
 
 
   const runSelfTest = useCallback((): Promise<SelfTestResult[]> => {
