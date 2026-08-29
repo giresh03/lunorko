@@ -59,8 +59,25 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
   function report(m, s){
     try { parent.postMessage({ __lunorPreview: true, type: 'error', message: String(m || 'Unknown error'), stack: String(s || '') }, '*'); } catch(e) {}
   }
-  window.addEventListener('error', function(e){ if (e && e.message) report(e.message, e.error && e.error.stack); }, true);
+  window.addEventListener('error', function(e){
+    if (e && e.target && e.target !== window && e.target.tagName)
+      return report('Failed to load ' + e.target.tagName.toLowerCase() + ': ' + (e.target.src || e.target.href || '?'), '');
+    if (e && e.message) report(e.message, e.error && e.error.stack);
+  }, true);
   window.addEventListener('unhandledrejection', function(e){ var r = e && e.reason; report((r && r.message) || r || 'Unhandled promise rejection', r && r.stack); });
+  var ce = console.error;
+  console.error = function(){
+    try { report('console.error: ' + Array.prototype.map.call(arguments, function(a){ return (a && a.message) || String(a); }).join(' '), (arguments[0] && arguments[0].stack) || ''); } catch(x) {}
+    return ce.apply(console, arguments);
+  };
+  var of = window.fetch;
+  if (of) window.fetch = function(){
+    var u = arguments[0] && (arguments[0].url || arguments[0]);
+    return of.apply(window, arguments).then(function(r){
+      if (!r.ok) report('fetch ' + r.status + ' ' + String(u), '');
+      return r;
+    }, function(err){ report('fetch failed: ' + String(u) + ' \u2014 ' + (err && err.message), err && err.stack); throw err; });
+  };
 })();<\/script>`;
 
 function injectRuntimeGuard(html: string): string {
@@ -612,8 +629,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // Preview runtime errors reported by the sandboxed iframe
   const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
   const [resolvingError, setResolvingError] = useState(false);
+  const previewErrorLogRef = useRef<string[]>([]);
   const setPreview = useCallback((html: string) => {
     setPreviewError(null);
+    previewErrorLogRef.current = [];
     setPreviewContent(injectRuntimeGuard(html));
   }, []);
   useEffect(() => {
@@ -621,6 +640,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       const d = e.data as { __lunorPreview?: boolean; type?: string; message?: string; stack?: string } | null;
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
         setPreviewError({ message: d.message, stack: d.stack });
+        const entry = d.message + (d.stack ? ` | ${d.stack.slice(0, 400)}` : "");
+        const log = previewErrorLogRef.current;
+        if (!log.includes(entry)) {
+          log.push(entry);
+          if (log.length > 8) log.shift();
+        }
       }
     };
     window.addEventListener("message", onMsg);
@@ -1757,6 +1782,15 @@ ${jsCode}
         `[EDIT RULES: This is a TARGETED EDIT to the live project above. Change ONLY the exact part the user asked about; keep all other layout, structure, markup, ids, classes, styling, spacing, colors, fonts, animations, content and behavior byte-identical. Do NOT redesign, refactor, reorder or regenerate untouched sections, and do NOT add unrequested sections or files. Reuse the EXACT file paths above. Return the COMPLETE updated content of only the files that actually change (never diffs, never "// rest unchanged"). Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
       : "";
 
+    // Attach captured preview runtime errors when the user is asking for a fix
+    const fixIntent = /\b(error|errors|not working|doesn'?t work|isn'?t working|broken|fix|debug|solve|issue|fails?|failing|crash|blank|white screen|can'?t (log|sign) ?in|login)\b/i.test(input);
+    const capturedErrors = previewErrorLogRef.current;
+    const errorContext = fixIntent && capturedErrors.length
+      ? `\n\n---\n[CAPTURED RUNTIME ERRORS FROM THE LIVE PREVIEW — these are real, authoritative errors thrown by the code above. Fix their ROOT CAUSE, not the symptom.]\n` +
+        capturedErrors.map((e, i) => `${i + 1}. ${e}`).join("\n") +
+        `\n\n[FIX REQUIREMENTS: Trace each error to the exact file and line in the project above and fix it properly. Return the COMPLETE updated content of every file you change, using the EXACT existing file paths (format: path/to/file.ext followed by a fenced code block). Do not answer with prose only, explanations only, TODOs or placeholders. After fixing, confirm in one short line that each listed error can no longer occur.]\n---`
+      : "";
+
     const userMsg: Message = { role: "user", content: input };
     const updated = [...messages, userMsg];
     setMessages(updated);
@@ -1787,7 +1821,7 @@ ${jsCode}
         // Append file context to the last user message for AI awareness
         const messagesWithContext = updated.map((m, i) => {
           if (i === updated.length - 1 && m.role === "user") {
-            return { role: m.role, content: m.content + fileContext };
+            return { role: m.role, content: m.content + fileContext + errorContext };
           }
           return { role: m.role, content: m.content };
         });
