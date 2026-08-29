@@ -970,7 +970,9 @@ serve(async (req) => {
   * Large sites: split CSS into styles.css (base/layout/nav/footer) + components.css.
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
-- MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
+- MANDATORY: 6-10+ high-quality images per page (Unsplash https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80 or Picsum https://picsum.photos/WIDTH/HEIGHT?random=N), each with the onerror fallback chain so no broken/blank image is ever rendered
+- DEFAULT THEME: light/white (white bg, dark text, soft shadows) unless the user asks for dark
+- Every page must be LONG: 8-14 sections of real content, 900+ lines of markup+content across the site
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
