@@ -82,10 +82,12 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
 
 function injectRuntimeGuard(html: string): string {
   if (!html || html.includes("__lunor_guard")) return html;
-  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
-  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
-  return PREVIEW_RUNTIME_GUARD + html;
+  const injected = PREVIEW_RUNTIME_GUARD + PREVIEW_SELF_TEST_SCRIPT;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + injected);
+  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + injected);
+  return injected + html;
 }
+
 
 // -- Project types --
 interface SavedProject {
