@@ -36,6 +36,10 @@ import {
   getHistory, addHistoryEntry, deleteHistoryEntry, clearHistory, isFullStackFiles,
   type GenerationEntry,
 } from "@/lib/generationHistory";
+import {
+  PREVIEW_SELF_TEST_SCRIPT, SELF_TEST_TIMEOUT_MS, summarizeResults, type SelfTestResult,
+} from "@/lib/previewSelfTest";
+
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
