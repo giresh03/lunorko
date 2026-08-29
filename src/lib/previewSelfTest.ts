@@ -132,7 +132,7 @@ export const PREVIEW_SELF_TEST_SCRIPT = `<script id="__lunor_selftest">(function
     var d = e && e.data;
     if (d && d.__lunorSelfTest === 'run') run();
   });
-})();<\\/script>`;
+})();<\/script>`;
 
 /** Human-readable summary used both in chat and in the follow-up fix prompt. */
 export function summarizeResults(results: SelfTestResult[]): string {
