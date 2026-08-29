@@ -641,9 +641,50 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     previewErrorLogRef.current = [];
     setPreviewContent(injectRuntimeGuard(html));
   }, []);
+  // Automated verification: does the app actually load and does login work?
+  const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
+  const selfTestResolveRef = useRef<((r: SelfTestResult[]) => void) | null>(null);
+  const autoRepairRoundsRef = useRef(0);
+
+  const runSelfTest = useCallback((): Promise<SelfTestResult[]> => {
+    setVerify({ running: true, results: [] });
+    return new Promise<SelfTestResult[]>((resolve) => {
+      let settled = false;
+      const finish = (results: SelfTestResult[]) => {
+        if (settled) return;
+        settled = true;
+        selfTestResolveRef.current = null;
+        setVerify({ running: false, results });
+        resolve(results);
+      };
+      selfTestResolveRef.current = finish;
+      const frame = iframeRef.current;
+      if (!frame?.contentWindow) {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "Preview frame is not available" }]);
+        return;
+      }
+      try {
+        frame.contentWindow.postMessage({ __lunorSelfTest: "run" }, "*");
+      } catch {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "Could not reach the preview frame" }]);
+        return;
+      }
+      setTimeout(() => {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "The app did not respond within the check window (likely a blank screen or a crash during startup)" }]);
+      }, SELF_TEST_TIMEOUT_MS);
+    });
+  }, []);
+
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
-      const d = e.data as { __lunorPreview?: boolean; type?: string; message?: string; stack?: string } | null;
+      const d = e.data as {
+        __lunorPreview?: boolean; type?: string; message?: string; stack?: string;
+        __lunorSelfTest?: boolean | string; results?: SelfTestResult[];
+      } | null;
+      if (d && d.__lunorSelfTest === true && Array.isArray(d.results)) {
+        selfTestResolveRef.current?.(d.results);
+        return;
+      }
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
         setPreviewError({ message: d.message, stack: d.stack });
         const entry = d.message + (d.stack ? ` | ${d.stack.slice(0, 400)}` : "");
@@ -657,6 +698,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
+
 
   // Theme state
   const [currentThemeId, setCurrentThemeId] = useState<string>(() => localStorage.getItem("lunor-editor-theme") || "vs-dark");
