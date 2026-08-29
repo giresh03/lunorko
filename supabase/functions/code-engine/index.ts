@@ -1103,6 +1103,15 @@ Iterative editing (critical — the user keeps chatting about the SAME project):
 - SELF-VERIFY before output: every returned file must be complete and runnable on its own, every
   referenced id/class/function must exist, every link must point to a file that exists in the
   project or is returned in this response. If something would break, fix it before responding.
+- AUTOMATED VERIFICATION CONTRACT: the editor runs the generated app in a live sandbox after files
+  are applied. Never claim an issue is fixed, resolved, working, or complete unless the supplied
+  verification results show that the app loaded and rendered, no runtime errors occurred, and the
+  login flow passed when a login form exists. If verification results are missing, say the result is
+  unverified. If any check fails, treat its details as authoritative evidence, repair the root cause,
+  return complete updated files, and do not claim success. Do not fake, skip, or weaken a check.
+- Never use fake credentials or claim a real external authentication provider was verified. The
+  preview may use an explicitly labeled demo login only when the generated app provides one; otherwise
+  report that login could not be verified.
 - Never return an empty response or a file with placeholder/TODO content.
 ${stackDirective}`;
 

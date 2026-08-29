@@ -36,6 +36,10 @@ import {
   getHistory, addHistoryEntry, deleteHistoryEntry, clearHistory, isFullStackFiles,
   type GenerationEntry,
 } from "@/lib/generationHistory";
+import {
+  PREVIEW_SELF_TEST_SCRIPT, SELF_TEST_TIMEOUT_MS, summarizeResults, type SelfTestResult,
+} from "@/lib/previewSelfTest";
+
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
@@ -82,10 +86,12 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
 
 function injectRuntimeGuard(html: string): string {
   if (!html || html.includes("__lunor_guard")) return html;
-  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
-  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + PREVIEW_RUNTIME_GUARD);
-  return PREVIEW_RUNTIME_GUARD + html;
+  const injected = PREVIEW_RUNTIME_GUARD + PREVIEW_SELF_TEST_SCRIPT;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + injected);
+  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + injected);
+  return injected + html;
 }
+
 
 // -- Project types --
 interface SavedProject {
@@ -630,14 +636,70 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
   const [resolvingError, setResolvingError] = useState(false);
   const previewErrorLogRef = useRef<string[]>([]);
+  const verifyPendingRef = useRef(false);
   const setPreview = useCallback((html: string) => {
     setPreviewError(null);
     previewErrorLogRef.current = [];
     setPreviewContent(injectRuntimeGuard(html));
   }, []);
+
+  // Automated verification: does the app actually load and does login work?
+  const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
+  const selfTestResolveRef = useRef<((r: SelfTestResult[]) => void) | null>(null);
+  const verificationMessageRef = useRef(false);
+  const autoRepairRoundsRef = useRef(0);
+
+
+
+
+  const runSelfTest = useCallback((): Promise<SelfTestResult[]> => {
+    verificationMessageRef.current = false;
+    setVerify({ running: true, results: [] });
+    return new Promise<SelfTestResult[]>((resolve) => {
+      let settled = false;
+      const finish = (results: SelfTestResult[]) => {
+        if (settled) return;
+        settled = true;
+        selfTestResolveRef.current = null;
+        setVerify({ running: false, results });
+        resolve(results);
+      };
+      selfTestResolveRef.current = finish;
+      const frame = iframeRef.current;
+      if (!frame?.contentWindow) {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "Preview frame is not available" }]);
+        return;
+      }
+      try {
+        frame.contentWindow.postMessage({ __lunorSelfTest: "run" }, "*");
+      } catch {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "Could not reach the preview frame" }]);
+        return;
+      }
+      setTimeout(() => {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "The app did not respond within the check window (likely a blank screen or a crash during startup)" }]);
+      }, SELF_TEST_TIMEOUT_MS);
+    });
+  }, []);
+
+  // Start verification after the newly generated iframe has mounted.
+  useEffect(() => {
+    if (!verifyPendingRef.current || !showPreview || !previewContent) return;
+    verifyPendingRef.current = false;
+    const timer = setTimeout(() => { void runSelfTest(); }, 700);
+    return () => clearTimeout(timer);
+  }, [previewContent, showPreview, runSelfTest]);
+
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
-      const d = e.data as { __lunorPreview?: boolean; type?: string; message?: string; stack?: string } | null;
+      const d = e.data as {
+        __lunorPreview?: boolean; type?: string; message?: string; stack?: string;
+        __lunorSelfTest?: boolean | string; results?: SelfTestResult[];
+      } | null;
+      if (d && d.__lunorSelfTest === true && Array.isArray(d.results)) {
+        selfTestResolveRef.current?.(d.results);
+        return;
+      }
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
         setPreviewError({ message: d.message, stack: d.stack });
         const entry = d.message + (d.stack ? ` | ${d.stack.slice(0, 400)}` : "");
@@ -651,6 +713,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
+
 
   // Theme state
   const [currentThemeId, setCurrentThemeId] = useState<string>(() => localStorage.getItem("lunor-editor-theme") || "vs-dark");
@@ -1970,6 +2033,8 @@ ${jsCode}
       const hasWebCode = newFiles.some(f => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(f.lang));
       if (hasWebCode) {
         setShowPreview(true);
+        verifyPendingRef.current = true;
+
 
         // Build a complete file map from existing tree + new files for immediate preview
         setTimeout(() => {
@@ -2075,6 +2140,29 @@ ${jsCode}
       setResolvingError(false);
     }
   }, [previewError, resolvingError, handleChatSend]);
+
+  // Never claim a generated fix is complete until the live preview checks pass.
+  useEffect(() => {
+    if (!verify || verify.running || !verify.results.length || verificationMessageRef.current) return;
+    verificationMessageRef.current = true;
+    const passed = verify.results.every((result) => result.passed);
+    const summary = summarizeResults(verify.results);
+    setMessages((prev) => [...prev, {
+      role: "assistant",
+      content: passed
+        ? `✅ **Verified in the live preview**\n\n${summary}\n\nThe app loaded successfully and the available login flow passed.`
+        : `⚠️ **Verification is not complete**\n\n${summary}\n\nI will not claim this is resolved until the failed checks pass.`,
+    }]);
+
+    if (!passed && autoRepairRoundsRef.current < 2 && !chatLoading) {
+      autoRepairRoundsRef.current += 1;
+      window.setTimeout(() => {
+        void handleChatSend(
+          `Automated verification failed after the latest change. Repair the root cause and return complete updated files only.\n\n${summary}\n\nThis is repair pass ${autoRepairRoundsRef.current} of 2. Preserve unrelated code, then make the preview pass app-load, runtime-error, navigation, and login checks.`
+        );
+      }, 250);
+    }
+  }, [verify, chatLoading, handleChatSend]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -3351,6 +3439,37 @@ ${jsCode}
           </div>
         )}
       </div>
+
+      {/* Automated preview verification */}
+      {verify && (
+        <div className="fixed bottom-10 left-4 z-[9997] w-80 rounded-lg border border-border bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold text-foreground">
+              {verify.running ? "Running app checks…" : verify.results.every((result) => result.passed) ? "Preview verified" : "Verification needs attention"}
+            </p>
+            <button
+              onClick={() => { autoRepairRoundsRef.current = 0; void runSelfTest(); }}
+              disabled={verify.running}
+              className="h-6 rounded-md border border-border px-2 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              Re-run
+            </button>
+          </div>
+          {verify.running ? (
+            <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Checking load, errors, navigation, and login…
+            </div>
+          ) : (
+            <div className="mt-2 space-y-1">
+              {verify.results.map((result) => (
+                <p key={result.id} className={`text-[10px] ${result.passed ? "text-primary" : "text-destructive"}`}>
+                  {result.passed ? "✓" : "✗"} {result.label}{result.detail ? ` — ${result.detail}` : ""}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Preview runtime error — one-click AI fix */}
       {previewError && (
