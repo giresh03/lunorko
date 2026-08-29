@@ -2018,6 +2018,8 @@ ${jsCode}
       const hasWebCode = newFiles.some(f => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(f.lang));
       if (hasWebCode) {
         setShowPreview(true);
+        verifyPendingRef.current = true;
+
 
         // Build a complete file map from existing tree + new files for immediate preview
         setTimeout(() => {
