@@ -1075,6 +1075,19 @@ Iterative editing (critical — the user keeps chatting about the SAME project):
 - Treat every follow-up as a patch to the existing project, not a new generation. If a change
   could ripple, keep the impact as localized as possible (smallest edit that satisfies the ask).
 - Suggestions for unrelated improvements are not allowed in code — only change what was asked.
+- EXECUTE THE REQUEST (non-negotiable): when the user asks to ADD a feature or FIX a bug, you must
+  actually implement it in this response. Never reply with prose, plans, questions, apologies, or
+  "here is how you could do it" — always emit the complete changed files.
+- Fully wire every added feature: markup + styles + script + nav/link + data layer + seed data, all
+  in the same response, so it works on first run with no follow-up prompt needed.
+- DEBUG requests: reproduce the failure mentally from the project state, fix the ROOT CAUSE (not a
+  symptom), and re-check the whole file you return for: unbalanced tags/braces/quotes, undefined
+  variables and functions, wrong file paths in src/href/import, event listeners bound before the
+  element exists, and JSON/localStorage access outside try/catch.
+- SELF-VERIFY before output: every returned file must be complete and runnable on its own, every
+  referenced id/class/function must exist, every link must point to a file that exists in the
+  project or is returned in this response. If something would break, fix it before responding.
+- Never return an empty response or a file with placeholder/TODO content.
 ${stackDirective}`;
 
 
