@@ -59,8 +59,25 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
   function report(m, s){
     try { parent.postMessage({ __lunorPreview: true, type: 'error', message: String(m || 'Unknown error'), stack: String(s || '') }, '*'); } catch(e) {}
   }
-  window.addEventListener('error', function(e){ if (e && e.message) report(e.message, e.error && e.error.stack); }, true);
+  window.addEventListener('error', function(e){
+    if (e && e.target && e.target !== window && e.target.tagName)
+      return report('Failed to load ' + e.target.tagName.toLowerCase() + ': ' + (e.target.src || e.target.href || '?'), '');
+    if (e && e.message) report(e.message, e.error && e.error.stack);
+  }, true);
   window.addEventListener('unhandledrejection', function(e){ var r = e && e.reason; report((r && r.message) || r || 'Unhandled promise rejection', r && r.stack); });
+  var ce = console.error;
+  console.error = function(){
+    try { report('console.error: ' + Array.prototype.map.call(arguments, function(a){ return (a && a.message) || String(a); }).join(' '), (arguments[0] && arguments[0].stack) || ''); } catch(x) {}
+    return ce.apply(console, arguments);
+  };
+  var of = window.fetch;
+  if (of) window.fetch = function(){
+    var u = arguments[0] && (arguments[0].url || arguments[0]);
+    return of.apply(window, arguments).then(function(r){
+      if (!r.ok) report('fetch ' + r.status + ' ' + String(u), '');
+      return r;
+    }, function(err){ report('fetch failed: ' + String(u) + ' \u2014 ' + (err && err.message), err && err.stack); throw err; });
+  };
 })();<\/script>`;
 
 function injectRuntimeGuard(html: string): string {
