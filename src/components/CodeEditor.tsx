@@ -642,13 +642,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     previewErrorLogRef.current = [];
     setPreviewContent(injectRuntimeGuard(html));
   }, []);
-  // Run the self-test only after a newly generated preview has mounted.
-  useEffect(() => {
-    if (!verifyPendingRef.current || !showPreview || !previewContent) return;
-    verifyPendingRef.current = false;
-    const timer = setTimeout(() => { void runSelfTest(); }, 700);
-    return () => clearTimeout(timer);
-  }, [previewContent, showPreview, runSelfTest]);
 
   // Automated verification: does the app actually load and does login work?
   const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
