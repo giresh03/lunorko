@@ -516,12 +516,21 @@ RULES:
 1. **HTML only** — semantic HTML5, no JSX or React. No import statements. No components.
 2. **CSS only** — styles.css with modern animations (transitions, keyframes, hover effects, gradients).
 3. **Vanilla JS only** — plain JavaScript, no import/export, no modules, no require, no npm packages.
-4. **IMAGES ARE MANDATORY** — Every website MUST include high-quality images. Use these image sources:
+4. **LIGHT / WHITE THEME BY DEFAULT** — Unless the user explicitly asks for dark mode, every site
+   uses a clean white/light UI: --bg:#ffffff, --surface:#f7f8fa, --text:#0f1115, --muted:#5b6472,
+   soft borders (#e6e8ec), light shadows, dark text on light surfaces. Never ship a dark-background
+   site by default. Do NOT add dark starfield/neon backgrounds unless requested.
+4b. **IMAGES ARE MANDATORY AND MUST ALWAYS RENDER** — Use these image sources:
    - **Unsplash (primary)**: <img src="https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80"> — use real Unsplash photo IDs for relevant topics.
    - **Picsum (random beautiful photos)**: <img src="https://picsum.photos/WIDTH/HEIGHT?random=N"> where N is a unique number per image.
    - **Hero images**: Use full-width background images with CSS: background-image: url('https://images.unsplash.com/photo-ID?w=1920&h=1080&fit=crop&q=80');
-   - Include AT LEAST 3-5 images per website (hero banner, feature images, team/product photos, gallery items).
+   - Include AT LEAST 6-10 images per page (hero banner, feature images, team/product photos, gallery items).
    - Use object-fit: cover on all images. Add loading="lazy" for below-fold images.
+   - EVERY <img> MUST carry a fallback + self-remove so a broken image is never shown:
+     <img src="URL" alt="..." loading="lazy"
+          onerror="if(!this.dataset.f){this.dataset.f=1;this.src='https://picsum.photos/800/600?random=7';}else{this.closest('.media,figure,.card')?.classList.add('no-img');this.remove();}">
+     Add CSS: .no-img{background:linear-gradient(135deg,#f2f4f7,#e8ebf0);}
+   - Never leave an empty image frame, gray box, or alt-text placeholder visible.
    - For icons, use inline SVGs or emoji — NOT external icon libraries.
    
    **Common Unsplash photo IDs by topic:**
@@ -541,7 +550,8 @@ RULES:
 7. **Always produce working UI** — the preview runs directly in HTML; no build step.
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
-10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, include a LIGHT-friendly animated background effect from the Background Effects Library below (soft gradient mesh, light dotted grid, subtle orbs). Dark effects (starfield) only if asked.
+11. **LONG, VAST PAGES** — Every page has 8-14 full sections (hero, value props, features, showcase/gallery, how-it-works, stats, pricing/plans, testimonials, team, FAQ, blog/resources, CTA, footer) with substantial real copy — never a 2-section stub page.
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -936,7 +946,8 @@ serve(async (req) => {
   stylesheets, scripts, and backend files as the prompt implies (screens, dashboards, admin, api).
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
-- Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+- Include 4-6 images per screen using pollinations.ai prompt URLs (<img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION">), each with the onerror fallback chain (fallback to picsum, then remove the node) so broken images are never displayed
+- DEFAULT THEME: light/white app UI (white surfaces, dark text, soft shadows) unless dark mode is requested`
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY (vanilla). Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
@@ -959,7 +970,9 @@ serve(async (req) => {
   * Large sites: split CSS into styles.css (base/layout/nav/footer) + components.css.
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
-- MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
+- MANDATORY: 6-10+ high-quality images per page (Unsplash https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80 or Picsum https://picsum.photos/WIDTH/HEIGHT?random=N), each with the onerror fallback chain so no broken/blank image is ever rendered
+- DEFAULT THEME: light/white (white bg, dark text, soft shadows) unless the user asks for dark
+- Every page must be LONG: 8-14 sections of real content, 900+ lines of markup+content across the site
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
@@ -1008,9 +1021,10 @@ OPERATING MODE (decide this FIRST, before writing anything):
 ALWAYS ADVANCED MODE (applies to every user, every plan — free trial included):
 - Never simplify, shorten, or "demo-ify" output because a request looks small or the user is on a free plan.
 - Every build ships a premium, agency-grade UI: strong type hierarchy, real spacing rhythm, cohesive
-  color system with dark mode, glass/gradient accents used with restraint, hover/focus states,
+  cohesive LIGHT/white color system by default (dark mode only when the user asks),
+  glass/gradient accents used with restraint, hover/focus states,
   responsive from 360px up, accessible contrast and aria labels.
-- Every build ships real structure: multiple linked pages, shared header/footer/nav, reusable
+- Every build ships vast structure: many linked pages, each 8-14 sections deep, shared header/footer/nav, reusable
   components, empty/loading/error states, and realistic seed content (never "Lorem ipsum").
 - Include the backend whenever the app implies data: SQL schema (tables, keys, indexes, row-level
   security), typed API/data layer, validation, auth flow, and wiring from UI to data.
