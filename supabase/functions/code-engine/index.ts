@@ -946,7 +946,8 @@ serve(async (req) => {
   stylesheets, scripts, and backend files as the prompt implies (screens, dashboards, admin, api).
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
-- Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+- Include 4-6 images per screen using pollinations.ai prompt URLs (<img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION">), each with the onerror fallback chain (fallback to picsum, then remove the node) so broken images are never displayed
+- DEFAULT THEME: light/white app UI (white surfaces, dark text, soft shadows) unless dark mode is requested`
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY (vanilla). Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
