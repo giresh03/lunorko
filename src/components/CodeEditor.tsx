@@ -681,6 +681,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     });
   }, []);
 
+  // Start verification after the newly generated iframe has mounted.
+  useEffect(() => {
+    if (!verifyPendingRef.current || !showPreview || !previewContent) return;
+    verifyPendingRef.current = false;
+    const timer = setTimeout(() => { void runSelfTest(); }, 700);
+    return () => clearTimeout(timer);
+  }, [previewContent, showPreview, runSelfTest]);
+
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       const d = e.data as {
