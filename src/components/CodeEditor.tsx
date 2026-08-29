@@ -653,6 +653,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
 
   const runSelfTest = useCallback((): Promise<SelfTestResult[]> => {
+    verificationMessageRef.current = false;
     setVerify({ running: true, results: [] });
     return new Promise<SelfTestResult[]>((resolve) => {
       let settled = false;
@@ -2140,6 +2141,29 @@ ${jsCode}
     }
   }, [previewError, resolvingError, handleChatSend]);
 
+  // Never claim a generated fix is complete until the live preview checks pass.
+  useEffect(() => {
+    if (!verify || verify.running || !verify.results.length || verificationMessageRef.current) return;
+    verificationMessageRef.current = true;
+    const passed = verify.results.every((result) => result.passed);
+    const summary = summarizeResults(verify.results);
+    setMessages((prev) => [...prev, {
+      role: "assistant",
+      content: passed
+        ? `✅ **Verified in the live preview**\n\n${summary}\n\nThe app loaded successfully and the available login flow passed.`
+        : `⚠️ **Verification is not complete**\n\n${summary}\n\nI will not claim this is resolved until the failed checks pass.`,
+    }]);
+
+    if (!passed && autoRepairRoundsRef.current < 2 && !chatLoading) {
+      autoRepairRoundsRef.current += 1;
+      window.setTimeout(() => {
+        void handleChatSend(
+          `Automated verification failed after the latest change. Repair the root cause and return complete updated files only.\n\n${summary}\n\nThis is repair pass ${autoRepairRoundsRef.current} of 2. Preserve unrelated code, then make the preview pass app-load, runtime-error, navigation, and login checks.`
+        );
+      }, 250);
+    }
+  }, [verify, chatLoading, handleChatSend]);
+
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
   };
@@ -3415,6 +3439,37 @@ ${jsCode}
           </div>
         )}
       </div>
+
+      {/* Automated preview verification */}
+      {verify && (
+        <div className="fixed bottom-10 left-4 z-[9997] w-80 rounded-lg border border-border bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold text-foreground">
+              {verify.running ? "Running app checks…" : verify.results.every((result) => result.passed) ? "Preview verified" : "Verification needs attention"}
+            </p>
+            <button
+              onClick={() => { autoRepairRoundsRef.current = 0; void runSelfTest(); }}
+              disabled={verify.running}
+              className="h-6 rounded-md border border-border px-2 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              Re-run
+            </button>
+          </div>
+          {verify.running ? (
+            <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Checking load, errors, navigation, and login…
+            </div>
+          ) : (
+            <div className="mt-2 space-y-1">
+              {verify.results.map((result) => (
+                <p key={result.id} className={`text-[10px] ${result.passed ? "text-primary" : "text-destructive"}`}>
+                  {result.passed ? "✓" : "✗"} {result.label}{result.detail ? ` — ${result.detail}` : ""}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Preview runtime error — one-click AI fix */}
       {previewError && (
