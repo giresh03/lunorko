@@ -629,8 +629,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // Preview runtime errors reported by the sandboxed iframe
   const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
   const [resolvingError, setResolvingError] = useState(false);
+  const previewErrorLogRef = useRef<string[]>([]);
   const setPreview = useCallback((html: string) => {
     setPreviewError(null);
+    previewErrorLogRef.current = [];
     setPreviewContent(injectRuntimeGuard(html));
   }, []);
   useEffect(() => {
@@ -638,6 +640,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       const d = e.data as { __lunorPreview?: boolean; type?: string; message?: string; stack?: string } | null;
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
         setPreviewError({ message: d.message, stack: d.stack });
+        const entry = d.message + (d.stack ? ` | ${d.stack.slice(0, 400)}` : "");
+        const log = previewErrorLogRef.current;
+        if (!log.includes(entry)) {
+          log.push(entry);
+          if (log.length > 8) log.shift();
+        }
       }
     };
     window.addEventListener("message", onMsg);
