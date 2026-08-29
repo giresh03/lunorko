@@ -322,7 +322,7 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
   }
   // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
   if (blocks.length > 0 && !blocks.some(b => b.filename)) {
-    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
+    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?([\w./-]*\w\.\w+)[`"']?/gi;
     let fnMatch;
     while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
       const unassigned = blocks.find(b => !b.filename);
