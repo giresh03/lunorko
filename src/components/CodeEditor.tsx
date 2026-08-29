@@ -1821,7 +1821,7 @@ ${jsCode}
         // Append file context to the last user message for AI awareness
         const messagesWithContext = updated.map((m, i) => {
           if (i === updated.length - 1 && m.role === "user") {
-            return { role: m.role, content: m.content + fileContext };
+            return { role: m.role, content: m.content + fileContext + errorContext };
           }
           return { role: m.role, content: m.content };
         });
