@@ -54,6 +54,11 @@ const VideoSection = () => {
               </button>
             )}
           </div>
+          <div className="mt-4 text-center">
+            <Link to="/promo" className="text-sm font-medium text-primary hover:underline">
+              Watch the full explainer →
+            </Link>
+          </div>
         </div>
       </div>
     </section>
