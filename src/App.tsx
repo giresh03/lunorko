@@ -9,6 +9,7 @@ import { useVisitorTracking } from "@/hooks/useVisitorTracking";
 import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
+import LevelPage from "./pages/LevelPage";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Community from "./pages/Community";
