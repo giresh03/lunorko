@@ -481,23 +481,12 @@ const DomainDetail = () => {
               streak={learning.streak}
               progressPct={learning.progressPct}
             />
-            {activeLevel ? (
-              <LevelWorkspace
-                domainId={domainId ?? ""}
-                domainName={domain.name}
-                level={activeLevel}
-                videoUrl={videos[0]?.url}
-                onBack={() => setActiveLevelIndex(null)}
-                onComplete={(score) => learning.completeLevel(activeLevel.index, score, activeLevel.xp)}
-              />
-            ) : (
-              <RoadmapMap
-                levels={roadmap}
-                statusFor={learning.statusFor}
-                scoreFor={learning.scoreFor}
-                onOpen={(lvl) => setActiveLevelIndex(lvl.index)}
-              />
-            )}
+            <RoadmapMap
+              levels={roadmap}
+              statusFor={learning.statusFor}
+              scoreFor={learning.scoreFor}
+              onOpen={(lvl) => navigate(`/domain/${domainId}/level/${lvl.index}`)}
+            />
           </div>
         )}
 
