@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useRef, useState } from "react";
 import platformDemoVideo from "@/assets/sections/platform-demo.mp4";
 
