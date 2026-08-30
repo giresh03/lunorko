@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Play, Pause, Square, RotateCcw, Save, Sparkles, Loader2, Trophy, Clock, ListChecks, Wand2, CheckCircle2,
+  Maximize2, Minimize2,
 } from "lucide-react";
 import { editorModeFor, lessonDuration, starterCodeFor, type LevelDef } from "@/lib/learningRoadmap";
 import LevelTutor from "./LevelTutor";
@@ -53,7 +54,41 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
   const storageKey = `lunor_level_code_${domainId}_${level.index}`;
   const videoRef = useRef<HTMLVideoElement>(null);
   const youtubeRef = useRef<HTMLIFrameElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const isYouTubeVideo = Boolean(videoUrl?.includes("youtube.com") || videoUrl?.includes("youtu.be"));
+  const [theater, setTheater] = useState(false);
+
+  const toggleTheater = () => setTheater((t) => !t);
+
+  // Native fullscreen as the ultimate "maximize" when available.
+  const toggleMaximize = async () => {
+    const el = stageRef.current;
+    if (!el) return;
+    const docAny = document as Document & {
+      webkitExitFullscreen?: () => Promise<void>;
+      webkitFullscreenElement?: Element | null;
+    };
+    const elAny = el as HTMLDivElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+      webkitRequestEnterFullscreen?: () => Promise<void>;
+    };
+    const isFull = docAny.webkitFullscreenElement || document.fullscreenElement;
+    try {
+      if (isFull) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (docAny.webkitExitFullscreen) await docAny.webkitExitFullscreen();
+      } else if (el.requestFullscreen) {
+        await el.requestFullscreen();
+      } else if (elAny.webkitRequestFullscreen) {
+        await elAny.webkitRequestFullscreen();
+      } else {
+        // Fallback: toggle the in-page theater layout.
+        setTheater((t) => !t);
+      }
+    } catch {
+      setTheater((t) => !t);
+    }
+  };
 
   const [html, setHtml] = useState((starter as any).html ?? "");
   const [css, setCss] = useState((starter as any).css ?? "");
