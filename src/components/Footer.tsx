@@ -21,6 +21,7 @@ const Footer = () => (
           <h4 className="mb-3 text-sm font-semibold text-foreground">Platform</h4>
           <div className="flex flex-col gap-2">
             <Link to="/domains" className="text-sm text-muted-foreground hover:text-foreground">Domains</Link>
+            <Link to="/promo" className="text-sm text-muted-foreground hover:text-foreground">Explainer Video</Link>
             <Link to="/about" className="text-sm text-muted-foreground hover:text-foreground">About</Link>
           </div>
         </div>
