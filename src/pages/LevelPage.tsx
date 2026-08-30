@@ -8,6 +8,7 @@ import { domains } from "@/lib/domains";
 import { getRoadmap } from "@/lib/learningRoadmap";
 import { useLearningProgress } from "@/hooks/useLearningProgress";
 import LevelWorkspace from "@/components/learn/LevelWorkspace";
+import { lessonVideoFor } from "@/lib/lessonVideos";
 
 const LevelPage = () => {
   const { domainId, levelIndex } = useParams();
@@ -45,7 +46,10 @@ const LevelPage = () => {
           domainId={domainId ?? ""}
           domainName={domain.name}
           level={level}
-          videoUrl={domain.resources.find((resource) => resource.type === "video")?.url}
+          videoUrl={
+            lessonVideoFor(domain.id, level.index) ??
+            domain.resources.find((resource) => resource.type === "video")?.url
+          }
           onBack={backToRoadmap}
           onComplete={(score) => learning.completeLevel(level.index, score, level.xp)}
         />
