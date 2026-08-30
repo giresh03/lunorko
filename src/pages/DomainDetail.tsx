@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import EditorPaywall from "@/components/EditorPaywall";
 import DesignEditorMain from "@/components/design-editor/DesignEditorMain";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
   CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
@@ -25,6 +25,12 @@ import { useCredits, FREE_TRIAL_CREDITS } from "@/hooks/useCredits";
 import { useDashboard } from "@/hooks/useDashboard";
 import { domains, type Resource } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
+import LearnBuildToggle, { type LearnMode } from "@/components/learn/LearnBuildToggle";
+import RoadmapMap from "@/components/learn/RoadmapMap";
+import ProgressHud from "@/components/learn/ProgressHud";
+import LevelWorkspace from "@/components/learn/LevelWorkspace";
+import { getRoadmap } from "@/lib/learningRoadmap";
+import { useLearningProgress } from "@/hooks/useLearningProgress";
 
 const sourceColors: Record<string, string> = {
   YouTube: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -201,6 +207,11 @@ const DomainDetail = () => {
   const domain = domains.find((d) => d.id === domainId);
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
+  const [learnMode, setLearnMode] = useState<LearnMode>("learn");
+  const [activeLevelIndex, setActiveLevelIndex] = useState<number | null>(null);
+  const roadmap = useMemo(() => getRoadmap(domainId ?? ""), [domainId]);
+  const learning = useLearningProgress(domainId ?? "");
+  const activeLevel = activeLevelIndex ? roadmap.find((l) => l.index === activeLevelIndex) ?? null : null;
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
   const [adminResources, setAdminResources] = useState<Resource[]>([]);
 
