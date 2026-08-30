@@ -51,6 +51,9 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
   const mode = editorModeFor(domainId);
   const starter = useMemo(() => starterCodeFor(mode, level), [mode, level]);
   const storageKey = `lunor_level_code_${domainId}_${level.index}`;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const youtubeRef = useRef<HTMLIFrameElement>(null);
+  const isYouTubeVideo = Boolean(videoUrl?.includes("youtube.com") || videoUrl?.includes("youtu.be"));
 
   const [html, setHtml] = useState((starter as any).html ?? "");
   const [css, setCss] = useState((starter as any).css ?? "");
@@ -99,6 +102,32 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
       setOutput([`❌ ${(e as Error).message}`]);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const sendYouTubeCommand = (func: "playVideo" | "pauseVideo" | "seekTo") => {
+    youtubeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: func === "seekTo" ? [0, true] : [] }), "*");
+  };
+
+  const startVideo = () => {
+    if (isYouTubeVideo) sendYouTubeCommand("playVideo");
+    else void videoRef.current?.play();
+  };
+
+  const stopVideo = () => {
+    if (isYouTubeVideo) sendYouTubeCommand("pauseVideo");
+    else videoRef.current?.pause();
+  };
+
+  const restartVideo = () => {
+    if (isYouTubeVideo) {
+      sendYouTubeCommand("seekTo");
+      sendYouTubeCommand("playVideo");
+      return;
+    }
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      void videoRef.current.play();
     }
   };
 

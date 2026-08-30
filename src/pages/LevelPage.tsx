@@ -45,7 +45,7 @@ const LevelPage = () => {
           domainId={domainId ?? ""}
           domainName={domain.name}
           level={level}
-          videoUrl={domain.resources.find((resource) => resource.type === "video" || resource.type === "course")?.url}
+          videoUrl={domain.resources.find((resource) => resource.type === "video")?.url}
           onBack={backToRoadmap}
           onComplete={(score) => learning.completeLevel(level.index, score, level.xp)}
         />
