@@ -57,6 +57,23 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
   const stageRef = useRef<HTMLDivElement>(null);
   const isYouTubeVideo = Boolean(videoUrl?.includes("youtube.com") || videoUrl?.includes("youtu.be"));
   const [theater, setTheater] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : true,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
 
   const toggleTheater = () => setTheater((t) => !t);
 
@@ -147,19 +164,28 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
   const playDirect = async () => {
     const v = videoRef.current;
     if (!v) return;
-    // Ensure metadata is loaded before attempting playback.
+    // Ensure metadata loads before playback, but bail after 2.5s so a
+    // stalled/unreachable source never blocks the Start button.
     if (v.readyState < 1) {
       await new Promise<void>((resolve) => {
-        const onReady = () => { v.removeEventListener("loadedmetadata", onReady); resolve(); };
-        v.addEventListener("loadedmetadata", onReady);
-        try { v.load(); } catch { resolve(); }
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          v.removeEventListener("loadedmetadata", finish);
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(finish, 2500);
+        v.addEventListener("loadedmetadata", finish);
+        try { v.load(); } catch { finish(); }
       });
     }
     try {
       v.muted = false;
       await v.play();
     } catch {
-      // Autoplay policy rejection — retry muted so playback still starts;
+      // Autoplay-policy rejection — retry muted so playback still starts;
       // the user can unmute via the native controls.
       try {
         v.muted = true;
@@ -501,15 +527,15 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
         <Badge variant="outline" className="text-xs">+{level.xp} XP on completion</Badge>
       </div>
 
-      {/* Desktop / tablet: three columns */}
-      <div className="hidden gap-4 lg:grid lg:grid-cols-12">
-        <div className="lg:col-span-4">{LessonPanel}</div>
-        <div className="lg:col-span-5">{CodePanel}</div>
-        <div className="lg:col-span-3">{TutorPanel}</div>
-      </div>
-
-      {/* Mobile: tabs */}
-      <div className="lg:hidden">
+      {/* Single responsive layout — rendered once so refs (video/iframe) never
+          point at a hidden duplicate and the Start button controls the visible player. */}
+      {isDesktop ? (
+        <div className="grid gap-4 lg:grid-cols-12">
+          <div className="lg:col-span-4">{LessonPanel}</div>
+          <div className="lg:col-span-5">{CodePanel}</div>
+          <div className="lg:col-span-3">{TutorPanel}</div>
+        </div>
+      ) : (
         <Tabs defaultValue="lesson">
           <TabsList className="w-full">
             <TabsTrigger value="lesson" className="flex-1 text-xs">Lesson</TabsTrigger>
@@ -520,7 +546,7 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
           <TabsContent value="code">{CodePanel}</TabsContent>
           <TabsContent value="ai">{TutorPanel}</TabsContent>
         </Tabs>
-      </div>
+      )}
     </div>
   );
 };
