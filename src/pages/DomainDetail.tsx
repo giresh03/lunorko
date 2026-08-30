@@ -204,6 +204,7 @@ const PdfCard = ({ resource }: { resource: Resource }) => {
 
 const DomainDetail = () => {
   const { domainId } = useParams();
+  const navigate = useNavigate();
   const domain = domains.find((d) => d.id === domainId);
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
