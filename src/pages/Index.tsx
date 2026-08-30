@@ -17,6 +17,7 @@ import ComparisonSection from "@/components/home/ComparisonSection";
 import FAQSection from "@/components/home/FAQSection";
 import HeroSection from "@/components/home/HeroSection";
 import FeaturesSection from "@/components/home/FeaturesSection";
+import VideoSection from "@/components/home/VideoSection";
 
 const Index = () => {
   const pageRef = useScrollReveal();
@@ -90,6 +91,12 @@ const Index = () => {
       <ParallaxLayer speed={0.03}>
         <FeaturesSection />
       </ParallaxLayer>
+
+      {/* Explainer Video */}
+      <ParallaxLayer speed={0.04}>
+        <VideoSection />
+      </ParallaxLayer>
+
 
       {/* Stats */}
       <ParallaxLayer speed={0.02}>

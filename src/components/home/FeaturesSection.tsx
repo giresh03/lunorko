@@ -206,7 +206,9 @@ const SkeletonThree = () => (
         muted
         loop
         playsInline
-        autoPlay
+        preload="none"
+        onMouseEnter={(e) => void e.currentTarget.play().catch(() => {})}
+        onMouseLeave={(e) => e.currentTarget.pause()}
       />
       <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-black/10 transition-colors">
         <div className="h-14 w-14 rounded-full bg-primary/90 flex items-center justify-center shadow-lg">
