@@ -57,6 +57,23 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
   const stageRef = useRef<HTMLDivElement>(null);
   const isYouTubeVideo = Boolean(videoUrl?.includes("youtube.com") || videoUrl?.includes("youtu.be"));
   const [theater, setTheater] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : true,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
 
   const toggleTheater = () => setTheater((t) => !t);
 
