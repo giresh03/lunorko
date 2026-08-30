@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import EditorPaywall from "@/components/EditorPaywall";
 import DesignEditorMain from "@/components/design-editor/DesignEditorMain";
 import { useRef, useState, useEffect, useMemo } from "react";
