@@ -799,6 +799,42 @@ export type Database = {
         }
         Relationships: []
       }
+      level_progress: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          domain_id: string
+          id: string
+          level_index: number
+          score: number | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          domain_id: string
+          id?: string
+          level_index: number
+          score?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          domain_id?: string
+          id?: string
+          level_index?: number
+          score?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       media_generations: {
         Row: {
           asset_path: string | null
