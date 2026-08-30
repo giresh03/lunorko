@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Play, RotateCcw, Save, Sparkles, Loader2, Trophy, Clock, ListChecks, Wand2, CheckCircle2,
+  ArrowLeft, Play, Pause, Square, RotateCcw, Save, Sparkles, Loader2, Trophy, Clock, ListChecks, Wand2, CheckCircle2,
 } from "lucide-react";
 import { editorModeFor, lessonDuration, starterCodeFor, type LevelDef } from "@/lib/learningRoadmap";
 import LevelTutor from "./LevelTutor";
@@ -51,6 +51,9 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
   const mode = editorModeFor(domainId);
   const starter = useMemo(() => starterCodeFor(mode, level), [mode, level]);
   const storageKey = `lunor_level_code_${domainId}_${level.index}`;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const youtubeRef = useRef<HTMLIFrameElement>(null);
+  const isYouTubeVideo = Boolean(videoUrl?.includes("youtube.com") || videoUrl?.includes("youtu.be"));
 
   const [html, setHtml] = useState((starter as any).html ?? "");
   const [css, setCss] = useState((starter as any).css ?? "");
@@ -99,6 +102,32 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
       setOutput([`❌ ${(e as Error).message}`]);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const sendYouTubeCommand = (func: "playVideo" | "pauseVideo" | "seekTo") => {
+    youtubeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: func === "seekTo" ? [0, true] : [] }), "*");
+  };
+
+  const startVideo = () => {
+    if (isYouTubeVideo) sendYouTubeCommand("playVideo");
+    else void videoRef.current?.play();
+  };
+
+  const stopVideo = () => {
+    if (isYouTubeVideo) sendYouTubeCommand("pauseVideo");
+    else videoRef.current?.pause();
+  };
+
+  const restartVideo = () => {
+    if (isYouTubeVideo) {
+      sendYouTubeCommand("seekTo");
+      sendYouTubeCommand("playVideo");
+      return;
+    }
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      void videoRef.current.play();
     }
   };
 
@@ -232,17 +261,22 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-black">
+      <div className="overflow-hidden rounded-xl border border-border bg-black shadow-lg">
         {videoUrl ? (
-          videoUrl.includes("youtube") || videoUrl.includes("youtu.be") ? (
-            <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="flex aspect-video items-center justify-center text-sm text-primary">
-              ▶ Watch the lesson video
-            </a>
+          isYouTubeVideo ? (
+            <iframe
+              ref={youtubeRef}
+              title={`${level.title} lesson video`}
+              src={`${videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/")}?enablejsapi=1`}
+              className="aspect-video min-h-[280px] w-full md:min-h-[360px]"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
           ) : (
-            <video src={videoUrl} controls preload="none" className="aspect-video w-full" />
+            <video ref={videoRef} src={videoUrl} controls preload="metadata" className="aspect-video min-h-[280px] w-full object-contain md:min-h-[360px]" />
           )
         ) : (
-          <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/15 to-background text-center">
+          <div className="flex aspect-video min-h-[280px] flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/15 to-background text-center md:min-h-[360px]">
             <Sparkles className="h-8 w-8 text-primary" />
             <p className="px-6 text-xs text-muted-foreground">
               AI lesson for <span className="text-foreground">{level.title}</span> — read the outline below and code along.
@@ -250,6 +284,20 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
           </div>
         )}
       </div>
+
+      {videoUrl && (
+        <div className="flex flex-wrap gap-2" aria-label="Video controls">
+          <Button type="button" size="sm" onClick={startVideo} className="flex-1">
+            <Play className="mr-1.5 h-3.5 w-3.5" /> Start
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={stopVideo} className="flex-1">
+            <Square className="mr-1.5 h-3.5 w-3.5" /> Stop
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={restartVideo} className="flex-1">
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Restart
+          </Button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border/60 bg-background/40 p-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-primary">Objective</p>

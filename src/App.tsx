@@ -9,6 +9,7 @@ import { useVisitorTracking } from "@/hooks/useVisitorTracking";
 import Index from "./pages/Index";
 import Domains from "./pages/Domains";
 import DomainDetail from "./pages/DomainDetail";
+import LevelPage from "./pages/LevelPage";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Community from "./pages/Community";
@@ -74,6 +75,7 @@ const AppContent = () => {
 
         <Route path="/domains" element={<Domains />} />
         <Route path="/domain/:domainId" element={<DomainDetail />} />
+        <Route path="/domain/:domainId/level/:levelIndex" element={<LevelPage />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/community" element={<Community />} />
