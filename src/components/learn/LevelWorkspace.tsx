@@ -296,40 +296,88 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-black shadow-lg">
-        {videoUrl ? (
-          isYouTubeVideo ? (
-            <iframe
-              ref={youtubeRef}
-              title={`${level.title} lesson video`}
-              src={`${videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/")}?enablejsapi=1`}
-              className="aspect-video min-h-[280px] w-full md:min-h-[360px]"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <video ref={videoRef} src={videoUrl} controls preload="metadata" className="aspect-video min-h-[280px] w-full object-contain md:min-h-[360px]" />
-          )
-        ) : (
-          <div className="flex aspect-video min-h-[280px] flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/15 to-background text-center md:min-h-[360px]">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <p className="px-6 text-xs text-muted-foreground">
-              AI lesson for <span className="text-foreground">{level.title}</span> — read the outline below and code along.
-            </p>
+      <div
+        ref={stageRef}
+        className={[
+          "group relative overflow-hidden rounded-2xl border border-border bg-black shadow-2xl shadow-primary/10 ring-1 ring-primary/20",
+          theater ? "fixed inset-0 z-50 m-0 rounded-none border-0 ring-0" : "",
+        ].join(" ")}
+      >
+        <div className={theater ? "flex h-screen w-screen items-center justify-center bg-black" : ""}>
+          <div className={theater ? "aspect-video w-full max-w-[100vw]" : "w-full"}>
+            {videoUrl ? (
+              isYouTubeVideo ? (
+                <iframe
+                  ref={youtubeRef}
+                  title={`${level.title} lesson video`}
+                  src={`${videoUrl.replace("watch?v=", "embed/").replace("youtu.be/", "www.youtube.com/embed/")}?enablejsapi=1`}
+                  className="aspect-video h-full max-h-[80vh] w-full min-h-[320px] md:min-h-[440px]"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  preload="metadata"
+                  className="aspect-video h-full max-h-[80vh] w-full min-h-[320px] object-contain md:min-h-[440px]"
+                />
+              )
+            ) : (
+              <div className="flex aspect-video min-h-[320px] flex-col items-center justify-center gap-2 bg-gradient-to-br from-primary/15 to-background text-center md:min-h-[440px]">
+                <Sparkles className="h-10 w-10 text-primary" />
+                <p className="px-6 text-sm text-muted-foreground">
+                  AI lesson for <span className="text-foreground">{level.title}</span> — read the outline below and code along.
+                </p>
+              </div>
+            )}
           </div>
+        </div>
+
+        {videoUrl && (
+          <>
+            {/* Maximize toggle pinned to the player */}
+            <button
+              type="button"
+              onClick={toggleMaximize}
+              aria-label={theater ? "Exit maximized view" : "Maximize video"}
+              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-black/55 text-white opacity-0 backdrop-blur transition group-hover:opacity-100 hover:bg-black/75"
+            >
+              {theater ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
+
+            {theater && (
+              <button
+                type="button"
+                onClick={toggleTheater}
+                aria-label="Close theater"
+                className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-black/70 text-white"
+              >
+                <Minimize2 className="h-4 w-4" />
+              </button>
+            )}
+          </>
         )}
       </div>
 
       {videoUrl && (
-        <div className="flex flex-wrap gap-2" aria-label="Video controls">
-          <Button type="button" size="sm" onClick={startVideo} className="flex-1">
-            <Play className="mr-1.5 h-3.5 w-3.5" /> Start
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-background/50 p-2" aria-label="Video controls">
+          <Button
+            type="button"
+            size="sm"
+            onClick={startVideo}
+            className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white shadow-[0_0_18px_-4px_rgba(239,68,68,0.7)] hover:from-red-500 hover:to-red-400"
+          >
+            <Play className="mr-1.5 h-3.5 w-3.5 fill-current" /> Start
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={stopVideo} className="flex-1">
             <Square className="mr-1.5 h-3.5 w-3.5" /> Stop
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={restartVideo} className="flex-1">
             <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Restart
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={toggleMaximize} className="gap-1.5">
+            <Maximize2 className="h-3.5 w-3.5" /> Maximize
           </Button>
         </div>
       )}
