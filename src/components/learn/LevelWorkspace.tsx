@@ -144,9 +144,35 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
     youtubeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: func === "seekTo" ? [0, true] : [] }), "*");
   };
 
+  const playDirect = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    // Ensure metadata is loaded before attempting playback.
+    if (v.readyState < 1) {
+      await new Promise<void>((resolve) => {
+        const onReady = () => { v.removeEventListener("loadedmetadata", onReady); resolve(); };
+        v.addEventListener("loadedmetadata", onReady);
+        try { v.load(); } catch { resolve(); }
+      });
+    }
+    try {
+      v.muted = false;
+      await v.play();
+    } catch {
+      // Autoplay policy rejection — retry muted so playback still starts;
+      // the user can unmute via the native controls.
+      try {
+        v.muted = true;
+        await v.play();
+      } catch {
+        toast({ title: "Playback blocked", description: "Tap the play button on the video to start.", variant: "destructive" });
+      }
+    }
+  };
+
   const startVideo = () => {
     if (isYouTubeVideo) sendYouTubeCommand("playVideo");
-    else void videoRef.current?.play();
+    else void playDirect();
   };
 
   const stopVideo = () => {
@@ -162,7 +188,7 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
     }
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
-      void videoRef.current.play();
+      void playDirect();
     }
   };
 
@@ -319,6 +345,8 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
                 <video
                   ref={videoRef}
                   src={videoUrl}
+                  controls
+                  playsInline
                   preload="metadata"
                   className="aspect-video h-full max-h-[80vh] w-full min-h-[320px] object-contain md:min-h-[440px]"
                 />
