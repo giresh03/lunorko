@@ -441,6 +441,54 @@ const DomainDetail = () => {
           );
         })()}
 
+        {/* Learn / Build toggle */}
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <LearnBuildToggle
+            mode={learnMode}
+            onChange={(m) => {
+              setLearnMode(m);
+              setActiveTab(m === "build" ? "editor" : "guidance");
+              setActiveLevelIndex(null);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            {learnMode === "learn"
+              ? "Gamified roadmap · AI lessons · live coding · AI tutor"
+              : "Full AI coding workspace for this domain"}
+          </p>
+        </div>
+
+        {learnMode === "learn" && (
+          <div className="mb-10 space-y-6 animate-in fade-in duration-500">
+            <ProgressHud
+              domainName={domain.name}
+              currentLevelTitle={roadmap[Math.min(roadmap.length - 1, learning.currentLevel - 1)]?.title ?? ""}
+              currentLevel={learning.currentLevel}
+              completed={learning.completedLevels.length}
+              xp={learning.xp}
+              streak={learning.streak}
+              progressPct={learning.progressPct}
+            />
+            {activeLevel ? (
+              <LevelWorkspace
+                domainId={domainId ?? ""}
+                domainName={domain.name}
+                level={activeLevel}
+                videoUrl={videos[0]?.url}
+                onBack={() => setActiveLevelIndex(null)}
+                onComplete={(score) => learning.completeLevel(activeLevel.index, score, activeLevel.xp)}
+              />
+            ) : (
+              <RoadmapMap
+                levels={roadmap}
+                statusFor={learning.statusFor}
+                scoreFor={learning.scoreFor}
+                onOpen={(lvl) => setActiveLevelIndex(lvl.index)}
+              />
+            )}
+          </div>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-8 w-full justify-start border-b border-border bg-transparent p-0 rounded-none">
             <TabsTrigger
