@@ -40,13 +40,23 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   useVisitorTracking();
-  const [booting, setBooting] = useState(() => !sessionStorage.getItem("lunor_booted"));
+  const [booting, setBooting] = useState(() => {
+    try {
+      return !sessionStorage.getItem("lunor_booted");
+    } catch {
+      return false; // storage blocked (sandboxed iframe) -> skip the boot loader
+    }
+  });
 
   if (booting) {
     return (
       <LunorLoader
         onDone={() => {
-          sessionStorage.setItem("lunor_booted", "1");
+          try {
+            sessionStorage.setItem("lunor_booted", "1");
+          } catch {
+            /* ignore storage failure in sandboxed iframe */
+          }
           setBooting(false);
         }}
       />
