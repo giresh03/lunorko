@@ -79,40 +79,17 @@ export const PREVIEW_SELF_TEST_SCRIPT = `<script id="__lunor_selftest">(function
     return { pw: pw, user: user, submit: submit, form: form, scope: scope };
   }
 
-  function setValue(el, value){
-    if (!el) return;
-    try {
-      var proto = Object.getPrototypeOf(el);
-      var desc = Object.getOwnPropertyDescriptor(proto, 'value');
-      if (desc && desc.set) desc.set.call(el, value); else el.value = value;
-    } catch(e) { el.value = value; }
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  }
-
   function checkLogin(){
+    // Non-invasive: never type credentials or click anything in the user's preview.
     var l = findLoginForm();
-    if (!l) return Promise.resolve({ id: 'login', label: 'Login works', passed: true, detail: 'No login form in this page' });
-    var errorsBefore = errors.length;
-    setValue(l.user, 'demo@lunor.ai');
-    setValue(l.pw, 'Demo@12345');
-    try {
-      if (l.submit) l.submit.click();
-      else if (l.form) l.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    } catch(e) { trackError('Login submit threw: ' + (e && e.message)); }
-    return wait(1400).then(function(){
-      var newErrors = errors.slice(errorsBefore);
-      var stillHasPassword = !!document.querySelector('input[type="password"]');
-      var body = visibleText().toLowerCase();
-      var visibleFailure = /(invalid|incorrect|failed|error|something went wrong|try again)/.test(body) && stillHasPassword;
-      var success = !stillHasPassword || /(dashboard|log ?out|sign ?out|welcome|logged in|profile)/.test(body);
-      var passed = newErrors.length === 0 && !visibleFailure && success;
-      var detail = passed ? 'Login submitted and a logged-in view rendered'
-        : (newErrors.length ? 'Login threw: ' + newErrors.join(' | ')
-          : (visibleFailure ? 'Login showed a failure message and stayed on the form'
-            : 'Login submitted but nothing changed — no logged-in view rendered'));
-      return { id: 'login', label: 'Login works', passed: passed, detail: detail };
-    });
+    if (!l) return Promise.resolve({ id: 'login', label: 'Login form is wired', passed: true, detail: 'No login form in this page' });
+    var missing = [];
+    if (!l.user) missing.push('email/username field');
+    if (!l.submit) missing.push('submit control');
+    if (!l.form) missing.push('form element');
+    var passed = missing.length === 0;
+    return Promise.resolve({ id: 'login', label: 'Login form is wired', passed: passed,
+      detail: passed ? 'Login form has all required fields and a submit control' : 'Login form is missing: ' + missing.join(', ') });
   }
 
   function run(){
