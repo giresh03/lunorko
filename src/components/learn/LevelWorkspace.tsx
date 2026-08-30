@@ -147,19 +147,28 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
   const playDirect = async () => {
     const v = videoRef.current;
     if (!v) return;
-    // Ensure metadata is loaded before attempting playback.
+    // Ensure metadata loads before playback, but bail after 2.5s so a
+    // stalled/unreachable source never blocks the Start button.
     if (v.readyState < 1) {
       await new Promise<void>((resolve) => {
-        const onReady = () => { v.removeEventListener("loadedmetadata", onReady); resolve(); };
-        v.addEventListener("loadedmetadata", onReady);
-        try { v.load(); } catch { resolve(); }
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          v.removeEventListener("loadedmetadata", finish);
+          clearTimeout(timer);
+          resolve();
+        };
+        const timer = setTimeout(finish, 2500);
+        v.addEventListener("loadedmetadata", finish);
+        try { v.load(); } catch { finish(); }
       });
     }
     try {
       v.muted = false;
       await v.play();
     } catch {
-      // Autoplay policy rejection — retry muted so playback still starts;
+      // Autoplay-policy rejection — retry muted so playback still starts;
       // the user can unmute via the native controls.
       try {
         v.muted = true;
