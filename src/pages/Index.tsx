@@ -92,6 +92,12 @@ const Index = () => {
         <FeaturesSection />
       </ParallaxLayer>
 
+      {/* Explainer Video */}
+      <ParallaxLayer speed={0.04}>
+        <VideoSection />
+      </ParallaxLayer>
+
+
       {/* Stats */}
       <ParallaxLayer speed={0.02}>
         <StatsSection />
