@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ArrowLeft, Play, RotateCcw, Save, Sparkles, Loader2, Trophy, Clock, ListChecks, Wand2, CheckCircle2,
+  ArrowLeft, Play, Pause, Square, RotateCcw, Save, Sparkles, Loader2, Trophy, Clock, ListChecks, Wand2, CheckCircle2,
 } from "lucide-react";
 import { editorModeFor, lessonDuration, starterCodeFor, type LevelDef } from "@/lib/learningRoadmap";
 import LevelTutor from "./LevelTutor";
