@@ -28,7 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import LearnBuildToggle, { type LearnMode } from "@/components/learn/LearnBuildToggle";
 import RoadmapMap from "@/components/learn/RoadmapMap";
 import ProgressHud from "@/components/learn/ProgressHud";
-import LevelWorkspace from "@/components/learn/LevelWorkspace";
+
 import { getRoadmap } from "@/lib/learningRoadmap";
 import { useLearningProgress } from "@/hooks/useLearningProgress";
 
@@ -209,10 +209,8 @@ const DomainDetail = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
   const [learnMode, setLearnMode] = useState<LearnMode>("learn");
-  const [activeLevelIndex, setActiveLevelIndex] = useState<number | null>(null);
   const roadmap = useMemo(() => getRoadmap(domainId ?? ""), [domainId]);
   const learning = useLearningProgress(domainId ?? "");
-  const activeLevel = activeLevelIndex ? roadmap.find((l) => l.index === activeLevelIndex) ?? null : null;
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
   const [adminResources, setAdminResources] = useState<Resource[]>([]);
 
@@ -460,7 +458,6 @@ const DomainDetail = () => {
             onChange={(m) => {
               setLearnMode(m);
               setActiveTab(m === "build" ? "editor" : "guidance");
-              setActiveLevelIndex(null);
             }}
           />
           <p className="text-xs text-muted-foreground">
