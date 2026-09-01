@@ -179,6 +179,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_exemplars: {
+        Row: {
+          created_at: string
+          difficulty: string | null
+          domain: string | null
+          id: string
+          instruction: string
+          kind: string | null
+          layer: string
+          response: string
+          search_text: string
+          stack: string[]
+          tags: string[]
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: string | null
+          domain?: string | null
+          id: string
+          instruction: string
+          kind?: string | null
+          layer: string
+          response: string
+          search_text?: string
+          stack?: string[]
+          tags?: string[]
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string | null
+          domain?: string | null
+          id?: string
+          instruction?: string
+          kind?: string | null
+          layer?: string
+          response?: string
+          search_text?: string
+          stack?: string[]
+          tags?: string[]
+        }
+        Relationships: []
+      }
       assistant_messages: {
         Row: {
           content: string
@@ -1617,6 +1659,19 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      match_exemplars: {
+        Args: { _limit?: number; _query: string }
+        Returns: {
+          domain: string
+          id: string
+          instruction: string
+          kind: string
+          layer: string
+          response: string
+          score: number
+          stack: string[]
+        }[]
       }
       plan_credit_allowance: { Args: { _plan_id: string }; Returns: number }
       sync_ai_credits: {
