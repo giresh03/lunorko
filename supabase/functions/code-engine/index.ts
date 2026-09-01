@@ -1009,7 +1009,41 @@ comments, chat, admin, CRUD, or "backend"):
 - No artificial file limit in this mode: emit every file the architecture needs, fully wired.`
 
         : "";
-      const systemPrompt = `${basePrompt}
+
+      // ===== Retrieval-augmented grounding: inject curated exemplars =====
+      let exemplarBlock = "";
+      try {
+        const lastUser = [...(messages || [])].reverse().find((m) => m.role === "user")?.content || "";
+        const queryText = lastUser.split("[CURRENT PROJECT STATE")[0].slice(0, 900);
+        const { data: exemplars, error: exErr } = await admin.rpc("match_exemplars", {
+          _query: queryText,
+          _limit: 6,
+        });
+        if (exErr) console.log("[code-engine] match_exemplars error", exErr.message);
+        if (Array.isArray(exemplars) && exemplars.length > 0) {
+          const parts = exemplars.map((e: any) => {
+            const resp = String(e.response || "").slice(0, 4000);
+            return `--- EXEMPLAR (${e.layer}${e.kind ? "/" + e.kind : ""}${e.domain ? " · " + e.domain : ""}${Array.isArray(e.stack) && e.stack.length ? " · " + e.stack.join(", ") : ""})
+TASK: ${e.instruction}
+REFERENCE IMPLEMENTATION:
+${resp}`;
+          });
+          exemplarBlock = `
+
+REFERENCE PATTERN LIBRARY (curated, high-quality Lunor exemplars — study these before writing):
+${parts.join("\n\n")}
+--- END EXEMPLARS
+
+How to use the library: match their structure, naming, accessibility, state handling, SQL/RLS rigor
+and API contract discipline. Adapt to the user's request and stack — NEVER copy them verbatim, never
+mention them, and never emit their file names unless they fit the project.`;
+        }
+      } catch (e) {
+        console.log("[code-engine] exemplar retrieval skipped:", (e as Error).message);
+      }
+
+      const systemPrompt = `${basePrompt}${exemplarBlock}
+
 
 OPERATING MODE (decide this FIRST, before writing anything):
 - If the user message contains a "[CURRENT PROJECT STATE ...]" section -> **EDIT MODE**.

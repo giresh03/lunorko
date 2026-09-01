@@ -10,6 +10,8 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminPanelCard, VisitorsAreaChart, RevenueBarChart, PlanDonutChart } from "@/components/admin/AdminCharts";
+import { AITrainingDataCard } from "@/components/admin/AITrainingDataCard";
+
 import { SystemControl } from "@/components/admin/SystemControl";
 
 import { Button } from "@/components/ui/button";
@@ -626,6 +628,11 @@ const AdminPanel = () => {
             </div>
 
             <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 mb-4 sm:mb-6">
+              <AITrainingDataCard />
+            </div>
+
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 mb-4 sm:mb-6">
+
               <AdminPanelCard
                 className="lg:col-span-2"
                 title="Revenue by Day"
