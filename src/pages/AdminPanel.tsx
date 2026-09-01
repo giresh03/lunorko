@@ -626,6 +626,11 @@ const AdminPanel = () => {
             </div>
 
             <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 mb-4 sm:mb-6">
+              <AITrainingDataCard />
+            </div>
+
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-3 mb-4 sm:mb-6">
+
               <AdminPanelCard
                 className="lg:col-span-2"
                 title="Revenue by Day"
