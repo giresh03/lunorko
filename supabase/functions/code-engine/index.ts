@@ -1108,7 +1108,7 @@ mention them, and never emit their file names unless they fit the project.`;
         console.log("[code-engine] exemplar retrieval skipped:", (e as Error).message);
       }
 
-      const systemPrompt = `${basePrompt}${exemplarBlock}
+      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${exemplarBlock}
 
 
 OPERATING MODE (decide this FIRST, before writing anything):
