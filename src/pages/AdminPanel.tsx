@@ -10,6 +10,8 @@ import {
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminPanelCard, VisitorsAreaChart, RevenueBarChart, PlanDonutChart } from "@/components/admin/AdminCharts";
+import { AITrainingDataCard } from "@/components/admin/AITrainingDataCard";
+
 import { SystemControl } from "@/components/admin/SystemControl";
 
 import { Button } from "@/components/ui/button";
