@@ -56,11 +56,50 @@ export function hasJSX(files: { path: string; content: string }[]): boolean {
 
 export type SandpackFiles = Record<string, string | { code: string; readOnly?: boolean; active?: boolean; hidden?: boolean }>;
 
+/** Server / docs / infra files that never run inside the browser preview. */
+const NON_CLIENT_RE = /^(server|backend|api|database|docs|prisma|scripts)\/|^(README|SCHEMA|API)\.md$|^\.env|^docker|^package(-lock)?\.json$/i;
+
+/**
+ * Normalize a MERN-style tree: unwrap `client/` (and `client/src/`) so the
+ * React app sits at the root, and drop server-side files.
+ */
+function normalizeFullStackFiles(files: { path: string; content: string }[]) {
+  const hasClientDir = files.some((f) => /^client\//i.test(f.path));
+  return files
+    .filter((f) => !NON_CLIENT_RE.test(f.path))
+    .map((f) => (hasClientDir ? { ...f, path: f.path.replace(/^client\//i, "") } : f))
+    .filter((f) => !hasClientDir || !/^(server|backend)\//i.test(f.path))
+    .filter((f) => !/^(package(-lock)?\.json|vite\.config\.[jt]s|\.env.*|index\.html)$/i.test(f.path));
+}
+
+/** Pull extra client dependencies declared in client/package.json (or root). */
+function collectClientDependencies(files: { path: string; content: string }[]): Record<string, string> {
+  const pkg = files.find((f) => /^(client\/)?package\.json$/i.test(f.path));
+  if (!pkg) return {};
+  try {
+    const parsed = JSON.parse(pkg.content);
+    const deps = { ...(parsed.dependencies || {}) } as Record<string, string>;
+    // Never pull server-only or build-only packages into the browser bundle.
+    for (const k of Object.keys(deps)) {
+      if (/^(express|mongoose|bcrypt|bcryptjs|jsonwebtoken|cors|dotenv|nodemon|vite|@vitejs\/|typescript|eslint|tailwindcss|postcss|autoprefixer)/.test(k)) delete deps[k];
+    }
+    return deps;
+  } catch {
+    return {};
+  }
+}
+
 export function buildSandpackFiles(
   fileTree: FileNode[],
-  projectName: string
+  projectName: string,
+  apiUrl?: string | null
 ): SandpackFiles {
-  const files = collectFiles(fileTree);
+  const rawFiles = collectFiles(fileTree);
+  const extraDeps = collectClientDependencies(rawFiles);
+  const files = normalizeFullStackFiles(rawFiles).map((f) => ({
+    ...f,
+    content: apiUrl ? replaceEnvApiRefs(f.content, apiUrl) : f.content,
+  }));
   const result: SandpackFiles = {};
 
   const appFile = files.find(
