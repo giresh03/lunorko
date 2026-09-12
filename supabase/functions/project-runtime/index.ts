@@ -328,10 +328,11 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
     const limit = Math.min(Number(url.searchParams.get('limit')) || 100, 500);
     const offset = Math.max(Number(url.searchParams.get('offset') || url.searchParams.get('skip')) || 0, 0);
     let q = db.from('runtime_documents').select('*').eq('project_id', projectId).eq('collection', collection);
-    if (url.searchParams.get('mine') === 'true' && me) q = q.eq('owner_user_id', me.id);
+    // Owner-scoped by default for signed-in users; ?all=true opts into shared/public data.
+    if (me && url.searchParams.get('all') !== 'true') q = q.eq('owner_user_id', me.id);
     // Simple equality filters: ?status=done&category=x
     for (const [k, v] of url.searchParams.entries()) {
-      if (['limit', 'offset', 'skip', 'mine', 'sort', 'q', 'search'].includes(k)) continue;
+      if (['limit', 'offset', 'skip', 'mine', 'all', 'sort', 'q', 'search'].includes(k)) continue;
       if (/^[a-zA-Z_][a-zA-Z0-9_]{0,40}$/.test(k)) q = q.contains('data', { [k]: v });
     }
     q = q.order('created_at', { ascending: url.searchParams.get('sort') === 'asc' }).range(offset, offset + limit - 1);
