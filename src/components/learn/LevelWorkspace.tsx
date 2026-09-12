@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { editorModeFor, lessonDuration, starterCodeFor, type LevelDef } from "@/lib/learningRoadmap";
 import LevelTutor from "./LevelTutor";
+import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
+import { useLiveRuntime } from "@/hooks/useLiveRuntime";
+import { filesNeedBackend, injectApiShim } from "@/lib/liveRuntime";
 
 interface Challenge {
   title: string;
