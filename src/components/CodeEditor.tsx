@@ -3130,7 +3130,7 @@ ${jsCode}
                     </span>
                   </div>
                 )}
-                <div className={`flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
+                <div className={`relative flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
                   {showSandpackPreview ? (
                     <SandpackPreviewPanel
                       fileTree={fileTree}
@@ -3277,6 +3277,23 @@ ${jsCode}
                       sandbox="allow-scripts allow-modals allow-forms allow-popups"
                       title="Web Preview"
                     />
+                  )}
+                  {backendNeeded && liveRuntime.status !== "live" && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-lg border border-red-500/40 bg-[#1a0d0d]/95 px-3 py-2 shadow-lg backdrop-blur" style={{ maxWidth: "90%" }}>
+                      <span className="text-[11px] text-red-200">
+                        {liveRuntime.status === "locked"
+                          ? "Live backend needs a paid plan."
+                          : liveRuntime.status === "error"
+                          ? liveRuntime.error || "Backend failed to start."
+                          : "Live backend isn't running yet."}
+                      </span>
+                      {liveRuntime.status !== "locked" && (
+                        <button onClick={() => void liveRuntime.provision()} className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-red-500 transition-colors">
+                          {liveRuntime.status === "starting" ? "Starting…" : "Start backend"}
+                        </button>
+                      )}
+                      <button onClick={() => setBackendNeeded(false)} className="text-[10px] text-red-300/70 hover:text-red-200">Dismiss</button>
+                    </div>
                   )}
                 </div>
               </div>
