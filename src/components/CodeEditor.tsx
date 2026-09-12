@@ -667,9 +667,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   });
   const liveApiUrlRef = useRef<string | null>(null);
   liveApiUrlRef.current = liveRuntime.apiUrl;
+  const liveRuntimeRef = useRef(liveRuntime);
+  liveRuntimeRef.current = liveRuntime;
 
   // Preview runtime errors reported by the sandboxed iframe
   const [previewErrors, setPreviewErrors] = useState<{ message: string; stack?: string }[]>([]);
+  const [backendNeeded, setBackendNeeded] = useState(false);
   const [resolvingError, setResolvingError] = useState(false);
   const previewErrorLogRef = useRef<string[]>([]);
   const verifyPendingRef = useRef(false);
@@ -687,6 +690,11 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     if (!liveRuntime.apiUrl) return;
     setPreviewContent((html) => (html && !html.includes("data-lunor-runtime") ? injectApiShim(html, liveRuntime.apiUrl) : html));
   }, [liveRuntime.apiUrl]);
+
+  // Clear the "start backend" nudge once the backend is live.
+  useEffect(() => {
+    if (liveRuntime.status === "live") setBackendNeeded(false);
+  }, [liveRuntime.status]);
 
   // Automated verification: does the app actually load and does login work?
   const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
@@ -743,6 +751,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       } | null;
       if (d && d.__lunorSelfTest === true && Array.isArray(d.results)) {
         selfTestResolveRef.current?.(d.results);
+        return;
+      }
+      if (d && d.__lunorPreview && d.type === "backend_needed") {
+        setBackendNeeded(true);
+        const rt = liveRuntimeRef.current;
+        if (rt && (rt.status === "off" || rt.status === "error") && rt.allowed) void rt.provision();
         return;
       }
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
