@@ -148,13 +148,9 @@ async function handleManage(req: Request): Promise<Response> {
       .single();
     if (error) {
       // Race on unique key: re-read.
-      const { data: again } = await db
-        .from('runtime_projects')
-        .select('*')
-        .eq('scope', scope)
-        .eq('scope_key', scopeKey)
-        .eq(scope === 'team' ? 'scope' : 'owner_id', scope === 'team' ? 'team' : userId)
-        .maybeSingle();
+      let reread = db.from('runtime_projects').select('*').eq('scope', scope).eq('scope_key', scopeKey);
+      if (scope !== 'team') reread = reread.eq('owner_id', userId);
+      const { data: again } = await reread.maybeSingle();
       if (!again) return json({ error: error.message }, 500);
       projectRow = again;
     } else {
