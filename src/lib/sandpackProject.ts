@@ -2,6 +2,7 @@
  * Build Sandpack files from fileTree for browser-based React runtime
  * Sandpack format: { "/path/to/file": "content" | { code, readOnly?, active?, hidden? } }
  */
+import { replaceEnvApiRefs, buildSandpackRuntimeModule } from "@/lib/liveRuntime";
 
 export interface FileNode {
   id: string;
