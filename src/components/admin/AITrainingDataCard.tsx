@@ -9,11 +9,16 @@ type Row = { layer: string; domain: string | null };
 export function AITrainingDataCard() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uiCount, setUiCount] = useState(0);
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("ai_exemplars").select("layer, domain").limit(5000);
+    const [{ data }, { count }] = await Promise.all([
+      supabase.from("ai_exemplars").select("layer, domain").limit(5000),
+      supabase.from("ui_components").select("id", { count: "exact", head: true }),
+    ]);
     setRows((data as Row[]) || []);
+    setUiCount(count ?? 0);
     setLoading(false);
   };
 
@@ -50,6 +55,9 @@ export function AITrainingDataCard() {
       <div className="mb-4">
         <p className="text-3xl font-bold">{rows.length.toLocaleString()}</p>
         <p className="text-xs text-muted-foreground">total curated examples</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">{uiCount.toLocaleString()}</span> premium UI components loaded
+        </p>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">

@@ -15,6 +15,34 @@
       "when": 1789225502108,
       "tag": "0001_workspace_history_and_team_file_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789235427981,
+      "tag": "0002_create_ui_components_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789235482961,
+      "tag": "0003_grant_ui_components_sandbox_import",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789235520483,
+      "tag": "0004_improve_match_ui_components",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789235539805,
+      "tag": "0005_diversify_match_ui_components",
+      "breakpoints": true
     }
   ]
 }

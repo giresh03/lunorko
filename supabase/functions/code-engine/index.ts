@@ -1175,7 +1175,47 @@ mention them, and never emit their file names unless they fit the project.`;
         console.log("[code-engine] exemplar retrieval skipped:", (e as Error).message);
       }
 
-      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${exemplarBlock}
+      // ===== Premium UI component library (animated Aceternity-style components) =====
+      let uiBlock = "";
+      try {
+        const lastUser = [...(messages || [])].reverse().find((m) => m.role === "user")?.content || "";
+        const uiQuery = lastUser.split("[CURRENT PROJECT STATE")[0].slice(0, 900);
+        const { data: uiComps, error: uiErr } = await admin.rpc("match_ui_components", {
+          _query: uiQuery,
+          _limit: 3,
+        });
+        if (uiErr) console.log("[code-engine] match_ui_components error", uiErr.message);
+        if (Array.isArray(uiComps) && uiComps.length > 0) {
+          const deps = new Set<string>();
+          const parts = uiComps.map((c: any) => {
+            (c.dependencies || []).forEach((d: string) => deps.add(d));
+            return `--- UI COMPONENT: ${c.name} (${c.category})
+${String(c.code || "").slice(0, 9000)}`;
+          });
+          uiBlock = `
+
+PREMIUM UI COMPONENT LIBRARY (production-grade animated components — use these for the visual layer):
+${parts.join("\n\n")}
+--- END UI COMPONENTS
+
+How to use this library (frontend quality is judged on it):
+- These are the house style for hero sections, feature/pricing cards, headline animations and
+  background effects. Reuse these exact implementations (adapted to the project's content, copy and
+  colors) instead of inventing plain flat sections.
+- Keep them accessible and responsive: real semantic HTML, alt text, keyboard focus states,
+  mobile-first spacing, and reduced-motion safety (no animation loops that block interaction).
+- React/Vite projects: emit each component as its own file under src/components/ui/, import with the
+  project's alias, and list every required package in package.json${deps.size ? ` (these need: ${[...deps].join(", ")})` : ""}.
+- Vanilla HTML/CSS/JS projects: do NOT emit React files — instead re-create the same visual effect
+  with plain CSS animations/canvas and inline JS, matching the look and motion of these components.
+- Never mention this library, never leave demo placeholder copy, and never ship a component whose
+  dependency you did not declare.`;
+        }
+      } catch (e) {
+        console.log("[code-engine] ui component retrieval skipped:", (e as Error).message);
+      }
+
+      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${exemplarBlock}${uiBlock}
 
 
 OPERATING MODE (decide this FIRST, before writing anything):
