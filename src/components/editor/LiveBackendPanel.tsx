@@ -36,22 +36,41 @@ export default function LiveBackendPanel({
   onReset,
   onRefresh,
   onStart,
+  onCredentials,
   compact = false,
   className = "",
 }: Props) {
   const [open, setOpen] = useState(!compact);
   const [copied, setCopied] = useState(false);
+  const [creds, setCreds] = useState<RuntimeCredentials | null>(info?.credentials ?? null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loadingCreds, setLoadingCreds] = useState(false);
   const meta = STATUS_META[status];
+  const tables = info?.stats?.tables ?? [];
+
+  const copy = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
 
   const copyUrl = async () => {
     if (!info?.apiUrl) return;
+    await copy(info.apiUrl, "API URL");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const loadCreds = async () => {
+    if (!onCredentials) return;
+    setLoadingCreds(true);
     try {
-      await navigator.clipboard.writeText(info.apiUrl);
-      setCopied(true);
-      toast.success("API URL copied");
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast.error("Could not copy");
+      setCreds(await onCredentials());
+    } finally {
+      setLoadingCreds(false);
     }
   };
 
