@@ -28,7 +28,7 @@ import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
 import { useLiveRuntime } from "@/hooks/useLiveRuntime";
-import { injectApiShim, filesNeedBackend } from "@/lib/liveRuntime";
+import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/liveRuntime";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
