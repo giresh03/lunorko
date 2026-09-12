@@ -55,6 +55,9 @@ export function AITrainingDataCard() {
       <div className="mb-4">
         <p className="text-3xl font-bold">{rows.length.toLocaleString()}</p>
         <p className="text-xs text-muted-foreground">total curated examples</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">{uiCount.toLocaleString()}</span> premium UI components loaded
+        </p>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
