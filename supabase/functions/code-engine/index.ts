@@ -1285,7 +1285,7 @@ How to use this library (frontend quality is judged on it):
         console.log("[code-engine] ui component retrieval skipped:", (e as Error).message);
       }
 
-      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${exemplarBlock}${uiBlock}
+      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${domain === "web-development" ? SITEFORGE_CHARTER : ""}${exemplarBlock}${uiBlock}
 
 
 OPERATING MODE (decide this FIRST, before writing anything):
