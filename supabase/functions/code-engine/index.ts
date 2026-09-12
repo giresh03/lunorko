@@ -675,7 +675,8 @@ GOAL
 - Mobile-first, responsive, accessible (semantic HTML5, labels on inputs, contrast, focus states).
 - No lorem ipsum. Write real copy matching the user's brand/topic.
 - No "Coming soon", TODO, empty href="#", or fake buttons that do nothing.
-- Forms: client-side validation + success message (no backend required unless asked).
+- Forms: client-side validation, then a REAL save to the live backend (see LIVE FORMS below),
+  then an on-page popup/modal confirmation. Never a fake "message sent" with no save.
 - Images: inline SVG, CSS patterns, or Unsplash photo URLs only. No broken img src.
 - Optional: subtle CSS animations, sticky header, light theme by default.
 
@@ -699,11 +700,27 @@ QUALITY BAR
 - Hover/focus on interactive elements.
 - If the user asks for e-commerce, blog, or dashboard: simulate with extra pages and JS
   (cart in localStorage, filterable list, etc.) so it FEELS functional.
+
+LIVE FORMS (orders, contact, bookings, signups — always real, never fake)
+- Any form that takes an order, enquiry, booking or signup MUST POST to the live backend:
+    POST /api/orders     -> { customer_name, customer_email, phone, items, total_cents, notes, status:"new" }
+    POST /api/contacts   -> { name, email, phone, subject, message, status:"new" }
+  Use fetch with 'Content-Type: application/json'. No auth needed for these public submissions.
+- Declare the tables in a DataModel JSON block (same format as the full-stack charter) right after
+  the sitemap, so the real tables exist before the site runs. Money is always integer cents.
+- On success: show a styled popup/modal confirming the order or message, echoing the customer's
+  name + a reference (the returned id), with a Close button. On failure: show the API error text
+  in the same popup, keep the entered values, and let the user retry. Never clear the form on error.
+- Cart/menu selections may live in localStorage, but the SUBMITTED order must be saved server-side.
+- Add an owner-facing page (e.g. orders.html) that lists saved orders and messages from
+  GET /api/orders?all=true and GET /api/contacts?all=true, newest first, with status shown.
+
 - Output the same way as the full-stack charter: a TaskPlan JSON block first, then every
   file as its own path + code block. No prose between files.
 
-NOTE: If the request implies real data, auth, or a backend, do NOT use this mode — fall back to
-the FULL-STACK BUILDER CHARTER instead.
+NOTE: Static here means "no separate server to run" — the Lunor live backend still stores real
+submissions. If the request needs user accounts, login, dashboards per user, or payments,
+fall back to the FULL-STACK BUILDER CHARTER instead.
 `;
 
 // Domain-specific system prompts for AI code generation
