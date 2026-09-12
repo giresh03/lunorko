@@ -1622,6 +1622,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ui_components: {
+        Row: {
+          category: string
+          code: string
+          created_at: string
+          dependencies: string[]
+          id: string
+          keywords: string
+          name: string
+          search_text: string
+        }
+        Insert: {
+          category?: string
+          code: string
+          created_at?: string
+          dependencies?: string[]
+          id: string
+          keywords?: string
+          name: string
+          search_text?: string
+        }
+        Update: {
+          category?: string
+          code?: string
+          created_at?: string
+          dependencies?: string[]
+          id?: string
+          keywords?: string
+          name?: string
+          search_text?: string
+        }
+        Relationships: []
+      }
       user_achievements: {
         Row: {
           achievement_id: string
@@ -1861,6 +1894,18 @@ export type Database = {
           response: string
           score: number
           stack: string[]
+        }[]
+      }
+      match_ui_components: {
+        Args: { _limit?: number; _query: string }
+        Returns: {
+          category: string
+          code: string
+          dependencies: string[]
+          id: string
+          keywords: string
+          name: string
+          score: number
         }[]
       }
       plan_credit_allowance: { Args: { _plan_id: string }; Returns: number }
