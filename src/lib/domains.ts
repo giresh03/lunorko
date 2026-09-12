@@ -39,7 +39,7 @@ export interface Resource {
   description?: string;
 }
 
-export const domains: Domain[] = [
+const allDomains: Domain[] = [
   {
     id: "web-development",
     name: "Web Development",
@@ -310,3 +310,10 @@ export const domains: Domain[] = [
     ],
   },
 ];
+
+// Active domains: only these four are shown across the site
+export const ACTIVE_DOMAIN_IDS = ["web-development", "app-development", "dsa", "ui-ux"] as const;
+
+export const domains: Domain[] = allDomains.filter((d) =>
+  (ACTIVE_DOMAIN_IDS as readonly string[]).includes(d.id)
+);
