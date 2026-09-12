@@ -3061,6 +3061,7 @@ ${jsCode}
                       projectName={currentProjectName || "app"}
                       showEditor={false}
                       className="w-full h-full"
+                      apiUrl={liveRuntime.apiUrl}
                     />
                   ) : isAppDomain && currentDevice.type === "phone" ? (
                     /* Phone frame */
