@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Server, Lock, Loader2, Copy, Check, RotateCcw, RefreshCw, Database, Users, AlertTriangle } from "lucide-react";
+import { Server, Lock, Loader2, Copy, Check, RotateCcw, RefreshCw, Database, Users, AlertTriangle, Table2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import type { LiveRuntimeStatus } from "@/hooks/useLiveRuntime";
-import type { RuntimeInfo } from "@/lib/liveRuntime";
+import type { RuntimeCredentials, RuntimeInfo } from "@/lib/liveRuntime";
 
 interface Props {
   status: LiveRuntimeStatus;
@@ -13,6 +13,8 @@ interface Props {
   onReset?: () => void;
   onRefresh?: () => void;
   onStart?: () => void;
+  /** Loads read-only database credentials for outside tools. */
+  onCredentials?: () => Promise<RuntimeCredentials | null>;
   /** Compact = single status pill for toolbars; expands on click. */
   compact?: boolean;
   className?: string;
@@ -34,22 +36,41 @@ export default function LiveBackendPanel({
   onReset,
   onRefresh,
   onStart,
+  onCredentials,
   compact = false,
   className = "",
 }: Props) {
   const [open, setOpen] = useState(!compact);
   const [copied, setCopied] = useState(false);
+  const [creds, setCreds] = useState<RuntimeCredentials | null>(info?.credentials ?? null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loadingCreds, setLoadingCreds] = useState(false);
   const meta = STATUS_META[status];
+  const tables = info?.stats?.tables ?? [];
+
+  const copy = async (value: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
 
   const copyUrl = async () => {
     if (!info?.apiUrl) return;
+    await copy(info.apiUrl, "API URL");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const loadCreds = async () => {
+    if (!onCredentials) return;
+    setLoadingCreds(true);
     try {
-      await navigator.clipboard.writeText(info.apiUrl);
-      setCopied(true);
-      toast.success("API URL copied");
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast.error("Could not copy");
+      setCreds(await onCredentials());
+    } finally {
+      setLoadingCreds(false);
     }
   };
 
@@ -154,15 +175,81 @@ export default function LiveBackendPanel({
                 <div className="text-base font-semibold">{info.stats.documents}</div>
               </div>
             </div>
-            {info.stats.collections.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {info.stats.collections.map((c) => (
-                  <span key={c} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">{c}</span>
+            {tables.length > 0 && (
+              <div className="rounded-md border border-border/60 divide-y divide-border/50">
+                <div className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground">
+                  <Table2 className="h-3 w-3" /> Tables{info.schemaName ? ` · ${info.schemaName}` : ""}
+                </div>
+                {tables.map((t) => (
+                  <div key={t.name} className="flex items-center justify-between px-2 py-1">
+                    <code className="font-mono text-[10px] text-foreground/80">{t.name}</code>
+                    <span className="text-[10px] text-muted-foreground">{t.rows} rows</span>
+                  </div>
                 ))}
               </div>
             )}
+
+            <div className="rounded-md border border-border/60 p-2 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <KeyRound className="h-3 w-3" /> Connection details
+                </div>
+                {!creds && onCredentials && (
+                  <button
+                    onClick={loadCreds}
+                    disabled={loadingCreds}
+                    className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] hover:bg-muted disabled:opacity-50"
+                  >
+                    {loadingCreds ? <Loader2 className="h-3 w-3 animate-spin" /> : <KeyRound className="h-3 w-3" />} Show
+                  </button>
+                )}
+              </div>
+              {!creds ? (
+                <p className="text-[10px] text-muted-foreground">
+                  Read-only login to open this app's tables in psql, TablePlus or DBeaver.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {[
+                    ["Host", creds.host],
+                    ["Port", creds.port],
+                    ["Database", creds.database],
+                    ["Schema", creds.schema],
+                    ["User", creds.user],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex items-center gap-1">
+                      <span className="w-16 shrink-0 text-[10px] text-muted-foreground">{label}</span>
+                      <code className="flex-1 truncate font-mono text-[10px]">{value}</code>
+                      <button onClick={() => copy(String(value), String(label))} className="text-muted-foreground hover:text-foreground">
+                        <Copy className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-1">
+                    <span className="w-16 shrink-0 text-[10px] text-muted-foreground">Password</span>
+                    <code className="flex-1 truncate font-mono text-[10px]">
+                      {showPassword ? creds.password : "•".repeat(12)}
+                    </code>
+                    <button onClick={() => setShowPassword((s) => !s)} className="text-muted-foreground hover:text-foreground">
+                      {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </button>
+                    <button onClick={() => copy(creds.password, "Password")} className="text-muted-foreground hover:text-foreground">
+                      <Copy className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => copy(creds.connectionString, "Connection string")}
+                    className="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md border border-border px-2 py-1 text-[10px] hover:bg-muted"
+                  >
+                    <Copy className="h-3 w-3" /> Copy connection string
+                  </button>
+                  <p className="text-[10px] text-muted-foreground">Read-only — writes go through your app's API.</p>
+                </div>
+              )}
+            </div>
+
             <p className="text-[10px] text-muted-foreground">
-              Routes: <code>/auth/register</code>, <code>/auth/login</code>, <code>/auth/me</code>, <code>/&lt;collection&gt;</code> CRUD. Your app's <code>/api</code> calls are routed here automatically.
+              Routes: <code>/auth/register</code>, <code>/auth/login</code>, <code>/auth/me</code>, <code>/&lt;table&gt;</code> CRUD. Your app's <code>/api</code> calls are routed here automatically.
             </p>
             <div className="flex items-center gap-2 pt-1">
               {onRefresh && (

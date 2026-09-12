@@ -28,7 +28,7 @@ import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
 import { useLiveRuntime } from "@/hooks/useLiveRuntime";
-import { injectApiShim, filesNeedBackend } from "@/lib/liveRuntime";
+import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/liveRuntime";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
@@ -344,6 +344,30 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   
   // Fallback with readable name
   return `untitled.${ext}`;
+}
+
+/** Pull the DataModel JSON block out of an assistant reply (real tables to create). */
+function extractDataModel(markdown: string): DataModelTable[] {
+  const blocks = markdown.match(/```json\s*([\s\S]*?)```/g) || [];
+  for (const block of blocks) {
+    const raw = block.replace(/```json\s*/, "").replace(/```$/, "");
+    try {
+      const parsed = JSON.parse(raw) as { dataModel?: unknown };
+      const model = Array.isArray(parsed?.dataModel) ? parsed.dataModel : null;
+      if (!model) continue;
+      return model
+        .filter((t): t is DataModelTable => Boolean(t) && typeof (t as DataModelTable).table === "string")
+        .map((t) => ({
+          table: t.table,
+          columns: Array.isArray(t.columns)
+            ? t.columns.filter((c) => c && typeof c.name === "string").slice(0, 60)
+            : [],
+        }));
+    } catch {
+      /* not the DataModel block */
+    }
+  }
+  return [];
 }
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
@@ -2014,6 +2038,10 @@ ${jsCode}
       }
     }
 
+    // Declared data model -> real database tables in the live backend.
+    const declaredModel = extractDataModel(assistantSoFar);
+    if (declaredModel.length > 0) void liveRuntime.applySchema(declaredModel);
+
     // Auto-apply: extract code blocks, batch all file operations, then trigger preview
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
@@ -3019,6 +3047,7 @@ ${jsCode}
                         onStart={() => void liveRuntime.provision()}
                         onRefresh={() => void liveRuntime.refresh()}
                         onReset={() => void liveRuntime.reset()}
+                        onCredentials={liveRuntime.credentials}
                       />
                     </>
                   )}

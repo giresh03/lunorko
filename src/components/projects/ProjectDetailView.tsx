@@ -29,6 +29,7 @@ const TeamBackendTab = ({ projectId, projectTitle }: { projectId: string; projec
         onStart={() => void rt.provision()}
         onRefresh={() => void rt.refresh()}
         onReset={() => void rt.reset()}
+        onCredentials={rt.credentials}
       />
     </div>
   );

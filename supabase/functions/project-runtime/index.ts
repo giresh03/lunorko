@@ -1,7 +1,11 @@
 // Lunor Live Runtime — hosted backend for AI-generated full-stack projects.
 //
+// Storage is a REAL Postgres schema per app (`app_<projectId>`) with genuine
+// tables and columns (see ./db.ts), so data survives the preview and can be
+// opened from any database tool with the app's read-only credentials.
+//
 // Two surfaces:
-//   POST /project-runtime/manage            (Lovable auth JWT) — ensure | reset | stats
+//   POST /project-runtime/manage            (Lovable auth JWT) — ensure | reset | stats | schema | credentials
 //   ANY  /project-runtime/r/<projectId>/api/... (public, runtime JWT) — the app's live API
 //
 // Runtime API contract (matches the code-engine FULL-STACK charter):
@@ -9,7 +13,7 @@
 //   POST /api/auth/login    { email, password }       -> { success, user, token } 200
 //   GET  /api/auth/me       Bearer <runtime jwt>      -> { success, user }
 //   GET  /api/health                                  -> { success, status: "ok" }
-//   GET/POST /api/<collection>, GET/PUT/PATCH/DELETE /api/<collection>/:id
+//   GET/POST /api/<table>, GET/PUT/PATCH/DELETE /api/<table>/:id
 //   POST /api/uploads (multipart "file", Bearer) -> { success, url, name, size, id }
 //   GET  /api/uploads -> my files;  GET /api/uploads/:id/raw (public);  DELETE /api/uploads/:id
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
@@ -17,6 +21,25 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3.23.8';
 import bcrypt from 'npm:bcryptjs@2.4.3';
 import { create as createJwt, verify as verifyJwt, getNumericDate } from 'https://deno.land/x/djwt@v3.0.2/mod.ts';
+import {
+  appCredentials,
+  coerce,
+  currentColumns,
+  ensureCoreTables,
+  ensureTable,
+  migrateLegacyData,
+  pg,
+  publicRow,
+  RESERVED,
+  resetApp,
+  safeName,
+  schemaFor,
+  specsFromBody,
+  tableExists,
+  tableStats,
+  type ColumnSpec,
+  type Row,
+} from './db.ts';
 
 const JSON_HEADERS = { ...corsHeaders, 'Content-Type': 'application/json' };
 const RUNTIME_CORS = {
@@ -26,13 +49,14 @@ const RUNTIME_CORS = {
   'Content-Type': 'application/json',
 };
 
-const MAX_DOCS_PER_PROJECT = 2000;
-const MAX_DOC_BYTES = 32 * 1024;
+const MAX_ROWS_PER_TABLE = 5000;
+const MAX_BODY_BYTES = 64 * 1024;
 const MAX_USERS_PER_PROJECT = 500;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const UPLOAD_BUCKET = 'runtime-uploads';
-const UPLOAD_COLLECTION = '_uploads';
 const ADMIN_EMAIL = 'lunor.ko@gmail.com';
+
+const qi = (name: string) => `"${name.replace(/"/g, '')}"`;
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = JSON_HEADERS) =>
   new Response(JSON.stringify(body), { status, headers });
@@ -60,31 +84,33 @@ async function signingKey(): Promise<CryptoKey> {
   return cachedKey;
 }
 
-const publicUser = (u: Record<string, unknown>) => ({
+const publicUser = (u: Row) => ({
   _id: u.id,
   id: u.id,
   name: u.name,
   email: u.email,
   role: u.role,
-  ...(typeof u.profile === 'object' && u.profile ? (u.profile as Record<string, unknown>) : {}),
+  ...(u.profile && typeof u.profile === 'object' ? (u.profile as Row) : {}),
   createdAt: u.created_at,
 });
 
-const flattenDoc = (d: Record<string, unknown>) => ({
-  ...(typeof d.data === 'object' && d.data ? (d.data as Record<string, unknown>) : {}),
-  _id: d.id,
-  id: d.id,
-  ownerId: d.owner_user_id,
-  createdAt: d.created_at,
-  updatedAt: d.updated_at,
+// ---------------------------------------------------------------- manage
+const ColumnSchema = z.object({
+  name: z.string().min(1).max(48),
+  type: z.string().max(24).optional(),
+  required: z.boolean().optional(),
 });
 
-// ---------------------------------------------------------------- manage
 const ManageSchema = z.object({
-  action: z.enum(['ensure', 'reset', 'stats']),
+  action: z.enum(['ensure', 'reset', 'stats', 'schema', 'credentials']),
   scope: z.enum(['domain', 'level', 'team']),
   scopeKey: z.string().min(1).max(200),
   name: z.string().min(1).max(120).optional(),
+  rotate: z.boolean().optional(),
+  model: z
+    .array(z.object({ table: z.string().min(1).max(48), columns: z.array(ColumnSchema).max(60).default([]) }))
+    .max(30)
+    .optional(),
 });
 
 async function handleManage(req: Request): Promise<Response> {
@@ -102,7 +128,7 @@ async function handleManage(req: Request): Promise<Response> {
 
   const parsed = ManageSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return json({ error: parsed.error.flatten().fieldErrors }, 400);
-  const { action, scope, scopeKey, name } = parsed.data;
+  const { action, scope, scopeKey, name, model, rotate } = parsed.data;
 
   const db = admin();
 
@@ -117,7 +143,7 @@ async function handleManage(req: Request): Promise<Response> {
   }
 
   // Team scope: any team member may use the shared runtime; owner is whoever provisions first.
-  let projectRow: Record<string, unknown> | null = null;
+  let projectRow: Row | null = null;
   if (scope === 'team') {
     const { data: membership } = await db
       .from('team_members')
@@ -165,28 +191,39 @@ async function handleManage(req: Request): Promise<Response> {
 
   const projectId = projectRow!.id as string;
 
-  if (action === 'reset') {
-    await Promise.all([
-      db.from('runtime_documents').delete().eq('project_id', projectId),
-      db.from('runtime_users').delete().eq('project_id', projectId),
-    ]);
+  // Real tables + one-off migration of any legacy preview data.
+  const schema = await ensureCoreTables(projectId);
+  await migrateLegacyData(projectId).catch((e) => console.error('legacy migration failed', e));
+
+  if (action === 'reset') await resetApp(projectId);
+
+  if (action === 'schema' && model) {
+    for (const entry of model) {
+      const table = safeName(entry.table);
+      if (!table || table === 'users' || table === 'uploads') continue;
+      await ensureTable(projectId, table, entry.columns as ColumnSpec[]);
+    }
   }
 
-  const [{ count: users }, { count: documents }, { data: collectionsRows }] = await Promise.all([
-    db.from('runtime_users').select('id', { count: 'exact', head: true }).eq('project_id', projectId),
-    db.from('runtime_documents').select('id', { count: 'exact', head: true }).eq('project_id', projectId),
-    db.from('runtime_documents').select('collection').eq('project_id', projectId).limit(1000),
-  ]);
-  const collections = Array.from(new Set((collectionsRows ?? []).map((r) => r.collection as string))).sort();
-
   const base = `${Deno.env.get('SUPABASE_URL')}/functions/v1/project-runtime/r/${projectId}`;
+  const stats = await tableStats(projectId);
+
+  let credentials: unknown = undefined;
+  if (action === 'credentials') {
+    const isOwner = projectRow!.owner_id === userId;
+    if (!isOwner && scope !== 'team') return json({ error: 'Only the app owner can read credentials' }, 403);
+    credentials = await appCredentials(projectId, Boolean(rotate));
+  }
+
   return json({
     projectId,
     scope,
     scopeKey,
     apiUrl: `${base}/api`,
     baseUrl: base,
-    stats: { users: users ?? 0, documents: documents ?? 0, collections },
+    schemaName: schema,
+    stats: { users: stats.users, documents: stats.documents, tables: stats.tables, collections: stats.tables.map((t) => t.name) },
+    credentials,
     createdAt: projectRow!.created_at,
   });
 }
@@ -204,7 +241,6 @@ const LoginSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
-const collectionRe = /^[a-z][a-z0-9_-]{0,48}$/i;
 const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function issueToken(projectId: string, userId: string, role: string): Promise<string> {
@@ -216,20 +252,21 @@ async function issueToken(projectId: string, userId: string, role: string): Prom
   );
 }
 
-async function runtimeUser(req: Request, projectId: string) {
+async function runtimeUser(req: Request, projectId: string): Promise<Row | null> {
   const header = req.headers.get('Authorization') || req.headers.get('authorization');
   if (!header?.startsWith('Bearer ')) return null;
   try {
     const payload = await verifyJwt(header.slice(7), await signingKey());
     if (payload.pid !== projectId || typeof payload.sub !== 'string') return null;
-    const { data } = await admin().from('runtime_users').select('*').eq('id', payload.sub).eq('project_id', projectId).maybeSingle();
-    return data;
+    const schema = schemaFor(projectId);
+    const rows = await pg().unsafe<Row[]>(`SELECT * FROM ${qi(schema)}."users" WHERE id = $1`, [payload.sub]);
+    return rows[0] ?? null;
   } catch {
     return null;
   }
 }
 
-async function readBody(req: Request): Promise<Record<string, unknown>> {
+async function readBody(req: Request): Promise<Row> {
   if (req.method === 'GET' || req.method === 'DELETE') return {};
   const ct = req.headers.get('content-type') || '';
   try {
@@ -241,7 +278,7 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
     }
     if (ct.includes('form')) {
       const fd = await req.formData();
-      const out: Record<string, unknown> = {};
+      const out: Row = {};
       fd.forEach((v, k) => { out[k] = typeof v === 'string' ? v : v.name; });
       return out;
     }
@@ -259,6 +296,8 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
   const { data: project } = await db.from('runtime_projects').select('id').eq('id', projectId).maybeSingle();
   if (!project) return fail('Unknown project', 404);
 
+  const sql = pg();
+  const schema = await ensureCoreTables(projectId);
   const segments = apiPath.split('/').filter(Boolean);
   const method = req.method.toUpperCase();
 
@@ -272,29 +311,35 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
       const parsed = RegisterSchema.safeParse(await readBody(req));
       if (!parsed.success) return fail(Object.values(parsed.error.flatten().fieldErrors).flat().join('; ') || 'Invalid input', 400);
       const { name, email, password, role, ...rest } = parsed.data;
-      const { count } = await db.from('runtime_users').select('id', { count: 'exact', head: true }).eq('project_id', projectId);
-      if ((count ?? 0) >= MAX_USERS_PER_PROJECT) return fail('User limit reached for this project', 429);
-      const { data: existing } = await db.from('runtime_users').select('id').eq('project_id', projectId).eq('email', email.toLowerCase()).maybeSingle();
-      if (existing) return fail('Email already registered', 409);
+      const [{ count }] = await sql.unsafe<{ count: string }[]>(`SELECT count(*)::text AS count FROM ${qi(schema)}."users"`);
+      if (Number(count) >= MAX_USERS_PER_PROJECT) return fail('User limit reached for this project', 429);
+      const existing = await sql.unsafe<Row[]>(
+        `SELECT id FROM ${qi(schema)}."users" WHERE lower(email) = lower($1) LIMIT 1`, [email],
+      );
+      if (existing.length) return fail('Email already registered', 409);
       const hash = await bcrypt.hash(password, 10);
-      const profile: Record<string, unknown> = {};
+      const profile: Row = {};
       for (const [k, v] of Object.entries(rest)) if (k !== 'passwordHash' && k !== 'password') profile[k] = v;
-      const { data: user, error } = await db
-        .from('runtime_users')
-        .insert({ project_id: projectId, name, email: email.toLowerCase(), password_hash: hash, role: role || 'user', profile })
-        .select('*')
-        .single();
-      if (error || !user) return fail('Could not create user', 500);
-      const token = await issueToken(projectId, user.id, user.role);
+      const rows = await sql.unsafe<Row[]>(
+        `INSERT INTO ${qi(schema)}."users" (name, email, password_hash, role, profile)
+         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [name, email.toLowerCase(), hash, role || 'user', JSON.stringify(profile)],
+      );
+      const user = rows[0];
+      if (!user) return fail('Could not create user', 500);
+      const token = await issueToken(projectId, user.id as string, user.role as string);
       return json({ success: true, user: publicUser(user), token }, 201, RUNTIME_CORS);
     }
     if (sub === 'login' && method === 'POST') {
       const parsed = LoginSchema.safeParse(await readBody(req));
       if (!parsed.success) return fail('Email and password are required', 400);
       const { email, password } = parsed.data;
-      const { data: user } = await db.from('runtime_users').select('*').eq('project_id', projectId).eq('email', email.toLowerCase()).maybeSingle();
-      if (!user || !(await bcrypt.compare(password, user.password_hash))) return fail('Invalid email or password', 401);
-      const token = await issueToken(projectId, user.id, user.role);
+      const rows = await sql.unsafe<Row[]>(
+        `SELECT * FROM ${qi(schema)}."users" WHERE lower(email) = lower($1) LIMIT 1`, [email],
+      );
+      const user = rows[0];
+      if (!user || !(await bcrypt.compare(password, String(user.password_hash)))) return fail('Invalid email or password', 401);
+      const token = await issueToken(projectId, user.id as string, user.role as string);
       return json({ success: true, user: publicUser(user), token }, 200, RUNTIME_CORS);
     }
     if (sub === 'me' && method === 'GET') {
@@ -311,33 +356,38 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
     const me = await runtimeUser(req, projectId);
     if (!me) return fail('Not authenticated', 401);
     if (method === 'GET' && !segments[1]) {
-      const { data } = await db.from('runtime_users').select('*').eq('project_id', projectId).order('created_at', { ascending: false }).limit(200);
-      return json({ success: true, data: (data ?? []).map(publicUser), users: (data ?? []).map(publicUser) }, 200, RUNTIME_CORS);
+      const rows = await sql.unsafe<Row[]>(
+        `SELECT * FROM ${qi(schema)}."users" ORDER BY created_at DESC LIMIT 200`,
+      );
+      const users = rows.map(publicUser);
+      return json({ success: true, data: users, users }, 200, RUNTIME_CORS);
     }
     if (method === 'GET' && segments[1]) {
-      const { data } = await db.from('runtime_users').select('*').eq('project_id', projectId).eq('id', segments[1]).maybeSingle();
-      if (!data) return fail('Not found', 404);
-      return json({ success: true, data: publicUser(data), user: publicUser(data) }, 200, RUNTIME_CORS);
+      if (!uuidRe.test(segments[1])) return fail('Not found', 404);
+      const rows = await sql.unsafe<Row[]>(`SELECT * FROM ${qi(schema)}."users" WHERE id = $1`, [segments[1]]);
+      if (!rows[0]) return fail('Not found', 404);
+      return json({ success: true, data: publicUser(rows[0]), user: publicUser(rows[0]) }, 200, RUNTIME_CORS);
     }
     return fail('Method not allowed', 405);
   }
 
-  // /api/uploads — real file storage, per project + per signed-in user
+  // /api/uploads — real file storage, metadata in the app's uploads table
   if (segments[0] === 'uploads' || segments[0] === 'files') {
     // Public raw file serving so <img src> works: /api/uploads/:id/raw
     if (method === 'GET' && segments[1] && segments[2] === 'raw') {
       if (!uuidRe.test(segments[1])) return fail('Not found', 404);
-      const { data: doc } = await db.from('runtime_documents').select('data')
-        .eq('project_id', projectId).eq('collection', UPLOAD_COLLECTION).eq('id', segments[1]).maybeSingle();
-      const meta = doc?.data as { path?: string; type?: string; name?: string } | undefined;
+      const rows = await sql.unsafe<Row[]>(
+        `SELECT path, type FROM ${qi(schema)}."uploads" WHERE id = $1`, [segments[1]],
+      );
+      const meta = rows[0];
       if (!meta?.path) return fail('Not found', 404);
-      const { data: blob, error } = await db.storage.from(UPLOAD_BUCKET).download(meta.path);
+      const { data: blob, error } = await db.storage.from(UPLOAD_BUCKET).download(String(meta.path));
       if (error || !blob) return fail('Not found', 404);
       return new Response(blob, {
         status: 200,
         headers: {
           ...corsHeaders,
-          'Content-Type': meta.type || 'application/octet-stream',
+          'Content-Type': String(meta.type || 'application/octet-stream'),
           'Cache-Control': 'public, max-age=31536000, immutable',
         },
       });
@@ -346,6 +396,12 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
     const me = await runtimeUser(req, projectId);
     if (!me) return fail('Not authenticated', 401);
     const base = `${Deno.env.get('SUPABASE_URL')}/functions/v1/project-runtime/r/${projectId}/api`;
+    const withUrl = (row: Row) => {
+      const rec = publicRow(row) as Row;
+      delete rec.path;
+      rec.url = `${base}/uploads/${row.id}/raw`;
+      return rec;
+    };
 
     if (method === 'POST') {
       let form: FormData;
@@ -358,121 +414,174 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
       const { error: upErr } = await db.storage.from(UPLOAD_BUCKET)
         .upload(path, await file.arrayBuffer(), { contentType: file.type || 'application/octet-stream' });
       if (upErr) return fail(upErr.message, 500);
-      const { data: row, error } = await db.from('runtime_documents')
-        .insert({
-          project_id: projectId,
-          collection: UPLOAD_COLLECTION,
-          data: { name: file.name, size: file.size, type: file.type || 'application/octet-stream', path },
-          owner_user_id: me.id,
-        })
-        .select('*')
-        .single();
-      if (error || !row) {
+      const rows = await sql.unsafe<Row[]>(
+        `INSERT INTO ${qi(schema)}."uploads" (owner_id, name, size, type, path)
+         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [me.id, file.name || 'upload', file.size, file.type || 'application/octet-stream', path],
+      );
+      if (!rows[0]) {
         await db.storage.from(UPLOAD_BUCKET).remove([path]);
         return fail('Could not save file', 500);
       }
-      const record = { ...flattenDoc(row), url: `${base}/uploads/${row.id}/raw` };
-      delete (record as Record<string, unknown>).path;
+      const record = withUrl(rows[0]);
       return json({ success: true, ...record, data: record, file: record }, 201, RUNTIME_CORS);
     }
 
     if (method === 'GET' && !segments[1]) {
-      const { data } = await db.from('runtime_documents').select('*')
-        .eq('project_id', projectId).eq('collection', UPLOAD_COLLECTION).eq('owner_user_id', me.id)
-        .order('created_at', { ascending: false }).limit(200);
-      const files = (data ?? []).map((row) => {
-        const rec = { ...flattenDoc(row), url: `${base}/uploads/${row.id}/raw` } as Record<string, unknown>;
-        delete rec.path;
-        return rec;
-      });
+      const rows = await sql.unsafe<Row[]>(
+        `SELECT * FROM ${qi(schema)}."uploads" WHERE owner_id = $1 ORDER BY created_at DESC LIMIT 200`, [me.id],
+      );
+      const files = rows.map(withUrl);
       return json({ success: true, data: files, files, count: files.length }, 200, RUNTIME_CORS);
     }
 
     if (method === 'DELETE' && segments[1]) {
       if (!uuidRe.test(segments[1])) return fail('Not found', 404);
-      const { data: doc } = await db.from('runtime_documents').select('*')
-        .eq('project_id', projectId).eq('collection', UPLOAD_COLLECTION).eq('id', segments[1]).maybeSingle();
+      const rows = await sql.unsafe<Row[]>(`SELECT * FROM ${qi(schema)}."uploads" WHERE id = $1`, [segments[1]]);
+      const doc = rows[0];
       if (!doc) return fail('Not found', 404);
-      if (doc.owner_user_id !== me.id && me.role !== 'admin') return fail('Forbidden', 403);
-      const p = (doc.data as { path?: string }).path;
-      if (p) await db.storage.from(UPLOAD_BUCKET).remove([p]);
-      await db.from('runtime_documents').delete().eq('id', segments[1]);
+      if (doc.owner_id !== me.id && me.role !== 'admin') return fail('Forbidden', 403);
+      if (doc.path) await db.storage.from(UPLOAD_BUCKET).remove([String(doc.path)]);
+      await sql.unsafe(`DELETE FROM ${qi(schema)}."uploads" WHERE id = $1`, [segments[1]]);
       return json({ success: true, data: { id: segments[1] } }, 200, RUNTIME_CORS);
     }
 
     return fail('Method not allowed', 405);
   }
 
-  // Generic collections: /api/<collection>[/<id>]
-  const collection = (segments[0] || '').toLowerCase();
-  if (!collectionRe.test(collection)) return fail('Invalid collection', 400);
-  if (collection === UPLOAD_COLLECTION) return fail('Use /api/uploads for files', 400);
+  // Real tables: /api/<table>[/<id>]
+  const table = safeName(segments[0] || '');
+  if (!table) return fail('Invalid collection', 400);
   const id = segments[1];
   const me = await runtimeUser(req, projectId);
   const url = new URL(req.url);
 
-  if (method === 'GET' && !id) {
+  if (method === 'GET') {
+    if (!(await tableExists(schema, table))) {
+      if (id) return fail('Not found', 404);
+      return json({ success: true, data: [], [table]: [], count: 0 }, 200, RUNTIME_CORS);
+    }
+    const columns = await currentColumns(schema, table);
+
+    if (id) {
+      if (!uuidRe.test(id)) return fail('Not found', 404);
+      const rows = await sql.unsafe<Row[]>(`SELECT * FROM ${qi(schema)}.${qi(table)} WHERE id = $1`, [id]);
+      if (!rows[0]) return fail('Not found', 404);
+      return json({ success: true, data: publicRow(rows[0]) }, 200, RUNTIME_CORS);
+    }
+
     const limit = Math.min(Number(url.searchParams.get('limit')) || 100, 500);
     const offset = Math.max(Number(url.searchParams.get('offset') || url.searchParams.get('skip')) || 0, 0);
-    let q = db.from('runtime_documents').select('*').eq('project_id', projectId).eq('collection', collection);
-    // Owner-scoped by default for signed-in users; ?all=true opts into shared/public data.
-    if (me && url.searchParams.get('all') !== 'true') q = q.eq('owner_user_id', me.id);
-    // Simple equality filters: ?status=done&category=x
+    const where: string[] = [];
+    const params: unknown[] = [];
+
+    // Owner-scoped by default for signed-in users; ?all=true opts into shared data.
+    if (me && url.searchParams.get('all') !== 'true') {
+      params.push(me.id);
+      where.push(`owner_id = $${params.length}`);
+    }
     for (const [k, v] of url.searchParams.entries()) {
       if (['limit', 'offset', 'skip', 'mine', 'all', 'sort', 'q', 'search'].includes(k)) continue;
-      if (/^[a-zA-Z_][a-zA-Z0-9_]{0,40}$/.test(k)) q = q.contains('data', { [k]: v });
+      const col = safeName(k);
+      if (!col || !columns[col]) continue;
+      const value = coerce(v, columns[col]);
+      if (value === undefined) continue;
+      params.push(value);
+      where.push(`${qi(col)} = $${params.length}`);
     }
-    q = q.order('created_at', { ascending: url.searchParams.get('sort') === 'asc' }).range(offset, offset + limit - 1);
-    const { data, error } = await q;
-    if (error) return fail(error.message, 500);
-    let docs = (data ?? []).map(flattenDoc);
-    const search = (url.searchParams.get('q') || url.searchParams.get('search') || '').toLowerCase();
-    if (search) docs = docs.filter((d) => JSON.stringify(d).toLowerCase().includes(search));
-    return json({ success: true, data: docs, [collection]: docs, count: docs.length }, 200, RUNTIME_CORS);
-  }
-
-  if (method === 'GET' && id) {
-    if (!uuidRe.test(id)) return fail('Not found', 404);
-    const { data } = await db.from('runtime_documents').select('*').eq('project_id', projectId).eq('collection', collection).eq('id', id).maybeSingle();
-    if (!data) return fail('Not found', 404);
-    return json({ success: true, data: flattenDoc(data) }, 200, RUNTIME_CORS);
+    const search = (url.searchParams.get('q') || url.searchParams.get('search') || '').trim();
+    if (search) {
+      const textCols = Object.entries(columns)
+        .filter(([, t]) => t.includes('char') || t === 'text')
+        .map(([c]) => c);
+      if (textCols.length) {
+        params.push(`%${search}%`);
+        const i = params.length;
+        where.push(`(${textCols.map((c) => `${qi(c)} ILIKE $${i}`).join(' OR ')})`);
+      }
+    }
+    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const dir = url.searchParams.get('sort') === 'asc' ? 'ASC' : 'DESC';
+    const rows = await sql.unsafe<Row[]>(
+      `SELECT * FROM ${qi(schema)}.${qi(table)} ${clause} ORDER BY created_at ${dir} LIMIT ${limit} OFFSET ${offset}`,
+      params,
+    );
+    const docs = rows.map(publicRow);
+    return json({ success: true, data: docs, [table]: docs, count: docs.length }, 200, RUNTIME_CORS);
   }
 
   if (method === 'POST' && !id) {
     const body = await readBody(req);
     delete body._id; delete body.id;
-    if (JSON.stringify(body).length > MAX_DOC_BYTES) return fail('Document too large (32KB max)', 413);
-    const { count } = await db.from('runtime_documents').select('id', { count: 'exact', head: true }).eq('project_id', projectId);
-    if ((count ?? 0) >= MAX_DOCS_PER_PROJECT) return fail('Storage limit reached for this project', 429);
-    const { data, error } = await db
-      .from('runtime_documents')
-      .insert({ project_id: projectId, collection, data: body, owner_user_id: me?.id ?? null })
-      .select('*')
-      .single();
-    if (error || !data) return fail('Could not create record', 500);
-    return json({ success: true, data: flattenDoc(data) }, 201, RUNTIME_CORS);
+    if (JSON.stringify(body).length > MAX_BODY_BYTES) return fail('Record too large (64KB max)', 413);
+    const { columns } = await ensureTable(projectId, table, specsFromBody(body));
+    const [{ count }] = await sql.unsafe<{ count: string }[]>(`SELECT count(*)::text AS count FROM ${qi(schema)}.${qi(table)}`);
+    if (Number(count) >= MAX_ROWS_PER_TABLE) return fail('Storage limit reached for this table', 429);
+
+    const cols = ['owner_id'];
+    const values: unknown[] = [me?.id ?? null];
+    for (const [key, value] of Object.entries(body)) {
+      const col = safeName(key);
+      if (!col || RESERVED.has(col) || !columns[col]) continue;
+      cols.push(col);
+      values.push(coerce(value, columns[col]));
+    }
+    const rows = await sql.unsafe<Row[]>(
+      `INSERT INTO ${qi(schema)}.${qi(table)} (${cols.map(qi).join(', ')})
+       VALUES (${cols.map((_, i) => `$${i + 1}`).join(', ')}) RETURNING *`,
+      values,
+    );
+    if (!rows[0]) return fail('Could not create record', 500);
+    return json({ success: true, data: publicRow(rows[0]) }, 201, RUNTIME_CORS);
   }
 
   if ((method === 'PUT' || method === 'PATCH') && id) {
     if (!uuidRe.test(id)) return fail('Not found', 404);
-    const { data: existing } = await db.from('runtime_documents').select('*').eq('project_id', projectId).eq('collection', collection).eq('id', id).maybeSingle();
+    if (!(await tableExists(schema, table))) return fail('Not found', 404);
+    const existing = (await sql.unsafe<Row[]>(`SELECT * FROM ${qi(schema)}.${qi(table)} WHERE id = $1`, [id]))[0];
     if (!existing) return fail('Not found', 404);
-    if (existing.owner_user_id && (!me || (me.id !== existing.owner_user_id && me.role !== 'admin'))) return fail('Forbidden', 403);
+    if (existing.owner_id && (!me || (me.id !== existing.owner_id && me.role !== 'admin'))) return fail('Forbidden', 403);
+
     const body = await readBody(req);
     delete body._id; delete body.id;
-    const next = method === 'PATCH' ? { ...(existing.data as Record<string, unknown>), ...body } : body;
-    if (JSON.stringify(next).length > MAX_DOC_BYTES) return fail('Document too large (32KB max)', 413);
-    const { data, error } = await db.from('runtime_documents').update({ data: next }).eq('id', id).select('*').single();
-    if (error || !data) return fail('Could not update record', 500);
-    return json({ success: true, data: flattenDoc(data) }, 200, RUNTIME_CORS);
+    if (JSON.stringify(body).length > MAX_BODY_BYTES) return fail('Record too large (64KB max)', 413);
+    const { columns } = await ensureTable(projectId, table, specsFromBody(body));
+
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    for (const [key, value] of Object.entries(body)) {
+      const col = safeName(key);
+      if (!col || RESERVED.has(col) || !columns[col]) continue;
+      params.push(coerce(value, columns[col]));
+      sets.push(`${qi(col)} = $${params.length}`);
+    }
+    // PUT semantics: clear declared columns that were not supplied.
+    if (method === 'PUT') {
+      const supplied = new Set(Object.keys(body).map((k) => safeName(k)));
+      for (const col of Object.keys(columns)) {
+        if (RESERVED.has(col) || supplied.has(col)) continue;
+        sets.push(`${qi(col)} = NULL`);
+      }
+    }
+    sets.push('updated_at = now()');
+    params.push(id);
+    const rows = await sql.unsafe<Row[]>(
+      `UPDATE ${qi(schema)}.${qi(table)} SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`,
+      params,
+    );
+    if (!rows[0]) return fail('Could not update record', 500);
+    return json({ success: true, data: publicRow(rows[0]) }, 200, RUNTIME_CORS);
   }
 
   if (method === 'DELETE' && id) {
     if (!uuidRe.test(id)) return fail('Not found', 404);
-    const { data: existing } = await db.from('runtime_documents').select('id, owner_user_id').eq('project_id', projectId).eq('collection', collection).eq('id', id).maybeSingle();
+    if (!(await tableExists(schema, table))) return fail('Not found', 404);
+    const existing = (await sql.unsafe<Row[]>(
+      `SELECT id, owner_id FROM ${qi(schema)}.${qi(table)} WHERE id = $1`, [id],
+    ))[0];
     if (!existing) return fail('Not found', 404);
-    if (existing.owner_user_id && (!me || (me.id !== existing.owner_user_id && me.role !== 'admin'))) return fail('Forbidden', 403);
-    await db.from('runtime_documents').delete().eq('id', id);
+    if (existing.owner_id && (!me || (me.id !== existing.owner_id && me.role !== 'admin'))) return fail('Forbidden', 403);
+    await sql.unsafe(`DELETE FROM ${qi(schema)}.${qi(table)} WHERE id = $1`, [id]);
     return json({ success: true, data: { id } }, 200, RUNTIME_CORS);
   }
 

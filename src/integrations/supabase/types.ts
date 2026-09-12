@@ -1140,6 +1140,47 @@ export type Database = {
         }
         Relationships: []
       }
+      runtime_credentials: {
+        Row: {
+          created_at: string
+          db_role: string
+          id: string
+          password_cipher: string
+          project_id: string
+          rotated_at: string
+          schema_name: string
+          scope: string
+        }
+        Insert: {
+          created_at?: string
+          db_role: string
+          id?: string
+          password_cipher: string
+          project_id: string
+          rotated_at?: string
+          schema_name: string
+          scope?: string
+        }
+        Update: {
+          created_at?: string
+          db_role?: string
+          id?: string
+          password_cipher?: string
+          project_id?: string
+          rotated_at?: string
+          schema_name?: string
+          scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "runtime_credentials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "runtime_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       runtime_documents: {
         Row: {
           collection: string
@@ -1182,8 +1223,10 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          migrated_at: string | null
           name: string
           owner_id: string
+          schema_name: string | null
           scope: string
           scope_key: string
           updated_at: string
@@ -1191,8 +1234,10 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          migrated_at?: string | null
           name?: string
           owner_id: string
+          schema_name?: string | null
           scope: string
           scope_key: string
           updated_at?: string
@@ -1200,13 +1245,56 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          migrated_at?: string | null
           name?: string
           owner_id?: string
+          schema_name?: string | null
           scope?: string
           scope_key?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      runtime_tables: {
+        Row: {
+          collection: string
+          columns: Json
+          created_at: string
+          id: string
+          project_id: string
+          schema_name: string
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          collection: string
+          columns?: Json
+          created_at?: string
+          id?: string
+          project_id: string
+          schema_name: string
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          collection?: string
+          columns?: Json
+          created_at?: string
+          id?: string
+          project_id?: string
+          schema_name?: string
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "runtime_tables_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "runtime_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       runtime_users: {
         Row: {

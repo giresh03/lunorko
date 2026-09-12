@@ -6,10 +6,35 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type RuntimeScope = "domain" | "level" | "team";
 
+export interface RuntimeTable {
+  name: string;
+  rows: number;
+}
+
 export interface RuntimeStats {
   users: number;
   documents: number;
+  /** Real tables in the app's database schema, with live row counts. */
+  tables: RuntimeTable[];
+  /** Legacy alias: table names only. */
   collections: string[];
+}
+
+export interface RuntimeCredentials {
+  host: string;
+  port: string;
+  database: string;
+  schema: string;
+  user: string;
+  password: string;
+  connectionString: string;
+  scope: string;
+}
+
+/** A table the generated app declares up front. */
+export interface DataModelTable {
+  table: string;
+  columns: { name: string; type?: string; required?: boolean }[];
 }
 
 export interface RuntimeInfo {
@@ -18,7 +43,9 @@ export interface RuntimeInfo {
   scopeKey: string;
   apiUrl: string;
   baseUrl: string;
+  schemaName?: string;
   stats: RuntimeStats;
+  credentials?: RuntimeCredentials;
   createdAt: string;
 }
 
@@ -33,13 +60,14 @@ export class RuntimeError extends Error {
 }
 
 async function manage(
-  action: "ensure" | "reset" | "stats",
+  action: "ensure" | "reset" | "stats" | "schema" | "credentials",
   scope: RuntimeScope,
   scopeKey: string,
   name?: string,
+  extra?: Record<string, unknown>,
 ): Promise<RuntimeInfo> {
   const { data, error } = await supabase.functions.invoke("project-runtime/manage", {
-    body: { action, scope, scopeKey, name },
+    body: { action, scope, scopeKey, name, ...extra },
   });
   if (error) {
     // supabase-js wraps non-2xx in FunctionsHttpError with the Response in context
@@ -67,6 +95,12 @@ export const ensureRuntime = (scope: RuntimeScope, scopeKey: string, name?: stri
   manage("ensure", scope, scopeKey, name);
 export const resetRuntime = (scope: RuntimeScope, scopeKey: string) => manage("reset", scope, scopeKey);
 export const runtimeStats = (scope: RuntimeScope, scopeKey: string) => manage("stats", scope, scopeKey);
+/** Create/extend the app's real tables from a declared data model. */
+export const applyDataModel = (scope: RuntimeScope, scopeKey: string, model: DataModelTable[]) =>
+  manage("schema", scope, scopeKey, undefined, { model });
+/** Read-only database credentials for outside tools (psql, TablePlus, DBeaver). */
+export const runtimeCredentials = (scope: RuntimeScope, scopeKey: string, rotate = false) =>
+  manage("credentials", scope, scopeKey, undefined, { rotate });
 
 /** Does this project look like it needs a backend? */
 export function filesNeedBackend(files: { path: string; content: string }[]): boolean {
