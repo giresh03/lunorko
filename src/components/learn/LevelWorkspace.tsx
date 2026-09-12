@@ -310,6 +310,7 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
               onStart={() => void liveRuntime.provision()}
               onRefresh={() => void liveRuntime.refresh()}
               onReset={() => void liveRuntime.reset()}
+              onCredentials={liveRuntime.credentials}
             />
           )}
           <Button size="sm" className="h-7 text-xs" onClick={run} disabled={running}>
