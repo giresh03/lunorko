@@ -150,6 +150,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       private: true,
       version: "1.0.0",
       dependencies: {
+        ...extraDeps,
         react: "^18.3.1",
         "react-dom": "^18.3.1",
         "lucide-react": "^0.462.0",
@@ -172,7 +173,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 </html>
 `;
 
-  result["/src/index.jsx"] = mainContent;
+  // Live backend: install the /api → hosted runtime shim before the app boots.
+  if (apiUrl) {
+    result["/src/lunor-runtime.js"] = buildSandpackRuntimeModule(apiUrl);
+    result["/src/index.jsx"] = `import './lunor-runtime.js'\n${mainContent}`;
+  } else {
+    result["/src/index.jsx"] = mainContent;
+  }
   result["/src/App.jsx"] = appContent;
 
   // cn utility for Radix/shadcn components (Tailwind class merging)
@@ -188,7 +195,7 @@ export function cn(...inputs) {
 
   for (const { path, content } of files) {
     if (skipPaths.some((s) => path.endsWith(s))) continue;
-    const dest = path.startsWith("src/") ? `/src/${path}` : path.startsWith("/") ? path : `/src/${path}`;
+    const dest = path.startsWith("src/") ? `/${path}` : path.startsWith("/") ? path : `/src/${path}`;
     result[dest] = content;
     existingPaths.add(dest);
   }
