@@ -2014,6 +2014,10 @@ ${jsCode}
       }
     }
 
+    // Declared data model -> real database tables in the live backend.
+    const declaredModel = extractDataModel(assistantSoFar);
+    if (declaredModel.length > 0) void liveRuntime.applySchema(declaredModel);
+
     // Auto-apply: extract code blocks, batch all file operations, then trigger preview
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
