@@ -345,7 +345,10 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
 
     const me = await runtimeUser(req, projectId);
     if (!me) return fail('Not authenticated', 401);
-    const base = new URL(req.url).origin + `/project-runtime/r/${projectId}/api`;
+    const reqUrl = new URL(req.url);
+    const marker = `/r/${projectId}/api`;
+    const idx = reqUrl.pathname.indexOf(marker);
+    const base = `${reqUrl.origin}${idx >= 0 ? reqUrl.pathname.slice(0, idx + marker.length) : `/project-runtime${marker}`}`;
 
     if (method === 'POST') {
       let form: FormData;
