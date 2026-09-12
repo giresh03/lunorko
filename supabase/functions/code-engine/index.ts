@@ -547,12 +547,35 @@ HOW YOU WORK:
      \`\`\`json
      { "intent": "...", "needs_auth": true, "required_files": ["client/...", "server/...", ...] }
      \`\`\`
-  2. Then emit EVERY path in required_files as a Lunor file block:
+  2. Then emit a DataModel JSON block declaring the real database tables this product needs.
+     Lunor creates these as genuine Postgres tables (real columns, typed) before the preview runs,
+     so the data outlives the preview and can be opened from any database tool:
+     \`\`\`json
+     { "dataModel": [
+         { "table": "products", "columns": [
+             { "name": "name", "type": "string", "required": true },
+             { "name": "price_cents", "type": "integer" },
+             { "name": "image_url", "type": "string" },
+             { "name": "in_stock", "type": "boolean" }
+         ] },
+         { "table": "orders", "columns": [
+             { "name": "product_id", "type": "uuid" },
+             { "name": "quantity", "type": "integer" },
+             { "name": "total_cents", "type": "integer" },
+             { "name": "status", "type": "string" }
+         ] }
+     ] }
+     \`\`\`
+     Rules: one entry per collection the client talks to; snake_case column names; types from
+     string | integer | number | boolean | timestamp | json | uuid; money always integer cents;
+     never declare id, owner_id, created_at, updated_at (Lunor adds them); never declare
+     "users" or "uploads" (built in); relations are uuid columns naming the other table's id.
+  3. Then emit EVERY path in required_files as a Lunor file block:
      <path>
      \`\`\`<lang>
      <complete file>
      \`\`\`
-  3. Stop and list how to run: Mongo running, server .env, npm install in client and server,
+  4. Stop and list how to run: Mongo running, server .env, npm install in client and server,
      open the Vite URL, register a user, then login.
 
 HARD RULES:
