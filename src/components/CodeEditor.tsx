@@ -63,6 +63,22 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
     try { var s = window[name]; s.setItem('__lunor_probe','1'); s.removeItem('__lunor_probe'); ok = true; } catch(e) { ok = false; }
     if (!ok) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true, writable: true }); } catch(e) {} }
   });
+  // When no live backend is attached yet, /api calls would die as "Failed to fetch".
+  // Answer them with a readable message and tell the editor to start the backend.
+  var of = window.fetch ? window.fetch.bind(window) : null;
+  if (of) {
+    window.fetch = function(input, init) {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (/\/api\//.test(url) && !window.__LUNOR_API_URL__) {
+        try { parent.postMessage({ __lunorPreview: true, type: 'backend_needed' }, '*'); } catch(e) {}
+        return Promise.resolve(new Response(JSON.stringify({
+          success: false,
+          message: 'Live backend is not running yet. Start the backend, then try again.'
+        }), { status: 503, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return of(input, init);
+    };
+  }
   function report(m, s){
     var k = String(m || 'Unknown error');
     if (/ResizeObserver loop|^Script error\\.?$/i.test(k)) return;
