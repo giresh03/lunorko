@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import {
+  applyDataModel,
   ensureRuntime,
   resetRuntime,
+  runtimeCredentials,
   runtimeStats,
   RuntimeError,
+  type DataModelTable,
+  type RuntimeCredentials,
   type RuntimeInfo,
   type RuntimeScope,
 } from "@/lib/liveRuntime";
