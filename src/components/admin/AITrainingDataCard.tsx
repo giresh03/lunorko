@@ -12,8 +12,12 @@ export function AITrainingDataCard() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("ai_exemplars").select("layer, domain").limit(5000);
+    const [{ data }, { count }] = await Promise.all([
+      supabase.from("ai_exemplars").select("layer, domain").limit(5000),
+      supabase.from("ui_components").select("id", { count: "exact", head: true }),
+    ]);
     setRows((data as Row[]) || []);
+    setUiCount(count ?? 0);
     setLoading(false);
   };
 
