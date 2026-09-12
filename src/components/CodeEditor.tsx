@@ -63,6 +63,22 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
     try { var s = window[name]; s.setItem('__lunor_probe','1'); s.removeItem('__lunor_probe'); ok = true; } catch(e) { ok = false; }
     if (!ok) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true, writable: true }); } catch(e) {} }
   });
+  // When no live backend is attached yet, /api calls would die as "Failed to fetch".
+  // Answer them with a readable message and tell the editor to start the backend.
+  var of = window.fetch ? window.fetch.bind(window) : null;
+  if (of) {
+    window.fetch = function(input, init) {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (/\/api\//.test(url) && !window.__LUNOR_API_URL__) {
+        try { parent.postMessage({ __lunorPreview: true, type: 'backend_needed' }, '*'); } catch(e) {}
+        return Promise.resolve(new Response(JSON.stringify({
+          success: false,
+          message: 'Live backend is not running yet. Start the backend, then try again.'
+        }), { status: 503, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return of(input, init);
+    };
+  }
   function report(m, s){
     var k = String(m || 'Unknown error');
     if (/ResizeObserver loop|^Script error\\.?$/i.test(k)) return;
@@ -651,9 +667,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   });
   const liveApiUrlRef = useRef<string | null>(null);
   liveApiUrlRef.current = liveRuntime.apiUrl;
+  const liveRuntimeRef = useRef(liveRuntime);
+  liveRuntimeRef.current = liveRuntime;
 
   // Preview runtime errors reported by the sandboxed iframe
   const [previewErrors, setPreviewErrors] = useState<{ message: string; stack?: string }[]>([]);
+  const [backendNeeded, setBackendNeeded] = useState(false);
   const [resolvingError, setResolvingError] = useState(false);
   const previewErrorLogRef = useRef<string[]>([]);
   const verifyPendingRef = useRef(false);
@@ -671,6 +690,11 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     if (!liveRuntime.apiUrl) return;
     setPreviewContent((html) => (html && !html.includes("data-lunor-runtime") ? injectApiShim(html, liveRuntime.apiUrl) : html));
   }, [liveRuntime.apiUrl]);
+
+  // Clear the "start backend" nudge once the backend is live.
+  useEffect(() => {
+    if (liveRuntime.status === "live") setBackendNeeded(false);
+  }, [liveRuntime.status]);
 
   // Automated verification: does the app actually load and does login work?
   const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
@@ -727,6 +751,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
       } | null;
       if (d && d.__lunorSelfTest === true && Array.isArray(d.results)) {
         selfTestResolveRef.current?.(d.results);
+        return;
+      }
+      if (d && d.__lunorPreview && d.type === "backend_needed") {
+        setBackendNeeded(true);
+        const rt = liveRuntimeRef.current;
+        if (rt && (rt.status === "off" || rt.status === "error") && rt.allowed) void rt.provision();
         return;
       }
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
@@ -3100,7 +3130,7 @@ ${jsCode}
                     </span>
                   </div>
                 )}
-                <div className={`flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
+                <div className={`relative flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
                   {showSandpackPreview ? (
                     <SandpackPreviewPanel
                       fileTree={fileTree}
@@ -3247,6 +3277,23 @@ ${jsCode}
                       sandbox="allow-scripts allow-modals allow-forms allow-popups"
                       title="Web Preview"
                     />
+                  )}
+                  {backendNeeded && liveRuntime.status !== "live" && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-lg border border-red-500/40 bg-[#1a0d0d]/95 px-3 py-2 shadow-lg backdrop-blur" style={{ maxWidth: "90%" }}>
+                      <span className="text-[11px] text-red-200">
+                        {liveRuntime.status === "locked"
+                          ? "Live backend needs a paid plan."
+                          : liveRuntime.status === "error"
+                          ? liveRuntime.error || "Backend failed to start."
+                          : "Live backend isn't running yet."}
+                      </span>
+                      {liveRuntime.status !== "locked" && (
+                        <button onClick={() => void liveRuntime.provision()} className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-red-500 transition-colors">
+                          {liveRuntime.status === "starting" ? "Starting…" : "Start backend"}
+                        </button>
+                      )}
+                      <button onClick={() => setBackendNeeded(false)} className="text-[10px] text-red-300/70 hover:text-red-200">Dismiss</button>
+                    </div>
                   )}
                 </div>
               </div>
