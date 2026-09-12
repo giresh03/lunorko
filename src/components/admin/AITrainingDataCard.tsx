@@ -9,6 +9,7 @@ type Row = { layer: string; domain: string | null };
 export function AITrainingDataCard() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uiCount, setUiCount] = useState(0);
 
   const load = async () => {
     setLoading(true);
