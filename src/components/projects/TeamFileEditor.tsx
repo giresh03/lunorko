@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FilePlus, FileCode, Save, Trash2, Loader2 } from "lucide-react";
+import { FilePlus, FileCode, Save, Trash2, Loader2, History, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,14 @@ interface TeamFile {
   updated_at: string;
 }
 
+interface FileVersion {
+  id: string;
+  file_id: string;
+  content: string;
+  saved_by: string;
+  created_at: string;
+}
+
 interface TeamFileEditorProps {
   projectId: string;
   profiles: Record<string, string>;
@@ -36,8 +44,35 @@ const TeamFileEditor = ({ projectId, profiles }: TeamFileEditorProps) => {
   const [showNewFile, setShowNewFile] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [newFileLang, setNewFileLang] = useState("javascript");
+  const [showHistory, setShowHistory] = useState(false);
+  const [versions, setVersions] = useState<FileVersion[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState<FileVersion | null>(null);
 
   const activeFile = files.find((f) => f.id === activeFileId);
+
+  const fetchVersions = async (fileId: string) => {
+    setLoadingVersions(true);
+    const { data } = await supabase
+      .from("team_file_versions")
+      .select("id, file_id, content, saved_by, created_at")
+      .eq("file_id", fileId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setVersions((data as FileVersion[]) || []);
+    setLoadingVersions(false);
+  };
+
+  useEffect(() => {
+    setPreviewVersion(null);
+    if (showHistory && activeFileId) fetchVersions(activeFileId);
+  }, [showHistory, activeFileId]);
+
+  const restoreVersion = (v: FileVersion) => {
+    setContent(v.content);
+    setPreviewVersion(null);
+    toast.info("Version loaded into editor — click Save to keep it");
+  };
 
   const fetchFiles = async () => {
     const { data } = await supabase
@@ -102,8 +137,20 @@ const TeamFileEditor = ({ projectId, profiles }: TeamFileEditorProps) => {
       .from("team_files")
       .update({ content, last_edited_by: user.id })
       .eq("id", activeFileId);
-    if (error) toast.error("Failed to save");
-    else toast.success("Saved!");
+    if (error) {
+      toast.error("Failed to save");
+    } else {
+      toast.success("Saved!");
+      // Keep a version of every save so the team can look back and restore.
+      const { error: vErr } = await supabase.from("team_file_versions").insert({
+        file_id: activeFileId,
+        project_id: projectId,
+        content,
+        saved_by: user.id,
+      });
+      if (vErr) console.warn("[team-files] version not recorded", vErr.message);
+      else if (showHistory) fetchVersions(activeFileId);
+    }
     setSaving(false);
   };
 
