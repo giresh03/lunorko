@@ -8,6 +8,13 @@
       "when": 1789218457782,
       "tag": "0000_live_runtime",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789225502108,
+      "tag": "0001_workspace_history_and_team_file_versions",
+      "breakpoints": true
     }
   ]
 }
