@@ -730,7 +730,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         return;
       }
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
-        setPreviewError({ message: d.message, stack: d.stack });
+        const msg = d.message;
+        setPreviewErrors((prev) =>
+          prev.some((p) => p.message === msg) ? prev : [...prev, { message: msg, stack: d.stack }].slice(0, 6));
         const entry = d.message + (d.stack ? ` | ${d.stack.slice(0, 400)}` : "");
         const log = previewErrorLogRef.current;
         if (!log.includes(entry)) {
@@ -1386,7 +1388,7 @@ ${jsCode}
 
   // Hard refresh: rebuild the document AND remount the iframe (works even when nothing changed)
   const hardRefreshPreview = useCallback(() => {
-    setPreviewError(null);
+    setPreviewErrors([]);
     setPreviewKey((k) => k + 1);
     updatePreview();
   }, [updatePreview]);
