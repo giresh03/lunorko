@@ -2034,6 +2034,7 @@ ${jsCode}
         });
         return tabs;
       });
+      appliedBatchRef.current += 1;
 
       // Auto-select the best file for preview (prefer HTML, then first JS)
       const htmlFile = newFiles.find(f => f.lang === "html" || f.name.endsWith(".html"));
@@ -2073,9 +2074,16 @@ ${jsCode}
           setFileTree(currentTree => {
             const allFiles = collectFiles(currentTree);
 
-            // Determine which file to preview
-            const previewFile = htmlFile || jsFile || newFiles[0];
+            // Keep previewing the same entry page; only switch if it no longer exists.
+            const entry = previewEntryRef.current;
+            const entryCode = entry ? allFiles[entry] : undefined;
+            const previewFile = entry && entryCode !== undefined
+              ? { name: entry.split("/").pop() || entry, code: entryCode, lang: getLang(entry) }
+              : (htmlFile || jsFile || newFiles[0]);
             if (previewFile) {
+              previewEntryRef.current = entry && entryCode !== undefined
+                ? entry
+                : ((previewFile as { id?: string }).id ?? previewFile.name);
               const isHtml = previewFile.lang === "html" || previewFile.name.endsWith(".html");
               const isJsLike = ["javascript", "typescript"].includes(previewFile.lang) || /\.(js|jsx|ts|tsx)$/.test(previewFile.name);
               const hasJSX = /<\w+[\s/>]/.test(previewFile.code) && /\breturn\s*[\s(]/.test(previewFile.code);
