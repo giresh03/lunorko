@@ -594,6 +594,35 @@ LUNOR LIVE RUNTIME (how the preview actually runs your backend):
     (e.g. const API = import.meta.env.VITE_API_URL || "/api") — never hardcode a port only.
   - Your generated Express server MUST implement the same routes + response shapes so the
     project runs identically when the user downloads it and runs it locally with MongoDB.
+
+  APPLIES TO EVERY BUILD, INCLUDING VANILLA HTML/CSS/JS PAGES:
+  Whenever the requested product has users, data, forms, carts, bookings, posts, todos,
+  authentication, or any state that must persist, wire the frontend to the LIVE RUNTIME API
+  above — even for a single index.html page. Concretely:
+
+  - Include a small \`api.js\` helper (or inline script) that defines:
+        const API = window.__LUNOR_API_URL__ || "/api";
+        async function request(path, { method = "GET", body, token } = {}) {
+          const res = await fetch(API + path, {
+            method,
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: "Bearer " + token } : {}),
+            },
+            body: body ? JSON.stringify(body) : undefined,
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.success === false) throw new Error(data.message || res.statusText);
+          return data;
+        }
+  - Auth UI: sign-up and login forms call POST /api/auth/register and /api/auth/login, store
+    the returned token in localStorage["token"], and protect pages by calling GET /api/auth/me.
+  - Every list/form/dashboard fetches and persists via /api/<collection> using request().
+  - No fake data that only lives in the page. No auth that only does setState / fake a user.
+    localStorage is for the token and UI preferences only.
+  - Always surface real API errors in the UI (body.message); never swallow them.
+  - Because Lunor's hosted runtime serves these routes inside the preview, a build written
+    this way signs users up, logs them in and persists data LIVE in the preview.
 `;
 
 // Domain-specific system prompts for AI code generation
