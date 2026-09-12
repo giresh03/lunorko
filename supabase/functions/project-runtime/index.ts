@@ -10,6 +10,8 @@
 //   GET  /api/auth/me       Bearer <runtime jwt>      -> { success, user }
 //   GET  /api/health                                  -> { success, status: "ok" }
 //   GET/POST /api/<collection>, GET/PUT/PATCH/DELETE /api/<collection>/:id
+//   POST /api/uploads (multipart "file", Bearer) -> { success, url, name, size, id }
+//   GET  /api/uploads -> my files;  GET /api/uploads/:id/raw (public);  DELETE /api/uploads/:id
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3.23.8';
@@ -27,6 +29,9 @@ const RUNTIME_CORS = {
 const MAX_DOCS_PER_PROJECT = 2000;
 const MAX_DOC_BYTES = 32 * 1024;
 const MAX_USERS_PER_PROJECT = 500;
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const UPLOAD_BUCKET = 'runtime-uploads';
+const UPLOAD_COLLECTION = '_uploads';
 const ADMIN_EMAIL = 'lunor.ko@gmail.com';
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = JSON_HEADERS) =>
@@ -317,9 +322,91 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
     return fail('Method not allowed', 405);
   }
 
+  // /api/uploads — real file storage, per project + per signed-in user
+  if (segments[0] === 'uploads' || segments[0] === 'files') {
+    // Public raw file serving so <img src> works: /api/uploads/:id/raw
+    if (method === 'GET' && segments[1] && segments[2] === 'raw') {
+      if (!uuidRe.test(segments[1])) return fail('Not found', 404);
+      const { data: doc } = await db.from('runtime_documents').select('data')
+        .eq('project_id', projectId).eq('collection', UPLOAD_COLLECTION).eq('id', segments[1]).maybeSingle();
+      const meta = doc?.data as { path?: string; type?: string; name?: string } | undefined;
+      if (!meta?.path) return fail('Not found', 404);
+      const { data: blob, error } = await db.storage.from(UPLOAD_BUCKET).download(meta.path);
+      if (error || !blob) return fail('Not found', 404);
+      return new Response(blob, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': meta.type || 'application/octet-stream',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
+    }
+
+    const me = await runtimeUser(req, projectId);
+    if (!me) return fail('Not authenticated', 401);
+    const base = `${Deno.env.get('SUPABASE_URL')}/functions/v1/project-runtime/r/${projectId}/api`;
+
+    if (method === 'POST') {
+      let form: FormData;
+      try { form = await req.formData(); } catch { return fail('Send the file as multipart/form-data (field: file)', 400); }
+      const file = form.get('file') ?? form.get('image') ?? form.get('avatar') ?? form.get('document');
+      if (!(file instanceof File)) return fail('No file provided (field name: file)', 400);
+      if (file.size > MAX_UPLOAD_BYTES) return fail('File too large (5MB max)', 413);
+      const safe = (file.name || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+      const path = `${projectId}/${me.id}/${crypto.randomUUID()}-${safe}`;
+      const { error: upErr } = await db.storage.from(UPLOAD_BUCKET)
+        .upload(path, await file.arrayBuffer(), { contentType: file.type || 'application/octet-stream' });
+      if (upErr) return fail(upErr.message, 500);
+      const { data: row, error } = await db.from('runtime_documents')
+        .insert({
+          project_id: projectId,
+          collection: UPLOAD_COLLECTION,
+          data: { name: file.name, size: file.size, type: file.type || 'application/octet-stream', path },
+          owner_user_id: me.id,
+        })
+        .select('*')
+        .single();
+      if (error || !row) {
+        await db.storage.from(UPLOAD_BUCKET).remove([path]);
+        return fail('Could not save file', 500);
+      }
+      const record = { ...flattenDoc(row), url: `${base}/uploads/${row.id}/raw` };
+      delete (record as Record<string, unknown>).path;
+      return json({ success: true, ...record, data: record, file: record }, 201, RUNTIME_CORS);
+    }
+
+    if (method === 'GET' && !segments[1]) {
+      const { data } = await db.from('runtime_documents').select('*')
+        .eq('project_id', projectId).eq('collection', UPLOAD_COLLECTION).eq('owner_user_id', me.id)
+        .order('created_at', { ascending: false }).limit(200);
+      const files = (data ?? []).map((row) => {
+        const rec = { ...flattenDoc(row), url: `${base}/uploads/${row.id}/raw` } as Record<string, unknown>;
+        delete rec.path;
+        return rec;
+      });
+      return json({ success: true, data: files, files, count: files.length }, 200, RUNTIME_CORS);
+    }
+
+    if (method === 'DELETE' && segments[1]) {
+      if (!uuidRe.test(segments[1])) return fail('Not found', 404);
+      const { data: doc } = await db.from('runtime_documents').select('*')
+        .eq('project_id', projectId).eq('collection', UPLOAD_COLLECTION).eq('id', segments[1]).maybeSingle();
+      if (!doc) return fail('Not found', 404);
+      if (doc.owner_user_id !== me.id && me.role !== 'admin') return fail('Forbidden', 403);
+      const p = (doc.data as { path?: string }).path;
+      if (p) await db.storage.from(UPLOAD_BUCKET).remove([p]);
+      await db.from('runtime_documents').delete().eq('id', segments[1]);
+      return json({ success: true, data: { id: segments[1] } }, 200, RUNTIME_CORS);
+    }
+
+    return fail('Method not allowed', 405);
+  }
+
   // Generic collections: /api/<collection>[/<id>]
   const collection = (segments[0] || '').toLowerCase();
   if (!collectionRe.test(collection)) return fail('Invalid collection', 400);
+  if (collection === UPLOAD_COLLECTION) return fail('Use /api/uploads for files', 400);
   const id = segments[1];
   const me = await runtimeUser(req, projectId);
   const url = new URL(req.url);
