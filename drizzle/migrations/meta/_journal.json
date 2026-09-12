@@ -43,6 +43,13 @@
       "when": 1789235539805,
       "tag": "0005_diversify_match_ui_components",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789236215549,
+      "tag": "0006_runtime_real_schema_registry",
+      "breakpoints": true
     }
   ]
 }
