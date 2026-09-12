@@ -107,10 +107,41 @@ export function useLiveRuntime({ scope, scopeKey, name, enabled = true }: Option
     }
   }, [scope, scopeKey, allowed]);
 
+  /** Create/extend the app's real tables from a declared data model. */
+  const applySchema = useCallback(
+    async (model: DataModelTable[]) => {
+      if (!scopeKey || !allowed || model.length === 0) return;
+      try {
+        setInfo(await applyDataModel(scope, scopeKey, model));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not create tables");
+      }
+    },
+    [scope, scopeKey, allowed],
+  );
+
+  /** Read-only database credentials for outside tools. */
+  const credentials = useCallback(async (): Promise<RuntimeCredentials | null> => {
+    if (!scopeKey || !allowed) return null;
+    setBusy(true);
+    try {
+      const next = await runtimeCredentials(scope, scopeKey);
+      setInfo(next);
+      return next.credentials ?? null;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load connection details");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }, [scope, scopeKey, allowed]);
+
   return {
     status,
     info,
     apiUrl: status === "live" ? info?.apiUrl ?? null : null,
+    schemaName: info?.schemaName ?? null,
+    tables: info?.stats?.tables ?? [],
     error,
     busy,
     allowed,
@@ -118,5 +149,7 @@ export function useLiveRuntime({ scope, scopeKey, name, enabled = true }: Option
     provision,
     refresh,
     reset,
+    applySchema,
+    credentials,
   };
 }
