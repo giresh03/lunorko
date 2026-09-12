@@ -64,7 +64,13 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
     if (!ok) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true, writable: true }); } catch(e) {} }
   });
   function report(m, s){
-    try { parent.postMessage({ __lunorPreview: true, type: 'error', message: String(m || 'Unknown error'), stack: String(s || '') }, '*'); } catch(e) {}
+    var k = String(m || 'Unknown error');
+    if (/ResizeObserver loop|^Script error\\.?$/i.test(k)) return;
+    window.__lunorSeen = window.__lunorSeen || {};
+    if (window.__lunorSeen[k]) return;
+    if (Object.keys(window.__lunorSeen).length > 6) return;
+    window.__lunorSeen[k] = 1;
+    try { parent.postMessage({ __lunorPreview: true, type: 'error', message: k, stack: String(s || '') }, '*'); } catch(e) {}
   }
   // Only genuine script failures are reported. Missing images/fonts, console.error
   // noise and non-200 responses are NOT treated as app errors.
@@ -647,12 +653,15 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   liveApiUrlRef.current = liveRuntime.apiUrl;
 
   // Preview runtime errors reported by the sandboxed iframe
-  const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
+  const [previewErrors, setPreviewErrors] = useState<{ message: string; stack?: string }[]>([]);
   const [resolvingError, setResolvingError] = useState(false);
   const previewErrorLogRef = useRef<string[]>([]);
   const verifyPendingRef = useRef(false);
+  const repairAttemptRef = useRef(0);
+  const appliedBatchRef = useRef(0);
+  const previewEntryRef = useRef<string | null>(null);
   const setPreview = useCallback((html: string) => {
-    setPreviewError(null);
+    setPreviewErrors([]);
     previewErrorLogRef.current = [];
     setPreviewContent(injectApiShim(injectRuntimeGuard(html), liveApiUrlRef.current));
   }, []);
