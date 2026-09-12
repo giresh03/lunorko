@@ -10,16 +10,17 @@ export type Feature =
   | "resume-builder"
   | "interview-prep"
   | "hackathons"
-  | "domains";
+  | "domains"
+  | "live-backend";
 
 const PLAN_FEATURES: Record<string, Feature[]> = {
   // Free users get a credit-metered trial of the AI workspace + domains.
   free: ["code-editor", "domains"],
-  pro: ["videos", "code-editor", "notes", "community", "domains"],
-  premium: ["videos", "code-editor", "notes", "community", "domains", "projects", "skill-radar", "interview-prep"],
+  pro: ["videos", "code-editor", "notes", "community", "domains", "live-backend"],
+  premium: ["videos", "code-editor", "notes", "community", "domains", "projects", "skill-radar", "interview-prep", "live-backend"],
   professional: [
     "videos", "code-editor", "notes", "community", "domains",
-    "projects", "skill-radar", "resume-builder", "interview-prep", "hackathons",
+    "projects", "skill-radar", "resume-builder", "interview-prep", "hackathons", "live-backend",
   ],
 };
 
