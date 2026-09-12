@@ -64,7 +64,13 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
     if (!ok) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true, writable: true }); } catch(e) {} }
   });
   function report(m, s){
-    try { parent.postMessage({ __lunorPreview: true, type: 'error', message: String(m || 'Unknown error'), stack: String(s || '') }, '*'); } catch(e) {}
+    var k = String(m || 'Unknown error');
+    if (/ResizeObserver loop|^Script error\\.?$/i.test(k)) return;
+    window.__lunorSeen = window.__lunorSeen || {};
+    if (window.__lunorSeen[k]) return;
+    if (Object.keys(window.__lunorSeen).length > 6) return;
+    window.__lunorSeen[k] = 1;
+    try { parent.postMessage({ __lunorPreview: true, type: 'error', message: k, stack: String(s || '') }, '*'); } catch(e) {}
   }
   // Only genuine script failures are reported. Missing images/fonts, console.error
   // noise and non-200 responses are NOT treated as app errors.
@@ -647,12 +653,15 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   liveApiUrlRef.current = liveRuntime.apiUrl;
 
   // Preview runtime errors reported by the sandboxed iframe
-  const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
+  const [previewErrors, setPreviewErrors] = useState<{ message: string; stack?: string }[]>([]);
   const [resolvingError, setResolvingError] = useState(false);
   const previewErrorLogRef = useRef<string[]>([]);
   const verifyPendingRef = useRef(false);
+  const repairAttemptRef = useRef(0);
+  const appliedBatchRef = useRef(0);
+  const previewEntryRef = useRef<string | null>(null);
   const setPreview = useCallback((html: string) => {
-    setPreviewError(null);
+    setPreviewErrors([]);
     previewErrorLogRef.current = [];
     setPreviewContent(injectApiShim(injectRuntimeGuard(html), liveApiUrlRef.current));
   }, []);
@@ -721,7 +730,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         return;
       }
       if (d && d.__lunorPreview && d.type === "error" && d.message) {
-        setPreviewError({ message: d.message, stack: d.stack });
+        const msg = d.message;
+        setPreviewErrors((prev) =>
+          prev.some((p) => p.message === msg) ? prev : [...prev, { message: msg, stack: d.stack }].slice(0, 6));
         const entry = d.message + (d.stack ? ` | ${d.stack.slice(0, 400)}` : "");
         const log = previewErrorLogRef.current;
         if (!log.includes(entry)) {
@@ -1345,6 +1356,7 @@ ${jsCode}
 
   const updatePreview = useCallback(() => {
     if (!activeTab || !showPreview) return;
+    previewEntryRef.current = activeTab.id;
     const allFiles = collectFiles(fileTree);
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
@@ -1377,7 +1389,7 @@ ${jsCode}
 
   // Hard refresh: rebuild the document AND remount the iframe (works even when nothing changed)
   const hardRefreshPreview = useCallback(() => {
-    setPreviewError(null);
+    setPreviewErrors([]);
     setPreviewKey((k) => k + 1);
     updatePreview();
   }, [updatePreview]);
@@ -2023,6 +2035,7 @@ ${jsCode}
         });
         return tabs;
       });
+      appliedBatchRef.current += 1;
 
       // Auto-select the best file for preview (prefer HTML, then first JS)
       const htmlFile = newFiles.find(f => f.lang === "html" || f.name.endsWith(".html"));
@@ -2062,9 +2075,16 @@ ${jsCode}
           setFileTree(currentTree => {
             const allFiles = collectFiles(currentTree);
 
-            // Determine which file to preview
-            const previewFile = htmlFile || jsFile || newFiles[0];
+            // Keep previewing the same entry page; only switch if it no longer exists.
+            const entry = previewEntryRef.current;
+            const entryCode = entry ? allFiles[entry] : undefined;
+            const previewFile = entry && entryCode !== undefined
+              ? { name: entry.split("/").pop() || entry, code: entryCode, lang: getLang(entry) }
+              : (htmlFile || jsFile || newFiles[0]);
             if (previewFile) {
+              previewEntryRef.current = entry && entryCode !== undefined
+                ? entry
+                : ((previewFile as { id?: string }).id ?? previewFile.name);
               const isHtml = previewFile.lang === "html" || previewFile.name.endsWith(".html");
               const isJsLike = ["javascript", "typescript"].includes(previewFile.lang) || /\.(js|jsx|ts|tsx)$/.test(previewFile.name);
               const hasJSX = /<\w+[\s/>]/.test(previewFile.code) && /\breturn\s*[\s(]/.test(previewFile.code);
@@ -2144,22 +2164,33 @@ ${jsCode}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, chatLoading, voice.voiceEnabled]);
 
-  // One-click AI fix for runtime errors surfaced by the preview
+  // One-click AI fix for every runtime error surfaced by the preview
   const handleResolveError = useCallback(async () => {
-    if (!previewError || resolvingError) return;
+    if (!previewErrors.length || resolvingError) return;
     setResolvingError(true);
+    const attempt = ++repairAttemptRef.current;
+    const before = appliedBatchRef.current;
     const prompt =
-      `The generated site threw a runtime error in the preview. Fix the root cause in the project files.\n` +
-      `Error: ${previewError.message}\n` +
-      (previewError.stack ? `Stack: ${previewError.stack.slice(0, 1500)}\n` : "") +
-      `Rules: keep the existing design and features, avoid APIs unavailable in a sandboxed iframe (use in-memory or guarded storage), and return the COMPLETE updated file(s) using the exact existing file paths.`;
+      `The preview is throwing ${previewErrors.length} runtime error(s). Fix the ROOT CAUSE of ALL of them.\n` +
+      previewErrors
+        .map((e, i) => `${i + 1}. ${e.message}${e.stack ? `\n   ${e.stack.slice(0, 800)}` : ""}`)
+        .join("\n") +
+      (previewEntryRef.current ? `\nEntry page being previewed: ${previewEntryRef.current}\n` : "\n") +
+      (attempt > 1 ? `Attempt ${attempt}: the previous fix did NOT work — change your approach, do not repeat it.\n` : "") +
+      `Rules: keep the existing design and features; guard every browser API a sandboxed iframe may block (storage, cookies, clipboard, notifications); never leave undefined element/DOM lookups unguarded; return COMPLETE files at their exact existing paths.`;
     try {
       await handleChatSend(prompt);
+      if (appliedBatchRef.current === before) {
+        toast.error("The assistant replied without code — errors kept so you can retry.");
+        return;
+      }
+      setPreviewErrors([]);
+      previewErrorLogRef.current = [];
+      setPreviewKey((k) => k + 1);
     } finally {
-      setPreviewError(null);
       setResolvingError(false);
     }
-  }, [previewError, resolvingError, handleChatSend]);
+  }, [previewErrors, resolvingError, handleChatSend]);
 
   // Verification runs silently in the background. Only genuine passes are surfaced,
   // and a self-test timeout is never treated as an application error.
@@ -3478,23 +3509,36 @@ ${jsCode}
       )}
 
       {/* Preview runtime error — one-click AI fix */}
-      {previewError && (
-        <div className="fixed bottom-10 right-4 z-[9998] w-72 rounded-lg border border-destructive/40 bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+      {previewErrors.length > 0 && (
+        <div className="fixed bottom-10 right-4 z-[9998] w-80 rounded-lg border border-destructive/40 bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 text-destructive text-sm">⚠</span>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold text-foreground">1 error in preview</p>
-              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground line-clamp-3 break-words">{previewError.message}</p>
+              <p className="text-[11px] font-semibold text-foreground">
+                {previewErrors.length} error{previewErrors.length > 1 ? "s" : ""} in preview
+                {repairAttemptRef.current > 0 && ` · fix attempt ${repairAttemptRef.current}`}
+              </p>
+              <ul className="mt-1 max-h-24 space-y-1 overflow-y-auto">
+                {previewErrors.map((e, i) => (
+                  <li key={i} className="text-[10px] leading-relaxed text-muted-foreground break-words">• {e.message}</li>
+                ))}
+              </ul>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={handleResolveError}
                   disabled={resolvingError}
                   className="h-6 rounded-md bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-transform hover:scale-[1.03] disabled:opacity-60"
                 >
-                  {resolvingError ? "Resolving…" : "Resolve error"}
+                  {resolvingError ? "Resolving…" : previewErrors.length > 1 ? "Resolve all errors" : "Resolve error"}
                 </button>
                 <button
-                  onClick={() => setPreviewError(null)}
+                  onClick={hardRefreshPreview}
+                  className="h-6 rounded-md border border-border px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Retry preview
+                </button>
+                <button
+                  onClick={() => setPreviewErrors([])}
                   className="h-6 rounded-md px-2 text-[10px] text-muted-foreground hover:text-foreground"
                 >
                   Dismiss
