@@ -585,6 +585,15 @@ LUNOR LIVE RUNTIME (how the preview actually runs your backend):
     PUT    /api/<collection>/:id   PATCH /api/<collection>/:id  DELETE /api/<collection>/:id
     Errors: { success: false, message }
 
+  STORAGE / FILE UPLOADS (images, avatars, documents, attachments):
+    POST   /api/uploads      multipart/form-data, field "file", Bearer <token> -> { success, id, url, name, size }
+    GET    /api/uploads      Bearer -> { success, data: [ { id, url, name, size } ] }
+    DELETE /api/uploads/:id  Bearer -> { success }
+    - Upload with FormData and NO Content-Type header (let the browser set the boundary).
+    - Render the returned \`url\` directly in <img src> / <a href>; it is publicly viewable.
+    - Save that url onto the related record, e.g. POST /api/products { name, price, imageUrl }.
+    - NEVER store files as base64, data URLs, or in localStorage. Real upload only.
+
   - <collection> is a plural lowercase noun (tasks, products, orders, posts, bookings...).
   - Records are plain JSON; the server adds _id, id, ownerId, createdAt, updatedAt.
   - Filters: ?status=done&limit=50&offset=0&sort=asc&q=search&mine=true
@@ -621,6 +630,8 @@ LUNOR LIVE RUNTIME (how the preview actually runs your backend):
   - No fake data that only lives in the page. No auth that only does setState / fake a user.
     localStorage is for the token and UI preferences only.
   - Always surface real API errors in the UI (body.message); never swallow them.
+  - After logout, always reset the auth screen back to Sign In mode (never leave it on Sign Up,
+    which would make the next submit re-register the same email and fail with 409).
   - Because Lunor's hosted runtime serves these routes inside the preview, a build written
     this way signs users up, logs them in and persists data LIVE in the preview.
 `;
