@@ -2939,6 +2939,21 @@ ${jsCode}
                       </button>
                     </>
                   )}
+                  {(projectNeedsBackend || liveRuntime.status === "live") && (
+                    <>
+                      <div className="w-px h-3.5 bg-border mx-0.5" />
+                      <LiveBackendPanel
+                        compact
+                        status={liveRuntime.status}
+                        info={liveRuntime.info}
+                        error={liveRuntime.error}
+                        busy={liveRuntime.busy}
+                        onStart={() => void liveRuntime.provision()}
+                        onRefresh={() => void liveRuntime.refresh()}
+                        onReset={() => void liveRuntime.reset()}
+                      />
+                    </>
+                  )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
                     onClick={() => {
