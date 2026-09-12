@@ -167,11 +167,16 @@ const ProjectDetailView = ({ projectId, onBack }: ProjectDetailViewProps) => {
             <TabsTrigger value="code" className="gap-1.5"><Code2 className="h-4 w-4" /> Code</TabsTrigger>
             <TabsTrigger value="chat" className="gap-1.5"><MessageCircle className="h-4 w-4" /> Team Chat</TabsTrigger>
             <TabsTrigger value="team" className="gap-1.5"><Users className="h-4 w-4" /> Team ({members.length})</TabsTrigger>
+            <TabsTrigger value="backend" className="gap-1.5"><Server className="h-4 w-4" /> Backend</TabsTrigger>
             <TabsTrigger value="ai" className="gap-1.5"><Sparkles className="h-4 w-4" /> AI Assist</TabsTrigger>
           </TabsList>
 
           <TabsContent value="code">
             <TeamFileEditor projectId={projectId} profiles={profiles} />
+          </TabsContent>
+
+          <TabsContent value="backend">
+            <TeamBackendTab projectId={projectId} projectTitle={project.title} />
           </TabsContent>
 
           <TabsContent value="chat">
