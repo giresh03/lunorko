@@ -26,6 +26,9 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
+import { useLiveRuntime } from "@/hooks/useLiveRuntime";
+import { injectApiShim, filesNeedBackend } from "@/lib/liveRuntime";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
@@ -620,6 +623,29 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const skipPreviewRebuildRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  // Live backend (hosted runtime) — provisioned per user + domain when the
+  // project contains server code or /api calls. Paid plans only.
+  const projectNeedsBackend = useMemo(() => {
+    const flat: { path: string; content: string }[] = [];
+    const walk = (nodes: FileNode[], prefix = "") => {
+      for (const n of nodes) {
+        const p = prefix ? `${prefix}/${n.name}` : n.name;
+        if (n.type === "file") flat.push({ path: p, content: n.content || "" });
+        if (n.children) walk(n.children, p);
+      }
+    };
+    walk(fileTree);
+    return filesNeedBackend(flat);
+  }, [fileTree]);
+  const liveRuntime = useLiveRuntime({
+    scope: "domain",
+    scopeKey: domainId,
+    name: domainName,
+    enabled: projectNeedsBackend,
+  });
+  const liveApiUrlRef = useRef<string | null>(null);
+  liveApiUrlRef.current = liveRuntime.apiUrl;
+
   // Preview runtime errors reported by the sandboxed iframe
   const [previewError, setPreviewError] = useState<{ message: string; stack?: string } | null>(null);
   const [resolvingError, setResolvingError] = useState(false);
@@ -628,8 +654,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const setPreview = useCallback((html: string) => {
     setPreviewError(null);
     previewErrorLogRef.current = [];
-    setPreviewContent(injectRuntimeGuard(html));
+    setPreviewContent(injectApiShim(injectRuntimeGuard(html), liveApiUrlRef.current));
   }, []);
+
+  // Re-inject the shim into the current preview once the backend comes online.
+  useEffect(() => {
+    if (!liveRuntime.apiUrl) return;
+    setPreviewContent((html) => (html && !html.includes("data-lunor-runtime") ? injectApiShim(html, liveRuntime.apiUrl) : html));
+  }, [liveRuntime.apiUrl]);
 
   // Automated verification: does the app actually load and does login work?
   const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
@@ -2907,6 +2939,21 @@ ${jsCode}
                       </button>
                     </>
                   )}
+                  {(projectNeedsBackend || liveRuntime.status === "live") && (
+                    <>
+                      <div className="w-px h-3.5 bg-border mx-0.5" />
+                      <LiveBackendPanel
+                        compact
+                        status={liveRuntime.status}
+                        info={liveRuntime.info}
+                        error={liveRuntime.error}
+                        busy={liveRuntime.busy}
+                        onStart={() => void liveRuntime.provision()}
+                        onRefresh={() => void liveRuntime.refresh()}
+                        onReset={() => void liveRuntime.reset()}
+                      />
+                    </>
+                  )}
                   <div className="w-px h-3.5 bg-border mx-0.5" />
                   <button
                     onClick={() => {
@@ -3029,6 +3076,7 @@ ${jsCode}
                       projectName={currentProjectName || "app"}
                       showEditor={false}
                       className="w-full h-full"
+                      apiUrl={liveRuntime.apiUrl}
                     />
                   ) : isAppDomain && currentDevice.type === "phone" ? (
                     /* Phone frame */

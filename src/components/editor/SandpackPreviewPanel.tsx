@@ -45,6 +45,8 @@ interface SandpackPreviewPanelProps {
   projectName: string;
   showEditor?: boolean;
   className?: string;
+  /** Hosted Lunor runtime API URL — when set, /api calls are routed there live. */
+  apiUrl?: string | null;
 }
 
 export default function SandpackPreviewPanel({
@@ -52,10 +54,11 @@ export default function SandpackPreviewPanel({
   projectName,
   showEditor = false,
   className = "",
+  apiUrl = null,
 }: SandpackPreviewPanelProps) {
   const files = useMemo(
-    () => buildSandpackFiles(fileTree, projectName),
-    [fileTree, projectName]
+    () => buildSandpackFiles(fileTree, projectName, apiUrl),
+    [fileTree, projectName, apiUrl]
   );
 
   return (

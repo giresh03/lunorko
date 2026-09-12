@@ -567,6 +567,33 @@ HARD RULES:
 LUNOR OUTPUT FORMAT NOTE: emit each file using Lunor's contract — the relative path on its
 own line, then a fenced code block with the language tag, then the complete file content.
 Never output partial files, diffs, or "// ...rest unchanged" placeholders.
+
+LUNOR LIVE RUNTIME (how the preview actually runs your backend):
+  Inside Lunor's preview the Express server is NOT booted. Instead every request the client
+  makes to "/api/..." (or "http://localhost:<port>/api/...", or VITE_API_URL) is transparently
+  routed to Lunor's hosted runtime, which implements exactly this contract with real
+  persistence and bcrypt + JWT auth. Therefore the client MUST ONLY use these routes so it
+  works both in the live preview and against the generated Express server:
+
+    POST   /api/auth/register   { name, email, password }  -> { success, user, token }  201
+    POST   /api/auth/login      { email, password }        -> { success, user, token }  200
+    GET    /api/auth/me         Bearer <token>             -> { success, user }
+    GET    /api/health                                     -> { success, status: "ok" }
+    GET    /api/<collection>                               -> { success, data: [...] }
+    GET    /api/<collection>/:id                           -> { success, data }
+    POST   /api/<collection>    { ...fields }  Bearer      -> { success, data }         201
+    PUT    /api/<collection>/:id   PATCH /api/<collection>/:id  DELETE /api/<collection>/:id
+    Errors: { success: false, message }
+
+  - <collection> is a plural lowercase noun (tasks, products, orders, posts, bookings...).
+  - Records are plain JSON; the server adds _id, id, ownerId, createdAt, updatedAt.
+  - Filters: ?status=done&limit=50&offset=0&sort=asc&q=search&mine=true
+  - Client: read from data.data (list or single), user from data.user, token from data.token.
+    Keep the token in localStorage under "token" and send "Authorization: Bearer <token>".
+  - Always read the API base from import.meta.env.VITE_API_URL with fallback "/api"
+    (e.g. const API = import.meta.env.VITE_API_URL || "/api") — never hardcode a port only.
+  - Your generated Express server MUST implement the same routes + response shapes so the
+    project runs identically when the user downloads it and runs it locally with MongoDB.
 `;
 
 // Domain-specific system prompts for AI code generation

@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { editorModeFor, lessonDuration, starterCodeFor, type LevelDef } from "@/lib/learningRoadmap";
 import LevelTutor from "./LevelTutor";
+import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
+import { useLiveRuntime } from "@/hooks/useLiveRuntime";
+import { filesNeedBackend, injectApiShim } from "@/lib/liveRuntime";
 
 interface Challenge {
   title: string;
@@ -138,11 +141,23 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
 
   const currentCode = mode === "web" ? `<!--HTML-->\n${html}\n/*CSS*/\n${css}\n//JS\n${js}` : code;
 
+  // Live backend for lessons that call an API (level-scoped, paid plans).
+  const lessonNeedsBackend = useMemo(
+    () => mode === "web" && filesNeedBackend([{ path: "script.js", content: js }, { path: "index.html", content: html }]),
+    [mode, js, html],
+  );
+  const liveRuntime = useLiveRuntime({
+    scope: "level",
+    scopeKey: `${domainId}:${level.index}`,
+    name: `${domainName} L${level.index}`,
+    enabled: lessonNeedsBackend,
+  });
+
   const run = async () => {
     setRunning(true);
     try {
       if (mode === "web") {
-        setPreview(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>${js}<\/script></body></html>`);
+        setPreview(injectApiShim(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>${js}<\/script></body></html>`, liveRuntime.apiUrl));
       } else {
         const { data, error } = await supabase.functions.invoke("run-code", {
           body: { code, language: mode === "python" ? "python" : mode === "sql" ? "sql" : "javascript" },
@@ -284,7 +299,19 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
     <div className="flex h-full flex-col rounded-2xl border border-border/70 bg-card/60 backdrop-blur-xl">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
         <p className="text-sm font-semibold text-foreground">Coding Workspace</p>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {mode === "web" && (lessonNeedsBackend || liveRuntime.status === "live") && (
+            <LiveBackendPanel
+              compact
+              status={liveRuntime.status}
+              info={liveRuntime.info}
+              error={liveRuntime.error}
+              busy={liveRuntime.busy}
+              onStart={() => void liveRuntime.provision()}
+              onRefresh={() => void liveRuntime.refresh()}
+              onReset={() => void liveRuntime.reset()}
+            />
+          )}
           <Button size="sm" className="h-7 text-xs" onClick={run} disabled={running}>
             {running ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Play className="mr-1 h-3 w-3" />} Run
           </Button>

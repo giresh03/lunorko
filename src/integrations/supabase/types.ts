@@ -1140,6 +1140,115 @@ export type Database = {
         }
         Relationships: []
       }
+      runtime_documents: {
+        Row: {
+          collection: string
+          created_at: string
+          data: Json
+          id: string
+          owner_user_id: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          collection: string
+          created_at?: string
+          data?: Json
+          id?: string
+          owner_user_id?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          collection?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          owner_user_id?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "runtime_documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "runtime_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      runtime_projects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          scope: string
+          scope_key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id: string
+          scope: string
+          scope_key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          scope?: string
+          scope_key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      runtime_users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          password_hash: string
+          profile: Json
+          project_id: string
+          role: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name?: string
+          password_hash: string
+          profile?: Json
+          project_id: string
+          role?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          password_hash?: string
+          profile?: Json
+          project_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "runtime_users_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "runtime_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_visits: {
         Row: {
           id: string

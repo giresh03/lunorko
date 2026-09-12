@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, UserPlus, Check, X, Crown, LogOut, MessageCircle, Code2, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, UserPlus, Check, X, Crown, LogOut, MessageCircle, Code2, Sparkles, Loader2, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,29 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import TeamChat from "./TeamChat";
 import TeamFileEditor from "./TeamFileEditor";
+import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
+import { useLiveRuntime } from "@/hooks/useLiveRuntime";
+
+/** Shared, team-scoped live backend (auth + database) for the project. */
+const TeamBackendTab = ({ projectId, projectTitle }: { projectId: string; projectTitle: string }) => {
+  const rt = useLiveRuntime({ scope: "team", scopeKey: projectId, name: projectTitle, enabled: true });
+  return (
+    <div className="max-w-xl space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Every teammate's code that calls <code className="rounded bg-muted px-1">/api/...</code> runs against this shared backend — real sign-up, login and saved data.
+      </p>
+      <LiveBackendPanel
+        status={rt.status}
+        info={rt.info}
+        error={rt.error}
+        busy={rt.busy}
+        onStart={() => void rt.provision()}
+        onRefresh={() => void rt.refresh()}
+        onReset={() => void rt.reset()}
+      />
+    </div>
+  );
+};
 
 interface ProjectDetailViewProps {
   projectId: string;
@@ -167,11 +190,16 @@ const ProjectDetailView = ({ projectId, onBack }: ProjectDetailViewProps) => {
             <TabsTrigger value="code" className="gap-1.5"><Code2 className="h-4 w-4" /> Code</TabsTrigger>
             <TabsTrigger value="chat" className="gap-1.5"><MessageCircle className="h-4 w-4" /> Team Chat</TabsTrigger>
             <TabsTrigger value="team" className="gap-1.5"><Users className="h-4 w-4" /> Team ({members.length})</TabsTrigger>
+            <TabsTrigger value="backend" className="gap-1.5"><Server className="h-4 w-4" /> Backend</TabsTrigger>
             <TabsTrigger value="ai" className="gap-1.5"><Sparkles className="h-4 w-4" /> AI Assist</TabsTrigger>
           </TabsList>
 
           <TabsContent value="code">
             <TeamFileEditor projectId={projectId} profiles={profiles} />
+          </TabsContent>
+
+          <TabsContent value="backend">
+            <TeamBackendTab projectId={projectId} projectTitle={project.title} />
           </TabsContent>
 
           <TabsContent value="chat">

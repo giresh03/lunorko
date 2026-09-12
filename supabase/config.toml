@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.assess-skills]
 verify_jwt = false
+
+[functions.project-runtime]
+verify_jwt = false
