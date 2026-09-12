@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Server, Lock, Loader2, Copy, Check, RotateCcw, RefreshCw, Database, Users, AlertTriangle } from "lucide-react";
+import { Server, Lock, Loader2, Copy, Check, RotateCcw, RefreshCw, Database, Users, AlertTriangle, Table2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import type { LiveRuntimeStatus } from "@/hooks/useLiveRuntime";
-import type { RuntimeInfo } from "@/lib/liveRuntime";
+import type { RuntimeCredentials, RuntimeInfo } from "@/lib/liveRuntime";
 
 interface Props {
   status: LiveRuntimeStatus;
@@ -13,6 +13,8 @@ interface Props {
   onReset?: () => void;
   onRefresh?: () => void;
   onStart?: () => void;
+  /** Loads read-only database credentials for outside tools. */
+  onCredentials?: () => Promise<RuntimeCredentials | null>;
   /** Compact = single status pill for toolbars; expands on click. */
   compact?: boolean;
   className?: string;
