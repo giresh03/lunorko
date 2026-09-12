@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  ChevronDown, ChevronRight, RotateCw, FolderInput, Trash2, Layers, File as FileIcon,
+  ChevronDown, ChevronRight, RotateCw, FolderInput, Trash2, Layers, File as FileIcon, Cloud, HardDrive,
 } from "lucide-react";
 import { relativeTime, type GenerationEntry } from "@/lib/generationHistory";
 
@@ -80,6 +80,14 @@ export default function GenerationHistoryPanel({
                         Full-stack
                       </span>
                     )}
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[8px] uppercase tracking-wide"
+                      style={{ color: colors.muted }}
+                      title={entry.synced ? "Saved to your account" : "Only saved on this device"}
+                    >
+                      {entry.synced ? <Cloud className="h-2.5 w-2.5" /> : <HardDrive className="h-2.5 w-2.5" />}
+                      {entry.synced ? "Synced" : "This device"}
+                    </span>
                   </div>
                 </div>
               </button>
