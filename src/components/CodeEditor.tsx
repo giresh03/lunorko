@@ -346,6 +346,30 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   return `untitled.${ext}`;
 }
 
+/** Pull the DataModel JSON block out of an assistant reply (real tables to create). */
+function extractDataModel(markdown: string): DataModelTable[] {
+  const blocks = markdown.match(/```json\s*([\s\S]*?)```/g) || [];
+  for (const block of blocks) {
+    const raw = block.replace(/```json\s*/, "").replace(/```$/, "");
+    try {
+      const parsed = JSON.parse(raw) as { dataModel?: unknown };
+      const model = Array.isArray(parsed?.dataModel) ? parsed.dataModel : null;
+      if (!model) continue;
+      return model
+        .filter((t): t is DataModelTable => Boolean(t) && typeof (t as DataModelTable).table === "string")
+        .map((t) => ({
+          table: t.table,
+          columns: Array.isArray(t.columns)
+            ? t.columns.filter((c) => c && typeof c.name === "string").slice(0, 60)
+            : [],
+        }));
+    } catch {
+      /* not the DataModel block */
+    }
+  }
+  return [];
+}
+
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
   const regex = /(?:(?:[\*`]*([\w./-]*\w\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
