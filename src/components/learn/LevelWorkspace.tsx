@@ -138,11 +138,23 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
 
   const currentCode = mode === "web" ? `<!--HTML-->\n${html}\n/*CSS*/\n${css}\n//JS\n${js}` : code;
 
+  // Live backend for lessons that call an API (level-scoped, paid plans).
+  const lessonNeedsBackend = useMemo(
+    () => mode === "web" && filesNeedBackend([{ path: "script.js", content: js }, { path: "index.html", content: html }]),
+    [mode, js, html],
+  );
+  const liveRuntime = useLiveRuntime({
+    scope: "level",
+    scopeKey: `${domainId}:${level.index}`,
+    name: `${domainName} L${level.index}`,
+    enabled: lessonNeedsBackend,
+  });
+
   const run = async () => {
     setRunning(true);
     try {
       if (mode === "web") {
-        setPreview(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>${js}<\/script></body></html>`);
+        setPreview(injectApiShim(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>${js}<\/script></body></html>`, liveRuntime.apiUrl));
       } else {
         const { data, error } = await supabase.functions.invoke("run-code", {
           body: { code, language: mode === "python" ? "python" : mode === "sql" ? "sql" : "javascript" },
