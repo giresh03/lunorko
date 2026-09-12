@@ -1389,6 +1389,48 @@ export type Database = {
           },
         ]
       }
+      team_file_versions: {
+        Row: {
+          content: string
+          created_at: string
+          file_id: string
+          id: string
+          project_id: string
+          saved_by: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          file_id: string
+          id?: string
+          project_id: string
+          saved_by: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          file_id?: string
+          id?: string
+          project_id?: string
+          saved_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_file_versions_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "team_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_file_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "team_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_files: {
         Row: {
           content: string | null
@@ -1662,6 +1704,45 @@ export type Database = {
           longest_streak?: number
           total_xp?: number
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workspace_history: {
+        Row: {
+          client_id: string
+          created_at: string
+          domain: string
+          files: Json
+          id: string
+          is_full_stack: boolean
+          project_id: string
+          project_name: string
+          prompt: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          domain: string
+          files?: Json
+          id?: string
+          is_full_stack?: boolean
+          project_id: string
+          project_name: string
+          prompt: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          domain?: string
+          files?: Json
+          id?: string
+          is_full_stack?: boolean
+          project_id?: string
+          project_name?: string
+          prompt?: string
           user_id?: string
         }
         Relationships: []
