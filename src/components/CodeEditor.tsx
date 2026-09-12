@@ -3500,23 +3500,36 @@ ${jsCode}
       )}
 
       {/* Preview runtime error — one-click AI fix */}
-      {previewError && (
-        <div className="fixed bottom-10 right-4 z-[9998] w-72 rounded-lg border border-destructive/40 bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+      {previewErrors.length > 0 && (
+        <div className="fixed bottom-10 right-4 z-[9998] w-80 rounded-lg border border-destructive/40 bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 text-destructive text-sm">⚠</span>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold text-foreground">1 error in preview</p>
-              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground line-clamp-3 break-words">{previewError.message}</p>
+              <p className="text-[11px] font-semibold text-foreground">
+                {previewErrors.length} error{previewErrors.length > 1 ? "s" : ""} in preview
+                {repairAttemptRef.current > 0 && ` · fix attempt ${repairAttemptRef.current}`}
+              </p>
+              <ul className="mt-1 max-h-24 space-y-1 overflow-y-auto">
+                {previewErrors.map((e, i) => (
+                  <li key={i} className="text-[10px] leading-relaxed text-muted-foreground break-words">• {e.message}</li>
+                ))}
+              </ul>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={handleResolveError}
                   disabled={resolvingError}
                   className="h-6 rounded-md bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-transform hover:scale-[1.03] disabled:opacity-60"
                 >
-                  {resolvingError ? "Resolving…" : "Resolve error"}
+                  {resolvingError ? "Resolving…" : previewErrors.length > 1 ? "Resolve all errors" : "Resolve error"}
                 </button>
                 <button
-                  onClick={() => setPreviewError(null)}
+                  onClick={hardRefreshPreview}
+                  className="h-6 rounded-md border border-border px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Retry preview
+                </button>
+                <button
+                  onClick={() => setPreviewErrors([])}
                   className="h-6 rounded-md px-2 text-[10px] text-muted-foreground hover:text-foreground"
                 >
                   Dismiss
