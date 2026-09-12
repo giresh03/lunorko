@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, UserPlus, Check, X, Crown, LogOut, MessageCircle, Code2, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Users, UserPlus, Check, X, Crown, LogOut, MessageCircle, Code2, Sparkles, Loader2, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,29 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import TeamChat from "./TeamChat";
 import TeamFileEditor from "./TeamFileEditor";
+import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
+import { useLiveRuntime } from "@/hooks/useLiveRuntime";
+
+/** Shared, team-scoped live backend (auth + database) for the project. */
+const TeamBackendTab = ({ projectId, projectTitle }: { projectId: string; projectTitle: string }) => {
+  const rt = useLiveRuntime({ scope: "team", scopeKey: projectId, name: projectTitle, enabled: true });
+  return (
+    <div className="max-w-xl space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Every teammate's code that calls <code className="rounded bg-muted px-1">/api/...</code> runs against this shared backend — real sign-up, login and saved data.
+      </p>
+      <LiveBackendPanel
+        status={rt.status}
+        info={rt.info}
+        error={rt.error}
+        busy={rt.busy}
+        onStart={() => void rt.provision()}
+        onRefresh={() => void rt.refresh()}
+        onReset={() => void rt.reset()}
+      />
+    </div>
+  );
+};
 
 interface ProjectDetailViewProps {
   projectId: string;
