@@ -3019,6 +3019,7 @@ ${jsCode}
                         onStart={() => void liveRuntime.provision()}
                         onRefresh={() => void liveRuntime.refresh()}
                         onReset={() => void liveRuntime.reset()}
+                        onCredentials={liveRuntime.credentials}
                       />
                     </>
                   )}
