@@ -2155,22 +2155,33 @@ ${jsCode}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, chatLoading, voice.voiceEnabled]);
 
-  // One-click AI fix for runtime errors surfaced by the preview
+  // One-click AI fix for every runtime error surfaced by the preview
   const handleResolveError = useCallback(async () => {
-    if (!previewError || resolvingError) return;
+    if (!previewErrors.length || resolvingError) return;
     setResolvingError(true);
+    const attempt = ++repairAttemptRef.current;
+    const before = appliedBatchRef.current;
     const prompt =
-      `The generated site threw a runtime error in the preview. Fix the root cause in the project files.\n` +
-      `Error: ${previewError.message}\n` +
-      (previewError.stack ? `Stack: ${previewError.stack.slice(0, 1500)}\n` : "") +
-      `Rules: keep the existing design and features, avoid APIs unavailable in a sandboxed iframe (use in-memory or guarded storage), and return the COMPLETE updated file(s) using the exact existing file paths.`;
+      `The preview is throwing ${previewErrors.length} runtime error(s). Fix the ROOT CAUSE of ALL of them.\n` +
+      previewErrors
+        .map((e, i) => `${i + 1}. ${e.message}${e.stack ? `\n   ${e.stack.slice(0, 800)}` : ""}`)
+        .join("\n") +
+      (previewEntryRef.current ? `\nEntry page being previewed: ${previewEntryRef.current}\n` : "\n") +
+      (attempt > 1 ? `Attempt ${attempt}: the previous fix did NOT work — change your approach, do not repeat it.\n` : "") +
+      `Rules: keep the existing design and features; guard every browser API a sandboxed iframe may block (storage, cookies, clipboard, notifications); never leave undefined element/DOM lookups unguarded; return COMPLETE files at their exact existing paths.`;
     try {
       await handleChatSend(prompt);
+      if (appliedBatchRef.current === before) {
+        toast.error("The assistant replied without code — errors kept so you can retry.");
+        return;
+      }
+      setPreviewErrors([]);
+      previewErrorLogRef.current = [];
+      setPreviewKey((k) => k + 1);
     } finally {
-      setPreviewError(null);
       setResolvingError(false);
     }
-  }, [previewError, resolvingError, handleChatSend]);
+  }, [previewErrors, resolvingError, handleChatSend]);
 
   // Verification runs silently in the background. Only genuine passes are surfaced,
   // and a self-test timeout is never treated as an application error.
