@@ -284,7 +284,19 @@ const LevelWorkspace = ({ domainId, domainName, level, videoUrl, onBack, onCompl
     <div className="flex h-full flex-col rounded-2xl border border-border/70 bg-card/60 backdrop-blur-xl">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
         <p className="text-sm font-semibold text-foreground">Coding Workspace</p>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {mode === "web" && (lessonNeedsBackend || liveRuntime.status === "live") && (
+            <LiveBackendPanel
+              compact
+              status={liveRuntime.status}
+              info={liveRuntime.info}
+              error={liveRuntime.error}
+              busy={liveRuntime.busy}
+              onStart={() => void liveRuntime.provision()}
+              onRefresh={() => void liveRuntime.refresh()}
+              onReset={() => void liveRuntime.reset()}
+            />
+          )}
           <Button size="sm" className="h-7 text-xs" onClick={run} disabled={running}>
             {running ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Play className="mr-1 h-3 w-3" />} Run
           </Button>
