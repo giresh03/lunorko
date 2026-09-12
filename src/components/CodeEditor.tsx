@@ -36,7 +36,7 @@ import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useCredits } from "@/hooks/useCredits";
 import GenerationHistoryPanel from "@/components/editor/GenerationHistoryPanel";
 import {
-  getHistory, addHistoryEntry, deleteHistoryEntry, clearHistory, isFullStackFiles,
+  getHistory, syncHistory, addHistoryEntry, deleteHistoryEntry, clearHistory, isFullStackFiles,
   type GenerationEntry,
 } from "@/lib/generationHistory";
 import {
@@ -605,6 +605,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
+  }, []);
+
+  // Pull account-wide workspace history (previous works) once signed in
+  useEffect(() => {
+    let cancelled = false;
+    syncHistory().then((entries) => { if (!cancelled) setGenHistory(entries); }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   const domainId = useMemo(() => domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), [domainName]);
