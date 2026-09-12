@@ -13,7 +13,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3.23.8';
-import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
+import bcrypt from 'npm:bcryptjs@2.4.3';
 import { create as createJwt, verify as verifyJwt, getNumericDate } from 'https://deno.land/x/djwt@v3.0.2/mod.ts';
 
 const JSON_HEADERS = { ...corsHeaders, 'Content-Type': 'application/json' };
@@ -275,7 +275,7 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
       if ((count ?? 0) >= MAX_USERS_PER_PROJECT) return fail('User limit reached for this project', 429);
       const { data: existing } = await db.from('runtime_users').select('id').eq('project_id', projectId).eq('email', email.toLowerCase()).maybeSingle();
       if (existing) return fail('Email already registered', 409);
-      const hash = await bcrypt.hash(password);
+      const hash = await bcrypt.hash(password, 10);
       const profile: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(rest)) if (k !== 'passwordHash' && k !== 'password') profile[k] = v;
       const { data: user, error } = await db
