@@ -1356,6 +1356,7 @@ ${jsCode}
 
   const updatePreview = useCallback(() => {
     if (!activeTab || !showPreview) return;
+    previewEntryRef.current = activeTab.id;
     const allFiles = collectFiles(fileTree);
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
