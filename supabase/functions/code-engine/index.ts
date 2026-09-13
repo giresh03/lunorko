@@ -734,6 +734,27 @@ QUALITY BAR
   "Load sample data" button that POSTs realistic rows through the API (never hardcoded arrays).
   Marketing pages may still render their own static copy/images so they never look empty.
 
+DESIGN EXCELLENCE (this is what "impressive" means — non-negotiable)
+- Typography: load a real Google Fonts pairing via <link> (e.g. Sora/Outfit + Inter, or Instrument
+  Serif + DM Sans). NEVER ship system-ui/Arial. Display headings 44-72px, clamp() fluid sizing,
+  tight letter-spacing on headings, 1.6 line-height body, max 68ch paragraph width.
+- Color: one confident brand palette derived from the business (not generic blue). Define tokens
+  in :root, use a single accent for CTAs, tinted surfaces, 1px hairline borders, layered soft
+  shadows. A gradient accent on headline words or the primary button.
+- Layout: no stack of identical 3-card rows. Alternate section rhythms — full-bleed hero, bento
+  grid, split image/text with offset imagery, marquee/logo strip, stats band, horizontal-scroll
+  gallery, numbered process timeline, FAQ accordion, big-quote testimonial, closing CTA band.
+- Motion: scroll-reveal via IntersectionObserver (fade+rise, staggered), animated number counters,
+  card lift + image zoom on hover, sticky header that compacts and gains blur on scroll, and
+  @media (prefers-reduced-motion: reduce) disabling it all.
+- Detail: rounded 14-20px radii, generous 96-140px section padding, eyebrow labels above headings,
+  inline SVG icons in tinted circles, badge/pill elements, custom-styled inputs and buttons with
+  focus rings. Real numbers, real names, real prices in copy — never "Lorem" or "Feature one".
+- styles.css must be substantial (600+ lines) and cover every component the pages use; no page may
+  rely on inline styles for its layout.
+- Self-check before finishing: would this pass as a paid agency site? If any section is a plain
+  centered heading + paragraph on white, redesign it before emitting.
+
 INTEGRATION WITH LUNOR
 - This is Lunor.AI's workspace. Emit each file as a separate code block headed by its relative path
   exactly as: path/to/file.ext then a fenced code block with the language. No prose around the code
@@ -763,9 +784,16 @@ RULES:
    soft borders (#e6e8ec), light shadows, dark text on light surfaces. Never ship a dark-background
    site by default. Do NOT add dark starfield/neon backgrounds unless requested.
 4b. **IMAGES ARE MANDATORY AND MUST ALWAYS RENDER** — Use these image sources:
-   - **Unsplash (primary)**: <img src="https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80"> — use real Unsplash photo IDs for relevant topics.
+   - **AI-generated (PRIMARY — always renders, always on-topic)**:
+     <img src="https://image.pollinations.ai/prompt/URL_ENCODED_SCENE?width=1200&height=800&nologo=true&seed=N">
+     Write a rich, specific scene per image ("wood-fired margherita pizza on rustic table, warm
+     restaurant light, photographic") and a unique seed per image so no two repeat.
+   - **Unsplash (only with an ID from the curated list below)** — never invent a photo ID; an
+     invented ID 404s and the page ends up with empty holes.
    - **Picsum (random beautiful photos)**: <img src="https://picsum.photos/WIDTH/HEIGHT?random=N"> where N is a unique number per image.
-   - **Hero images**: Use full-width background images with CSS: background-image: url('https://images.unsplash.com/photo-ID?w=1920&h=1080&fit=crop&q=80');
+   - **Hero**: a full-bleed generated image (width=1920&height=1080) behind a dark-to-transparent
+     gradient overlay so headline text stays readable, plus a second product/detail image offset
+     over it — never a flat colored band.
    - Include AT LEAST 6-10 images per page (hero banner, feature images, team/product photos, gallery items).
    - Use object-fit: cover on all images. Add loading="lazy" for below-fold images.
    - EVERY <img> MUST carry a fallback + self-remove so a broken image is never shown:
