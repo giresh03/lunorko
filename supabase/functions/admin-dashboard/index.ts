@@ -439,7 +439,7 @@ serve(async (req) => {
       (rtUsers || []).forEach((u: any) => { userCount[u.project_id] = (userCount[u.project_id] || 0) + 1; });
       const enriched = list.map((p: any) => {
         const collections = tableMap[p.id] || [];
-        const status = !p.schema_name ? "pending" : collections.length > 0 ? "live" : "provisioned";
+        const status = p.schema_name ? "live" : collections.length > 0 ? "provisioned" : "pending";
         return {
           id: p.id,
           name: p.name,
