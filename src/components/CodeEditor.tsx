@@ -1496,6 +1496,44 @@ ${jsCode}
     updatePreview();
   }, [updatePreview]);
 
+  // Live-apply admin edits: when this user's saved pages change in the backend,
+  // reload the snapshot into the open workspace and refresh the preview instantly.
+  useEffect(() => {
+    const channel = supabase.channel("workspace-history-live");
+    let active = true;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const userId = data.user?.id;
+      if (!userId || !active) return;
+      channel
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "workspace_history", filter: `user_id=eq.${userId}` },
+          (payload) => {
+            const row = payload.new as { files?: { path: string; language?: string; content: string }[] };
+            const files = Array.isArray(row?.files) ? row.files : [];
+            if (!files.length) return;
+            setFileTree(buildTreeFromSnapshot(files));
+            setOpenTabs((tabs) =>
+              tabs.map((t) => {
+                const f = files.find((x) => x.path === t.id || x.path.endsWith(`/${t.id}`));
+                return f ? { ...t, content: f.content, isModified: false } : t;
+              })
+            );
+            setShowPreview(true);
+            hardRefreshPreview();
+            toast.success("Site updated — preview refreshed");
+            syncHistory().then(setGenHistory).catch(() => {});
+          }
+        )
+        .subscribe();
+    })();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [hardRefreshPreview]);
+
   const copyPreviewHtml = useCallback(() => {
     if (!previewContent) return;
     navigator.clipboard.writeText(previewContent).then(() => toast.success("Preview HTML copied"));
