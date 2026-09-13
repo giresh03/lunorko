@@ -1606,6 +1606,14 @@ const AdminPanel = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      <SiteEditorDialog
+        site={editSite}
+        open={!!editSite}
+        onClose={() => setEditSite(null)}
+        onSaved={fetchAll}
+        callAdmin={callAdmin}
+      />
     </div>
   );
 };
