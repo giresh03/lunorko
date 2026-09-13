@@ -1689,7 +1689,7 @@ ${code}
     // ============= ACTION: autocomplete (ghost text) =============
     if (action === "autocomplete") {
       const { code, language, cursorLine, cursorColumn } = body as { code: string; language: string; cursorLine: number; cursorColumn: number };
-      const selectedModel = "google/gemini-2.5-flash-lite";
+      const selectedModel = LITE_MODEL;
       console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
 
       const lines = code.split("\n");
@@ -1718,7 +1718,7 @@ ${code}
     // ============= ACTION: analyze-code (real-time AI guidance) =============
     if (action === "analyze-code") {
       const { code, language, cursorLine, domain: actionDomain, teachingMode } = body as { code: string; language: string; cursorLine: number; domain: string; teachingMode: boolean };
-      const selectedModel = "google/gemini-2.5-flash-lite";
+      const selectedModel = LITE_MODEL;
       console.log(`[code-engine] analyze-code lang=${language}, line=${cursorLine}, teachingMode=${!!teachingMode}`);
 
       const lines = code.split("\n");
@@ -1786,7 +1786,7 @@ Keep responses concise.${teachingHint}`;
     // ============= ACTION: explain-error (AI explanation for errors) =============
     if (action === "explain-error") {
       const { error: codeError, code, language, domain: actionDomain, teachingMode } = body as { error: string; code: string; language: string; domain: string; teachingMode: boolean };
-      const selectedModel = "google/gemini-2.5-flash-lite";
+      const selectedModel = LITE_MODEL;
       console.log(`[code-engine] explain-error teachingMode=${!!teachingMode}`);
 
       const basePrompt = domainPrompts[actionDomain || domain] || `You are a coding mentor for ${actionDomain || domain}.`;
