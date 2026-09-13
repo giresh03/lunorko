@@ -55,6 +55,48 @@ function sortFiles(files: SiteFile[]): SiteFile[] {
   return [...files].sort((a, b) => rank(a.path) - rank(b.path) || a.path.localeCompare(b.path));
 }
 
+/** Same tokens the save path writes, so the pane matches the saved result. */
+function themeStyleTag(theme: SiteTheme): string {
+  const rules: string[] = [];
+  if (theme.accent) rules.push(`--accent:${theme.accent};--primary:${theme.accent};--brand:${theme.accent}`);
+  if (theme.background) rules.push(`--bg:${theme.background};--background:${theme.background}`);
+  if (theme.surface) rules.push(`--surface:${theme.surface};--card:${theme.surface}`);
+  if (theme.text) rules.push(`--text:${theme.text};--foreground:${theme.text}`);
+  const fonts = [theme.headingFont, theme.bodyFont].filter(Boolean) as string[];
+  const link = fonts.length
+    ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${fonts
+        .map((f) => `family=${encodeURIComponent(f)}:wght@400;600;700;800`)
+        .join("&")}&display=swap">`
+    : "";
+  return `${link}<style>
+:root{${rules.join(";")}}
+${theme.background ? `body{background:${theme.background}}` : ""}
+${theme.text ? `body{color:${theme.text}}` : ""}
+${theme.bodyFont ? `body{font-family:'${theme.bodyFont}',sans-serif}` : ""}
+${theme.headingFont ? `h1,h2,h3,h4,h5,h6{font-family:'${theme.headingFont}',serif}` : ""}
+${theme.accent ? `a{color:${theme.accent}}` : ""}
+</style>`;
+}
+
+/** Inline the site's own CSS/JS into the selected page so the pane needs no server. */
+function buildPreviewDoc(files: SiteFile[], activePath: string, theme: SiteTheme): string {
+  const byName = (re: RegExp) => files.find((f) => re.test(f.path.split("/").pop() || ""));
+  const page =
+    files.find((f) => f.path === activePath && /\.html$/i.test(f.path)) ||
+    byName(/^index\.html$/i) ||
+    files.find((f) => /\.html$/i.test(f.path));
+  if (!page) return "<!doctype html><title>No page</title><body style='font:14px system-ui;padding:24px'>No page to preview yet.</body>";
+  const css = files.filter((f) => /\.css$/i.test(f.path)).map((f) => f.content).join("\n");
+  const js = files.filter((f) => /^(script|main|app|api)\.js$/i.test(f.path.split("/").pop() || "")).map((f) => f.content).join("\n;\n");
+  let html = page.content
+    .replace(/<link[^>]+rel=["']stylesheet["'][^>]*>/gi, "")
+    .replace(/<script[^>]+src=["'][^"']+["'][^>]*>\s*<\/script>/gi, "");
+  const head = `<style>${css}</style>${themeStyleTag(theme)}`;
+  html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${head}</head>`) : head + html;
+  const tail = `<script>try{${js}}catch(e){console.error(e)}</script>`;
+  return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${tail}</body>`) : html + tail;
+}
+
 const SiteEditorDialog = ({ site, open, onClose, onSaved, callAdmin }: Props) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,6 +134,9 @@ const SiteEditorDialog = ({ site, open, onClose, onSaved, callAdmin }: Props) =>
   }, [open, site?.id, site?.name, callAdmin]);
 
   const activeFile = useMemo(() => files.find((f) => f.path === active) || null, [files, active]);
+
+  // Rebuilt on every keystroke / theme change — no save needed.
+  const previewHtml = useMemo(() => buildPreviewDoc(files, active, theme), [files, active, theme]);
 
   const updateContent = (value: string) => {
     if (!activeFile) return;
@@ -251,14 +296,25 @@ const SiteEditorDialog = ({ site, open, onClose, onSaved, callAdmin }: Props) =>
                   </p>
                 )}
               </div>
-              <Textarea
-                value={activeFile?.content || ""}
-                onChange={(e) => updateContent(e.target.value)}
-                spellCheck={false}
-                disabled={!activeFile}
-                className="min-h-[360px] font-mono text-xs leading-relaxed"
-                placeholder="Select a page to edit its code"
-              />
+              <div className="grid gap-3 xl:grid-cols-2">
+                <Textarea
+                  value={activeFile?.content || ""}
+                  onChange={(e) => updateContent(e.target.value)}
+                  spellCheck={false}
+                  disabled={!activeFile}
+                  className="min-h-[360px] font-mono text-xs leading-relaxed"
+                  placeholder="Select a page to edit its code"
+                />
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Live preview — updates as you type</p>
+                  <iframe
+                    title="Site preview"
+                    srcDoc={previewHtml}
+                    sandbox="allow-scripts"
+                    className="min-h-[360px] w-full rounded-lg border border-border bg-white"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}

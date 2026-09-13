@@ -50,6 +50,13 @@
       "when": 1789236215549,
       "tag": "0006_runtime_real_schema_registry",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789329937746,
+      "tag": "0007_workspace_history_realtime",
+      "breakpoints": true
     }
   ]
 }
