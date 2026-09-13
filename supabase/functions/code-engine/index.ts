@@ -1542,6 +1542,8 @@ ${stackDirective}`;
             { role: "system", content: systemPrompt },
             ...messages,
           ],
+          max_tokens: 32768,
+          temperature: 0.85,
           stream: true,
         }),
       });
