@@ -763,6 +763,10 @@ DESIGN EXCELLENCE (this is what "impressive" means — non-negotiable)
   rely on inline styles for its layout.
 - Self-check before finishing: would this pass as a paid agency site? If any section is a plain
   centered heading + paragraph on white, redesign it before emitting.
+- Every section needs a visual anchor: an image, inline-SVG illustration, chart-like stat block,
+  icon grid or tinted gradient panel. A section that is only a heading + paragraph is a failure.
+- Depth cues: overlapping cards, offset images breaking the grid, decorative blurred gradient
+  blobs behind sections, subtle noise/grid background texture, and a dark closing CTA band.
 
 INTEGRATION WITH LUNOR
 - This is Lunor.AI's workspace. Emit each file as a separate code block headed by its relative path
