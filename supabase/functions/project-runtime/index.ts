@@ -467,10 +467,14 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
     const where: string[] = [];
     const params: unknown[] = [];
 
-    // Owner-scoped by default for signed-in users; ?all=true opts into shared data.
-    if (me && url.searchParams.get('all') !== 'true') {
+    // Signed-in users see their own rows PLUS site-published content (no owner, e.g. records
+    // the site owner added from the Lunor admin). ?mine=true = strictly own rows; ?all=true = everything.
+    if (me && url.searchParams.get('mine') === 'true') {
       params.push(me.id);
       where.push(`owner_id = $${params.length}`);
+    } else if (me && url.searchParams.get('all') !== 'true') {
+      params.push(me.id);
+      where.push(`(owner_id = $${params.length} OR owner_id IS NULL)`);
     }
     for (const [k, v] of url.searchParams.entries()) {
       if (['limit', 'offset', 'skip', 'mine', 'all', 'sort', 'q', 'search'].includes(k)) continue;
