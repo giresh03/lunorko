@@ -2111,15 +2111,17 @@ ${jsCode}
       // Fresh site build: drop untouched starter-template files so they can't
       // pollute the generated preview (e.g. the "Hello World!" app.js).
       let staleTemplatePaths: string[] = [];
-      if (newFiles.some((f) => f.name.toLowerCase().endsWith(".html"))) {
+      if (isSiteBuild) {
         const templates = new Set(
           (domainEnvironments[domainId]?.templateFiles ?? []).map((t) => (t.content || "").trim()),
         );
+        const starterNames = /^(index\.html|app\.js|main\.js|script\.js|style\.css|styles\.css)$/i;
         staleTemplatePaths = existingForResolve
           .filter(
             (f) =>
-              templates.has((f.content || "").trim()) &&
-              !newFiles.some((n) => n.id === f.path),
+              !newFiles.some((n) => n.id === f.path) &&
+              (templates.has((f.content || "").trim()) ||
+                (f.path.startsWith("src/") && starterNames.test(f.name))),
           )
           .map((f) => f.path);
       }
