@@ -744,7 +744,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // Preview runtime errors reported by the sandboxed iframe
   const [previewErrors, setPreviewErrors] = useState<{ message: string; stack?: string }[]>([]);
-  const [backendNeeded, setBackendNeeded] = useState(false);
   const [resolvingError, setResolvingError] = useState(false);
   const previewErrorLogRef = useRef<string[]>([]);
   const verifyPendingRef = useRef(false);
