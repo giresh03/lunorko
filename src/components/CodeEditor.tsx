@@ -2095,6 +2095,21 @@ ${jsCode}
         newFiles.push({ id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code });
       });
 
+      // Fresh site build: drop untouched starter-template files so they can't
+      // pollute the generated preview (e.g. the "Hello World!" app.js).
+      let staleTemplatePaths: string[] = [];
+      if (newFiles.some((f) => f.name.toLowerCase().endsWith(".html"))) {
+        const templates = new Set(
+          (domainEnvironments[domainId]?.templateFiles ?? []).map((t) => (t.content || "").trim()),
+        );
+        staleTemplatePaths = existingForResolve
+          .filter(
+            (f) =>
+              templates.has((f.content || "").trim()) &&
+              !newFiles.some((n) => n.id === f.path),
+          )
+          .map((f) => f.path);
+      }
 
       // Batch update file tree in a single setState
       setFileTree(prev => {
@@ -2106,13 +2121,19 @@ ${jsCode}
           tree = [srcFolder, ...tree];
         }
 
+        staleTemplatePaths.forEach((p) => { tree = removeNode(tree, p); });
+
         newFiles.forEach(({ id, name, lang, code }) => {
           const existingInTree = findFile(tree, id);
           if (existingInTree) {
             tree = updateNode(tree, id, n => ({ ...n, content: code }));
           } else {
             const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
+            if (id.includes("/")) {
+              tree = addChild(tree, "src", newNode);
+            } else {
+              tree = [...tree, newNode];
+            }
           }
         });
         return tree;
@@ -2120,7 +2141,7 @@ ${jsCode}
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
-        let tabs = [...prev];
+        let tabs = [...prev].filter(t => !staleTemplatePaths.includes(t.id));
         newFiles.forEach(({ id, name, lang, code }) => {
           const existingTab = tabs.find(t => t.id === id);
           if (existingTab) {
