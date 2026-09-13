@@ -10,17 +10,20 @@ export interface AIModel {
   icon: "fast" | "balanced" | "powerful";
 }
 
+export const DEFAULT_AI_MODEL = "google/gemini-3.1-pro-preview";
+
 export const AI_MODELS: AIModel[] = [
-  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash", description: "Fast & balanced (default)", icon: "fast" },
-  { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Good multimodal reasoning", icon: "balanced" },
-  { id: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Lite", description: "Fastest, simple tasks", icon: "fast" },
-  { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Top-tier reasoning", icon: "powerful" },
-  { id: "google/gemini-3-pro-preview", label: "Gemini 3 Pro", description: "Next-gen heavy reasoning", icon: "powerful" },
-  { id: "openai/gpt-5-nano", label: "GPT-5 Nano", description: "Speed optimized", icon: "fast" },
-  { id: "openai/gpt-5-mini", label: "GPT-5 Mini", description: "Balanced cost & quality", icon: "balanced" },
-  { id: "openai/gpt-5", label: "GPT-5", description: "Powerful all-rounder", icon: "powerful" },
-  { id: "openai/gpt-5.2", label: "GPT-5.2", description: "Latest, best reasoning", icon: "powerful" },
+  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", description: "Highest quality (default)", icon: "powerful" },
+  { id: "google/gemini-3.8-flash", label: "Gemini 3.8 Flash", description: "Fast & balanced", icon: "balanced" },
+  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash", description: "Previous fast model", icon: "fast" },
+  { id: "google/gemini-3.1-flash-lite", label: "Gemini 3.1 Lite", description: "Fastest, simple edits", icon: "fast" },
 ];
+
+/** Map any stored/legacy model id onto one that is still served. */
+export function resolveModelId(id?: string | null): string {
+  if (id && AI_MODELS.some((m) => m.id === id)) return id;
+  return DEFAULT_AI_MODEL;
+}
 
 const iconMap = {
   fast: Zap,
