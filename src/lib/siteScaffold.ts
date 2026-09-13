@@ -124,7 +124,7 @@ function reconcileNav(block: string, pages: string[], current: string): string {
     return link;
   });
 
-  const missing = pages.filter((p) => !present.has(p));
+  const missing = pages.filter((p) => !present.has(p) && !UTILITY_PAGE.test(p));
   if (missing.length) {
     const extra = missing
       .map(
