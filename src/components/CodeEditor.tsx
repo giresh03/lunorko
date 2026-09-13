@@ -1665,6 +1665,64 @@ ${jsCode}
     }
   }, [activeTabId, activeTab, updateNode, addChild]);
 
+  // Live auto-apply: write streamed code blocks into their files as soon as each
+  // block finishes, so nothing needs an "Apply" click.
+  const liveAppliedRef = useRef<Map<string, number>>(new Map());
+  const lastLiveApplyRef = useRef(0);
+
+  const liveApplyBlocks = useCallback((markdown: string, userPrompt?: string) => {
+    const fences = (markdown.match(/```/g) || []).length;
+    if (fences < 2) return;
+    const complete = fences % 2 === 0 ? markdown : markdown.slice(0, markdown.lastIndexOf("```"));
+    const blocks = extractCodeBlocks(complete, userPrompt);
+    if (!blocks.length) return;
+    const isSiteBuild = !isAppDomain && blocks.some(
+      (b) => /<!DOCTYPE html|<html/i.test(b.code) || /\.html$/i.test(b.filename || ""));
+
+    const written: { id: string; name: string; lang: string; code: string }[] = [];
+    setFileTree((prev) => {
+      let tree = [...prev];
+      const existing = flattenFiles(tree);
+      blocks.forEach((block) => {
+        const lang = LANG_MAP[block.language] || block.language;
+        const ext = LANG_EXT_MAP[lang] || LANG_EXT_MAP[block.language] || block.language || "js";
+        const fname = block.filename || `untitled.${ext}`;
+        const id = resolveTargetPath(fname, lang, existing, isSiteBuild);
+        if (liveAppliedRef.current.get(id) === block.code.length) return;
+        liveAppliedRef.current.set(id, block.code.length);
+        const name = id.split("/").pop() || fname;
+        written.push({ id, name, lang: lang || getLang(name), code: block.code });
+        if (findFile(tree, id)) {
+          tree = updateNode(tree, id, (n) => ({ ...n, content: block.code }));
+          return;
+        }
+        const node: FileNode = { id, name, type: "file", language: lang || getLang(name), content: block.code };
+        if (id.includes("/")) {
+          if (!tree.find((n) => n.id === "src" && n.type === "folder"))
+            tree = [{ id: "src", name: "src", type: "folder", isOpen: true, children: [] }, ...tree];
+          tree = addChild(tree, "src", node);
+        } else {
+          tree = [...tree, node];
+        }
+      });
+      return tree;
+    });
+    if (!written.length) return;
+    setOpenTabs((prev) => {
+      let tabs = [...prev];
+      written.forEach(({ id, name, lang, code }) => {
+        tabs = tabs.some((t) => t.id === id)
+          ? tabs.map((t) => (t.id === id ? { ...t, content: code, isModified: true } : t))
+          : [...tabs, { id, name, language: lang, content: code, isModified: true }];
+      });
+      return tabs;
+    });
+    const entry = written.find((f) => f.name === "index.html")
+      || written.find((f) => f.name.endsWith(".html")) || written[0];
+    if (entry) { previewEntryRef.current = entry.id; setActiveTabId(entry.id); }
+    setShowPreview(true);
+  }, [isAppDomain, updateNode, addChild]);
+
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
     try {
