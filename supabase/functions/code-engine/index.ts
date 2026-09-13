@@ -1334,7 +1334,8 @@ FIX MODE (non-negotiable):
   replace them with in-memory or demo users. Wrap localStorage/sessionStorage access in a guarded
   helper that falls back to an in-memory object when the sandbox throws, and never call an
   external auth API that is not part of the live runtime contract.
-- Never fetch URLs, images or endpoints that are not defined in the project; remove dead fetches
+- Never fetch URLs, images or endpoints that are not defined in the project (the live runtime
+  /api routes count as defined); remove dead fetches
   instead of letting them 404.
 - Always return the COMPLETE content of every changed file using its EXACT existing path, then end
   with one short line confirming each listed error can no longer occur.
