@@ -555,69 +555,6 @@ serve(async (req) => {
       return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // --- Load one generated site's files (admin, any owner) ---
-    if (action === "site-files") {
-      const body = await req.json().catch(() => ({}));
-      const projectId = body?.projectId as string | undefined;
-      if (!projectId) return jsonRes({ error: "projectId is required" }, 400);
-      const { data: p } = await adminClient
-        .from("runtime_projects")
-        .select("id, name, owner_id, scope_key")
-        .eq("id", projectId)
-        .maybeSingle();
-      if (!p) return jsonRes({ error: "Site not found" }, 404);
-      // History rows may store the domain as a display name ("Web Development")
-      // while runtime projects use the slug ("web-development") — match on the slug.
-      const { data: histRows } = await adminClient
-        .from("workspace_history")
-        .select("client_id, project_name, files, prompt, created_at, domain")
-        .eq("user_id", p.owner_id)
-        .order("created_at", { ascending: false })
-        .limit(60);
-      const wanted = slug(p.scope_key || "");
-      const hist = (histRows || []).find((h: any) => slug(h.domain || "") === wanted) || (histRows || [])[0];
-      return jsonRes({
-        id: p.id,
-        name: p.name,
-        clientId: hist?.client_id ?? null,
-        projectName: hist?.project_name ?? p.name,
-        prompt: hist?.prompt ?? "",
-        files: Array.isArray(hist?.files) ? hist!.files : [],
-        theme: readTheme(hist?.files),
-      });
-    }
-
-    // --- Save name / theme / page content back onto the site ---
-    if (action === "site-update") {
-      const body = await req.json().catch(() => ({}));
-      const { projectId, name, clientId, files, theme } = body || {};
-      if (!projectId) return jsonRes({ error: "projectId is required" }, 400);
-      const { data: p } = await adminClient
-        .from("runtime_projects")
-        .select("id, owner_id, scope_key")
-        .eq("id", projectId)
-        .maybeSingle();
-      if (!p) return jsonRes({ error: "Site not found" }, 404);
-
-      let next: SiteFile[] = Array.isArray(files) ? files : [];
-      if (theme && next.length) next = applyTheme(next, theme as SiteTheme);
-
-      if (typeof name === "string" && name.trim()) {
-        await adminClient.from("runtime_projects").update({ name: name.trim() }).eq("id", p.id);
-      }
-      if (clientId && next.length) {
-        const patch: Record<string, unknown> = { files: next };
-        if (typeof name === "string" && name.trim()) patch.project_name = name.trim();
-        const { error: upErr } = await adminClient
-          .from("workspace_history")
-          .update(patch)
-          .eq("user_id", p.owner_id)
-          .eq("client_id", clientId);
-        if (upErr) return jsonRes({ error: upErr.message }, 500);
-      }
-      return jsonRes({ success: true, files: next });
-    }
-
     return new Response(JSON.stringify({ error: `Unknown action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("Admin error:", err);
