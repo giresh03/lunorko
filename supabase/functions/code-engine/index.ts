@@ -697,6 +697,10 @@ OUTPUT WORKFLOW (emit files in this order, each as a complete code block)
 
 FILE RULES
 - Root files only: index.html, <short-name>.html for each page, styles.css, script.js.
+- The homepage is ALWAYS named index.html. Never name a page after the business
+  (no restaurant.html as the home page) — label pages by purpose: menu.html, about.html, contact.html.
+- Always emit index.html, styles.css and script.js in every BUILD, even if a starter file already
+  exists; your versions replace them completely.
 - Relative paths only (styles.css, script.js — never /styles.css) so the preview works.
 - Valid HTML5, a unique <title> per page, exactly one <h1> per page.
 - Each page must have distinct, meaningful sections (hero, features/services, proof/testimonials,
