@@ -15,7 +15,7 @@ export type Feature =
 
 const PLAN_FEATURES: Record<string, Feature[]> = {
   // Free users get a credit-metered trial of the AI workspace + domains.
-  free: ["code-editor", "domains"],
+  free: ["code-editor", "domains", "live-backend"],
   pro: ["videos", "code-editor", "notes", "community", "domains", "live-backend"],
   premium: ["videos", "code-editor", "notes", "community", "domains", "projects", "skill-radar", "interview-prep", "live-backend"],
   professional: [

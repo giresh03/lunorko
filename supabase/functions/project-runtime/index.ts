@@ -132,15 +132,7 @@ async function handleManage(req: Request): Promise<Response> {
 
   const db = admin();
 
-  // Plan gate: paid plan or admin.
-  const [{ data: isAdmin }, { data: hasSub }] = await Promise.all([
-    db.rpc('has_role', { _user_id: userId, _role: 'admin' }),
-    db.rpc('has_active_subscription', { _user_id: userId }),
-  ]);
-  const allowed = Boolean(isAdmin) || Boolean(hasSub) || email.toLowerCase() === ADMIN_EMAIL;
-  if (!allowed) {
-    return json({ error: 'Live backend requires a Pro, Premium or Professional plan', code: 'PLAN_REQUIRED' }, 403);
-  }
+  // Live backend is available to every signed-in user.
 
   // Team scope: any team member may use the shared runtime; owner is whoever provisions first.
   let projectRow: Row | null = null;
