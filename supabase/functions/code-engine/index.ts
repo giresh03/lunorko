@@ -1480,6 +1480,7 @@ ${stackDirective}`;
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: systemPrompt }] },
             contents,
+            generationConfig: { maxOutputTokens: 32768, temperature: 0.85 },
           }),
         });
         if (!googleResp.ok) {
