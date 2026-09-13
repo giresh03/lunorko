@@ -10,6 +10,10 @@
 
 const NAV_MARK = "__site-nav";
 
+/** Account/utility pages the AI links deliberately — never auto-append them to the main nav. */
+const UTILITY_PAGE =
+  /^(login|signin|sign-in|signup|sign-up|register|logout|admin|dashboard|account|profile|settings|cart|checkout|orders?|bookings?|reset-password|forgot-password|404|thank-you|success)\.html$/i;
+
 /** All HTML page names in the project, index.html first, then alphabetical. */
 export function listPages(allFiles: Record<string, string>): string[] {
   const names = Object.keys(allFiles)
