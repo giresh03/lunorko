@@ -64,6 +64,7 @@ const AdminPanel = () => {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
   const [editSite, setEditSite] = useState<any | null>(null);
+  const [contentSite, setContentSite] = useState<any | null>(null);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
