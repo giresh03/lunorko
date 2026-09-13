@@ -6,6 +6,100 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const jsonRes = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+// ------------------------------------------------------- generated-site theme
+interface SiteFile { path: string; content: string; language?: string }
+interface SiteTheme {
+  accent?: string; accentDark?: string; background?: string; surface?: string; text?: string;
+  headingFont?: string; bodyFont?: string;
+}
+
+const THEME_START = "/* lunor-admin-theme:start */";
+const THEME_END = "/* lunor-admin-theme:end */";
+
+const fontStack = (name?: string, fallback = "sans-serif") =>
+  name ? `'${name}', ${fallback}` : "";
+
+function themeBlock(theme: SiteTheme): string {
+  const vars: string[] = [];
+  if (theme.accent) vars.push(`  --accent: ${theme.accent};`, `  --primary: ${theme.accent};`, `  --brand: ${theme.accent};`);
+  if (theme.accentDark) vars.push(`  --accent-dark: ${theme.accentDark};`);
+  if (theme.background) vars.push(`  --bg: ${theme.background};`, `  --background: ${theme.background};`);
+  if (theme.surface) vars.push(`  --surface: ${theme.surface};`, `  --card: ${theme.surface};`);
+  if (theme.text) vars.push(`  --text: ${theme.text};`, `  --foreground: ${theme.text};`);
+  if (theme.headingFont) vars.push(`  --font-heading: ${fontStack(theme.headingFont)};`);
+  if (theme.bodyFont) vars.push(`  --font-body: ${fontStack(theme.bodyFont)};`);
+
+  const rules: string[] = [];
+  if (vars.length) rules.push(`:root {\n${vars.join("\n")}\n}`);
+  if (theme.background) rules.push(`body { background: ${theme.background};${theme.text ? ` color: ${theme.text};` : ""} }`);
+  if (theme.bodyFont) rules.push(`body { font-family: ${fontStack(theme.bodyFont)}; }`);
+  if (theme.headingFont) rules.push(`h1, h2, h3, h4, h5, h6 { font-family: ${fontStack(theme.headingFont, "serif")}; }`);
+  if (theme.accent) {
+    rules.push(`a { color: ${theme.accent}; }`);
+    rules.push(`.btn, .button, button.primary, .btn-primary, [class*="cta"] { background: ${theme.accent}; border-color: ${theme.accent}; }`);
+  }
+  if (!rules.length) return "";
+  return `${THEME_START}\n${rules.join("\n")}\n${THEME_END}`;
+}
+
+function stripThemeBlock(css: string): string {
+  const s = css.indexOf(THEME_START);
+  const e = css.indexOf(THEME_END);
+  if (s === -1 || e === -1 || e < s) return css;
+  return (css.slice(0, s) + css.slice(e + THEME_END.length)).replace(/\n{3,}$/g, "\n");
+}
+
+function fontLink(theme: SiteTheme): string {
+  const families = [theme.headingFont, theme.bodyFont]
+    .filter((f): f is string => !!f)
+    .filter((f, i, arr) => arr.indexOf(f) === i)
+    .map((f) => `family=${encodeURIComponent(f).replace(/%20/g, "+")}:wght@400;500;600;700;800`);
+  if (!families.length) return "";
+  return `<link data-lunor-theme rel="stylesheet" href="https://fonts.googleapis.com/css2?${families.join("&")}&display=swap">`;
+}
+
+function applyTheme(files: SiteFile[], theme: SiteTheme): SiteFile[] {
+  const block = themeBlock(theme);
+  const link = fontLink(theme);
+  return files.map((f) => {
+    const path = (f.path || "").toLowerCase();
+    if (/\.css$/.test(path)) {
+      const base = stripThemeBlock(f.content || "").replace(/\s+$/, "");
+      return { ...f, content: block ? `${base}\n\n${block}\n` : `${base}\n` };
+    }
+    if (/\.html$/.test(path)) {
+      let html = (f.content || "").replace(/[ \t]*<link[^>]*data-lunor-theme[^>]*>\n?/gi, "");
+      if (link && /<\/head>/i.test(html)) html = html.replace(/<\/head>/i, `  ${link}\n</head>`);
+      else if (link) html = `${link}\n${html}`;
+      return { ...f, content: html };
+    }
+    return f;
+  });
+}
+
+function readTheme(files: unknown): SiteTheme {
+  const list = Array.isArray(files) ? (files as SiteFile[]) : [];
+  const css = list.find((f) => /\.css$/i.test(f?.path || ""))?.content || "";
+  const s = css.indexOf(THEME_START);
+  const e = css.indexOf(THEME_END);
+  if (s === -1 || e === -1) return {};
+  const block = css.slice(s, e);
+  const grab = (name: string) => block.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1]?.trim();
+  const font = (name: string) => grab(name)?.match(/'([^']+)'/)?.[1];
+  return {
+    accent: grab("accent"),
+    accentDark: grab("accent-dark"),
+    background: grab("bg"),
+    surface: grab("surface"),
+    text: grab("text"),
+    headingFont: font("font-heading"),
+    bodyFont: font("font-body"),
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
