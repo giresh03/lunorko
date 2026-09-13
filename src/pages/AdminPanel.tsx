@@ -1614,6 +1614,13 @@ const AdminPanel = () => {
         onSaved={fetchAll}
         callAdmin={callAdmin}
       />
+      <SiteContentDialog
+        site={contentSite}
+        open={!!contentSite}
+        onClose={() => setContentSite(null)}
+        onSaved={fetchAll}
+        callAdmin={callAdmin}
+      />
     </div>
   );
 };
