@@ -480,6 +480,145 @@ serve(async (req) => {
         return jsonRes({ success: true, files: next });
       }
 
+      // ================= Content editor: real records in a site's own database =================
+      if (action.startsWith("site-content-")) {
+        const projectId = typeof body.projectId === "string" ? body.projectId : "";
+        if (!UUID_RE.test(projectId)) return jsonRes({ error: "projectId is required" }, 400);
+        const { data: p } = await adminClient
+          .from("runtime_projects")
+          .select("id, name, owner_id")
+          .eq("id", projectId)
+          .maybeSingle();
+        if (!p) return jsonRes({ error: "Site not found" }, 404);
+        const schema = schemaFor(p.id);
+        const sql = pg();
+
+        // --- list a site's content tables with columns + row counts ---
+        if (action === "site-content-tables") {
+          await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS ${qi(schema)}`);
+          const names = await sql<{ table_name: string }[]>`
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = ${schema} AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+          `;
+          const tables: { name: string; rows: number; columns: { name: string; type: string }[] }[] = [];
+          for (const { table_name } of names) {
+            if (SYSTEM_TABLES.has(table_name)) continue;
+            const [row] = await sql.unsafe<{ count: string }[]>(`SELECT count(*)::text AS count FROM ${qi(schema)}.${qi(table_name)}`);
+            tables.push({ name: table_name, rows: Number(row?.count ?? 0), columns: await siteColumns(schema, table_name) });
+          }
+          return jsonRes({ schemaName: schema, tables });
+        }
+
+        // --- create a new content table (Articles / Products / Blog posts / custom) ---
+        if (action === "site-content-create-table") {
+          const table = safeName(body.table);
+          if (!table) return jsonRes({ error: "Table name must be lowercase letters, numbers and underscores" }, 400);
+          if (SYSTEM_TABLES.has(table)) return jsonRes({ error: `"${table}" is reserved` }, 400);
+          const specs = Array.isArray(body.columns) ? (body.columns as { name?: unknown; type?: unknown }[]) : [];
+          if (specs.length > 60) return jsonRes({ error: "Too many columns (60 max)" }, 400);
+          await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS ${qi(schema)}`);
+          await sql.unsafe(`CREATE TABLE IF NOT EXISTS ${qi(schema)}.${qi(table)} (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            owner_id uuid,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          )`);
+          for (const spec of specs) {
+            const col = safeName(spec.name);
+            if (!col || RESERVED_COLS.has(col)) continue;
+            await sql.unsafe(`ALTER TABLE ${qi(schema)}.${qi(table)} ADD COLUMN IF NOT EXISTS ${qi(col)} ${pgType(spec.type)}`);
+          }
+          const columns = await siteColumns(schema, table);
+          await sql`
+            INSERT INTO public.runtime_tables (project_id, collection, schema_name, table_name, columns)
+            VALUES (${p.id}, ${table}, ${schema}, ${table}, ${sql.json(columns)})
+            ON CONFLICT (project_id, collection)
+            DO UPDATE SET columns = EXCLUDED.columns, updated_at = now()
+          `;
+          await sql`UPDATE public.runtime_projects SET schema_name = ${schema}, updated_at = now()
+                    WHERE id = ${p.id} AND schema_name IS DISTINCT FROM ${schema}`;
+          return jsonRes({ success: true, table, columns });
+        }
+
+        const table = safeName(body.table);
+        if (!table || SYSTEM_TABLES.has(table)) return jsonRes({ error: "Invalid table" }, 400);
+        if (!(await siteTableExists(schema, table))) return jsonRes({ error: "Table not found" }, 404);
+        const columns = await siteColumns(schema, table);
+        const typeOf: Record<string, string> = Object.fromEntries(columns.map((c) => [c.name, c.type]));
+
+        // --- list rows ---
+        if (action === "site-content-rows") {
+          const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 500);
+          const offset = Math.max(Number(body.offset) || 0, 0);
+          const q = typeof body.q === "string" ? body.q.trim().slice(0, 200) : "";
+          const params: unknown[] = [];
+          let clause = "";
+          if (q) {
+            const textCols = columns.filter((c) => c.type === "text" || c.type.includes("char")).map((c) => c.name);
+            if (textCols.length) {
+              params.push(`%${q}%`);
+              clause = `WHERE (${textCols.map((c) => `${qi(c)} ILIKE $1`).join(" OR ")})`;
+            }
+          }
+          const rows = await sql.unsafe<Record<string, unknown>[]>(
+            `SELECT * FROM ${qi(schema)}.${qi(table)} ${clause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+            params,
+          );
+          const [{ count }] = await sql.unsafe<{ count: string }[]>(
+            `SELECT count(*)::text AS count FROM ${qi(schema)}.${qi(table)} ${clause}`,
+            params,
+          );
+          return jsonRes({ rows, columns, total: Number(count) });
+        }
+
+        // --- create or update one record ---
+        if (action === "site-content-save") {
+          const id = typeof body.id === "string" && UUID_RE.test(body.id) ? body.id : null;
+          const values = body.values && typeof body.values === "object" ? (body.values as Record<string, unknown>) : {};
+          if (JSON.stringify(values).length > 200_000) return jsonRes({ error: "Record too large (200KB max)" }, 413);
+          const cols: string[] = [];
+          const vals: unknown[] = [];
+          for (const [key, value] of Object.entries(values)) {
+            const col = safeName(key);
+            if (!col || RESERVED_COLS.has(col) || !typeOf[col]) continue;
+            const v = coerceValue(value, typeOf[col]);
+            if (v === undefined) continue;
+            cols.push(col);
+            vals.push(v);
+          }
+          let rows: Record<string, unknown>[];
+          if (id) {
+            const sets = cols.map((c, i) => `${qi(c)} = $${i + 1}`);
+            sets.push("updated_at = now()");
+            vals.push(id);
+            rows = await sql.unsafe<Record<string, unknown>[]>(
+              `UPDATE ${qi(schema)}.${qi(table)} SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING *`,
+              vals,
+            );
+            if (!rows[0]) return jsonRes({ error: "Record not found" }, 404);
+          } else {
+            if (!cols.length) return jsonRes({ error: "Nothing to save" }, 400);
+            // owner_id NULL = site-published content, visible to every visitor.
+            rows = await sql.unsafe<Record<string, unknown>[]>(
+              `INSERT INTO ${qi(schema)}.${qi(table)} (${cols.map(qi).join(", ")})
+               VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+              vals,
+            );
+          }
+          await sql`UPDATE public.runtime_projects SET updated_at = now() WHERE id = ${p.id}`;
+          return jsonRes({ success: true, row: rows[0] });
+        }
+
+        // --- delete one record ---
+        if (action === "site-content-delete") {
+          const id = typeof body.id === "string" && UUID_RE.test(body.id) ? body.id : null;
+          if (!id) return jsonRes({ error: "id is required" }, 400);
+          await sql.unsafe(`DELETE FROM ${qi(schema)}.${qi(table)} WHERE id = $1`, [id]);
+          return jsonRes({ success: true });
+        }
+      }
+
       return new Response(JSON.stringify({ error: `Unknown POST action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
