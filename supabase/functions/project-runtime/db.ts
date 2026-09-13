@@ -222,6 +222,10 @@ export async function ensureCoreTables(projectId: string): Promise<string> {
       updated_at timestamptz NOT NULL DEFAULT now()
     )
   `);
+  // Mark the project as having a real backend schema so dashboards can report it.
+  await sql`UPDATE public.runtime_projects
+            SET schema_name = ${schema}
+            WHERE id = ${projectId} AND schema_name IS DISTINCT FROM ${schema}`;
   return schema;
 }
 
