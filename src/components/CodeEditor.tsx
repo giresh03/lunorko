@@ -2087,12 +2087,17 @@ ${jsCode}
     if (codeBlocks.length > 0) {
       // Prepare all new files/updates in one pass — resolve onto existing paths first
       const existingForResolve = flattenFiles(fileTree);
+      // Static-site build (plain HTML pages, not the React app domain):
+      // keep pages and assets at the root so relative links resolve.
+      const isSiteBuild =
+        !isAppDomain &&
+        codeBlocks.some((b) => /<!DOCTYPE html|<html/i.test(b.code) || /\.html$/i.test(b.filename || ""));
       const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = resolveTargetPath(fname, normalizedLang, existingForResolve);
+        const newId = resolveTargetPath(fname, normalizedLang, existingForResolve, isSiteBuild);
         const displayName = newId.split("/").pop() || fname;
         if (newFiles.some((f) => f.id === newId)) {
           // Same file returned twice in one response — keep the latest version
