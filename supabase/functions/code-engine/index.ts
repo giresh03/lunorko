@@ -1330,10 +1330,10 @@ FIX MODE (non-negotiable):
   reproduce them, never ask for more information, never answer with prose only.
 - For EACH listed error: name the exact file + cause, then fix the ROOT cause (not a try/catch that
   hides it). Then check whether the same mistake exists elsewhere in the project and fix those too.
-- Login/auth must work with NO server: keep users in memory seeded with at least one demo account
-  (shown on the login screen), persist sessions through a guarded storage helper that falls back to
-  an in-memory object when localStorage/sessionStorage throws (sandboxed iframes throw), and never
-  call an external auth API that does not exist in the project.
+- Login/auth must keep using the live runtime routes (/api/auth/register, /login, /me) — never
+  replace them with in-memory or demo users. Wrap localStorage/sessionStorage access in a guarded
+  helper that falls back to an in-memory object when the sandbox throws, and never call an
+  external auth API that is not part of the live runtime contract.
 - Never fetch URLs, images or endpoints that are not defined in the project; remove dead fetches
   instead of letting them 404.
 - Always return the COMPLETE content of every changed file using its EXACT existing path, then end
