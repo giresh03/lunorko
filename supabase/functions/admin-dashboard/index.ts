@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import postgres from "npm:postgres@3.4.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,79 @@ const jsonRes = (body: unknown, status = 200) =>
 
 /** Normalise "Web Development" and "web-development" to the same key. */
 const slug = (value: string) => value.toLowerCase().trim().replace(/[\s_]+/g, "-");
+
+// ------------------------------------------------------- generated-site content (real tables)
+// Direct access to each site's own schema (app_<projectId>), same layout as the live runtime.
+let pgClient: ReturnType<typeof postgres> | null = null;
+const pg = () => {
+  if (pgClient) return pgClient;
+  const url = Deno.env.get("SUPABASE_DB_URL");
+  if (!url) throw new Error("SUPABASE_DB_URL is not configured");
+  pgClient = postgres(url, { prepare: false, max: 2, idle_timeout: 20, connect_timeout: 15 });
+  return pgClient;
+};
+const schemaFor = (projectId: string) => `app_${projectId.replace(/-/g, "")}`;
+const safeName = (input: unknown): string | null => {
+  const n = String(input || "").trim().toLowerCase().replace(/[-\s]+/g, "_").replace(/[^a-z0-9_]/g, "");
+  if (!/^[a-z_][a-z0-9_]{0,40}$/.test(n) || n.startsWith("pg_")) return null;
+  return n;
+};
+const qi = (n: string) => `"${n.replace(/"/g, "")}"`;
+const SYSTEM_TABLES = new Set(["users", "uploads"]);
+const RESERVED_COLS = new Set(["id", "_id", "owner_id", "ownerid", "created_at", "createdat", "updated_at", "updatedat"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TYPE_MAP: Record<string, string> = {
+  string: "text", text: "text", email: "text", url: "text",
+  int: "integer", integer: "integer", money: "integer", cents: "integer",
+  number: "double precision", float: "double precision", decimal: "numeric",
+  bool: "boolean", boolean: "boolean",
+  date: "timestamptz", datetime: "timestamptz", timestamp: "timestamptz",
+  json: "jsonb", jsonb: "jsonb", object: "jsonb", array: "jsonb",
+  uuid: "uuid", ref: "uuid", reference: "uuid",
+};
+const pgType = (declared: unknown) => TYPE_MAP[String(declared || "text").toLowerCase().trim()] || "text";
+
+/** Same rules as project-runtime/db.ts coerce(); `undefined` means "skip". */
+function coerceValue(value: unknown, type: string): unknown {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const t = type.toLowerCase();
+  if (t.includes("json")) return typeof value === "string" ? value : JSON.stringify(value);
+  if (t === "integer" || t === "bigint" || t === "smallint") {
+    const n = Math.round(Number(value));
+    return Number.isFinite(n) ? n : null;
+  }
+  if (t.includes("double") || t === "numeric" || t === "real") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (t === "boolean") return value === true || value === "true" || value === 1 || value === "1";
+  if (t.includes("timestamp")) {
+    const d = new Date(String(value));
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  if (t === "uuid") return UUID_RE.test(String(value)) ? String(value) : null;
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+async function siteColumns(schema: string, table: string): Promise<{ name: string; type: string }[]> {
+  const sql = pg();
+  const rows = await sql<{ column_name: string; data_type: string }[]>`
+    SELECT column_name, data_type FROM information_schema.columns
+    WHERE table_schema = ${schema} AND table_name = ${table}
+    ORDER BY ordinal_position
+  `;
+  return rows.map((r) => ({ name: r.column_name, type: r.data_type }));
+}
+
+async function siteTableExists(schema: string, table: string): Promise<boolean> {
+  const sql = pg();
+  const rows = await sql<{ one: number }[]>`
+    SELECT 1 AS one FROM information_schema.tables
+    WHERE table_schema = ${schema} AND table_name = ${table} LIMIT 1
+  `;
+  return rows.length > 0;
+}
 
 // ------------------------------------------------------- generated-site theme
 interface SiteFile { path: string; content: string; language?: string }
