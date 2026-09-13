@@ -1498,6 +1498,72 @@ const AdminPanel = () => {
           </TabsContent>
 
 
+          <TabsContent value="sites">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" /> Generated Sites ({sites.length})
+              </h2>
+              <Button variant="outline" size="sm" className="btn-outline-glow" onClick={fetchAll}>Refresh</Button>
+            </div>
+
+            <div className="mb-6 grid gap-3 sm:gap-4 grid-cols-3">
+              {[
+                { label: "Total Sites", value: sites.length, Icon: Globe, tone: "text-primary" },
+                { label: "Live Backends", value: sites.filter((s) => s.status === "live").length, Icon: Server, tone: "text-green-400" },
+                { label: "App Users", value: sites.reduce((n, s) => n + (s.app_users || 0), 0), Icon: Database, tone: "text-yellow-400" },
+              ].map(({ label, value, Icon, tone }) => (
+                <div key={label} className="rounded-xl border border-border gradient-card p-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className={`h-4 w-4 ${tone}`} /> {label}</div>
+                  <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Site</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Workspace</TableHead>
+                    <TableHead>Backend</TableHead>
+                    <TableHead>Tables</TableHead>
+                    <TableHead>App Users</TableHead>
+                    <TableHead>Last Activity</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sites.map((s: any) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium text-sm">{s.name || "Untitled site"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{s.owner_email || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.scope_key || s.scope}</TableCell>
+                      <TableCell>
+                        {s.status === "live" && <Badge className="bg-green-500/15 text-green-400 border-green-500/30">Live</Badge>}
+                        {s.status === "provisioned" && <Badge className="bg-yellow-500/15 text-yellow-400 border-yellow-500/30">Provisioned</Badge>}
+                        {s.status === "pending" && <Badge variant="outline" className="text-muted-foreground">No backend</Badge>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <span className="font-semibold text-foreground">{s.table_count || 0}</span>
+                        {s.collections?.length > 0 && (
+                          <span className="ml-2 text-xs text-muted-foreground">{s.collections.slice(0, 4).join(", ")}{s.collections.length > 4 ? "…" : ""}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{s.app_users || 0}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {sites.length === 0 && (
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No generated sites yet</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+
           <TabsContent value="feedback">
             <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><MessageSquare className="h-5 w-5 text-primary" /> User Feedback ({feedbacks.length})</h2>
             <div className="rounded-xl border border-border gradient-card overflow-x-auto">
