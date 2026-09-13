@@ -71,7 +71,7 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
   if (of) {
     window.fetch = function(input, init) {
       var url = typeof input === 'string' ? input : (input && input.url) || '';
-      if (/\/api\//.test(url) && !window.__LUNOR_API_URL__) {
+      if (/\\/api\\//.test(url) && !window.__LUNOR_API_URL__) {
         try { parent.postMessage({ __lunorPreview: true, type: 'backend_needed' }, '*'); } catch(e) {}
         return Promise.resolve(new Response(JSON.stringify({
           success: false,
