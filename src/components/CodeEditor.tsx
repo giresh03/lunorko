@@ -347,6 +347,20 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   return `untitled.${ext}`;
 }
 
+/** Derive a page filename from an HTML page's <title> (e.g. "Menu | Bella" -> menu.html). */
+function slugFromTitle(code: string, index: number): string {
+  const title = code.match(/<title>([^<]+)<\/title>/i)?.[1] || "";
+  const slug = title
+    .split(/[|\-–—•]/)[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .join("-");
+  return slug ? `${slug}.html` : `page-${index}.html`;
+}
+
 /** Pull the DataModel JSON block out of an assistant reply (real tables to create). */
 function extractDataModel(markdown: string): DataModelTable[] {
   const blocks = markdown.match(/```json\s*([\s\S]*?)```/g) || [];
@@ -390,9 +404,22 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
       if (unassigned) unassigned.filename = fnMatch[1];
     }
   }
-  // Generate proper filenames for blocks that still don't have one
+  // Generate proper filenames for blocks that still don't have one.
+  // Web files follow convention (first HTML is ALWAYS the homepage).
+  let htmlSeen = 0;
   blocks.forEach((block) => {
-    if (!block.filename) {
+    if (block.filename) {
+      if (/\.html$/i.test(block.filename)) htmlSeen++;
+      return;
+    }
+    const lang = LANG_MAP[block.language] || block.language;
+    if (lang === "html" || /<!DOCTYPE html|<html/i.test(block.code)) {
+      block.filename = htmlSeen++ === 0 ? "index.html" : slugFromTitle(block.code, htmlSeen);
+    } else if (lang === "css") {
+      block.filename = "styles.css";
+    } else if (lang === "javascript" && blocks.some((b) => /<!DOCTYPE html|<html/i.test(b.code))) {
+      block.filename = "script.js";
+    } else {
       block.filename = generateFileName(block.language, block.code, userPrompt);
     }
   });
@@ -417,10 +444,17 @@ function flattenFiles(nodes: FileNode[]): { path: string; name: string; content:
 function resolveTargetPath(
   filename: string,
   language: string,
-  existing: { path: string; name: string; language?: string }[]
+  existing: { path: string; name: string; language?: string }[],
+  rootWebFiles = false
 ): string {
   const clean = filename.replace(/^\.?\//, "");
   const base = clean.split("/").pop() || clean;
+
+  // 0. Static-site build: every page and asset lives at the project root, with its
+  //    exact name, so relative <link>/<script>/<a> hrefs resolve in the preview.
+  if (rootWebFiles && (/\.(html|css)$/i.test(base) || /^(script|app|main)\.js$/i.test(base))) {
+    return base;
+  }
 
   // 1. Exact path match
   const byPath = existing.find((f) => f.path === clean || f.path === `src/${clean}`);
@@ -432,7 +466,11 @@ function resolveTargetPath(
     .sort((a, b) => (a.path.startsWith("src/") ? -1 : 1) - (b.path.startsWith("src/") ? -1 : 1));
   if (byName[0]) return byName[0].path;
 
-  // 3. Untitled/generic name but a single existing file of the same extension → edit that file
+  // 3. Web pages/assets keep their exact name at the project root so the
+  //    relative <link>/<script> hrefs in the generated pages resolve.
+  if (/\.(html|css)$/i.test(base) || base === "script.js") return base;
+
+  // 4. Untitled/generic name but a single existing file of the same extension → edit that file
   const ext = base.split(".").pop()?.toLowerCase() || "";
   const isGeneric = /^(untitled|index|main|app|script|style|styles)\./i.test(base);
   if (ext) {
@@ -442,7 +480,7 @@ function resolveTargetPath(
     }
   }
 
-  // 4. New file → place under src/
+  // 5. New file → place under src/
   return clean.startsWith("src/") ? clean : `src/${base}`;
 
 }
@@ -2049,12 +2087,17 @@ ${jsCode}
     if (codeBlocks.length > 0) {
       // Prepare all new files/updates in one pass — resolve onto existing paths first
       const existingForResolve = flattenFiles(fileTree);
+      // Static-site build (plain HTML pages, not the React app domain):
+      // keep pages and assets at the root so relative links resolve.
+      const isSiteBuild =
+        !isAppDomain &&
+        codeBlocks.some((b) => /<!DOCTYPE html|<html/i.test(b.code) || /\.html$/i.test(b.filename || ""));
       const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = resolveTargetPath(fname, normalizedLang, existingForResolve);
+        const newId = resolveTargetPath(fname, normalizedLang, existingForResolve, isSiteBuild);
         const displayName = newId.split("/").pop() || fname;
         if (newFiles.some((f) => f.id === newId)) {
           // Same file returned twice in one response — keep the latest version
@@ -2065,6 +2108,23 @@ ${jsCode}
         newFiles.push({ id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code });
       });
 
+      // Fresh site build: drop untouched starter-template files so they can't
+      // pollute the generated preview (e.g. the "Hello World!" app.js).
+      let staleTemplatePaths: string[] = [];
+      if (isSiteBuild) {
+        const templates = new Set(
+          (domainEnvironments[domainId]?.templateFiles ?? []).map((t) => (t.content || "").trim()),
+        );
+        const starterNames = /^(index\.html|app\.js|main\.js|script\.js|style\.css|styles\.css)$/i;
+        staleTemplatePaths = existingForResolve
+          .filter(
+            (f) =>
+              !newFiles.some((n) => n.id === f.path) &&
+              (templates.has((f.content || "").trim()) ||
+                (f.path.startsWith("src/") && starterNames.test(f.name))),
+          )
+          .map((f) => f.path);
+      }
 
       // Batch update file tree in a single setState
       setFileTree(prev => {
@@ -2076,13 +2136,19 @@ ${jsCode}
           tree = [srcFolder, ...tree];
         }
 
+        staleTemplatePaths.forEach((p) => { tree = removeNode(tree, p); });
+
         newFiles.forEach(({ id, name, lang, code }) => {
           const existingInTree = findFile(tree, id);
           if (existingInTree) {
             tree = updateNode(tree, id, n => ({ ...n, content: code }));
           } else {
             const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
+            if (id.includes("/")) {
+              tree = addChild(tree, "src", newNode);
+            } else {
+              tree = [...tree, newNode];
+            }
           }
         });
         return tree;
@@ -2090,7 +2156,7 @@ ${jsCode}
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
-        let tabs = [...prev];
+        let tabs = [...prev].filter(t => !staleTemplatePaths.includes(t.id));
         newFiles.forEach(({ id, name, lang, code }) => {
           const existingTab = tabs.find(t => t.id === id);
           if (existingTab) {
