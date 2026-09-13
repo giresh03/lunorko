@@ -819,7 +819,10 @@ RULES:
 6. **Visually rich** — gradients, cards with hover effects, smooth transitions, box-shadows, modern design patterns. EVERY section should feel polished.
 7. **Always produce working UI** — the preview runs directly in HTML; no build step.
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
-9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
+9. **Design quality** — Follow the DESIGN EXCELLENCE rules: a Google Fonts pairing via <link>
+   (never system fonts), fluid clamp() type scale, a brand-specific palette in :root, 96-140px
+   section padding, varied section layouts, scroll-reveal animations, hover states everywhere,
+   and a sticky blurred header.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, include a LIGHT-friendly animated background effect from the Background Effects Library below (soft gradient mesh, light dotted grid, subtle orbs). Dark effects (starfield) only if asked.
 11. **LONG, VAST PAGES** — Every page has 8-14 full sections (hero, value props, features, showcase/gallery, how-it-works, stats, pricing/plans, testimonials, team, FAQ, blog/resources, CTA, footer) with substantial real copy — never a 2-section stub page.
 
