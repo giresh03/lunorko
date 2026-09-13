@@ -14,6 +14,7 @@ import { AITrainingDataCard } from "@/components/admin/AITrainingDataCard";
 
 import { SystemControl } from "@/components/admin/SystemControl";
 import SiteEditorDialog from "@/components/admin/SiteEditorDialog";
+import SiteContentDialog from "@/components/admin/SiteContentDialog";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
