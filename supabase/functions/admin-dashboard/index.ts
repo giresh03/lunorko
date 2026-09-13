@@ -418,6 +418,46 @@ serve(async (req) => {
       }
     }
 
+    if (action === "generated-sites") {
+      const { data: projects } = await adminClient
+        .from("runtime_projects")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(300);
+      const list = projects || [];
+      const { data: tables } = await adminClient.from("runtime_tables").select("project_id, collection");
+      const { data: rtUsers } = await adminClient.from("runtime_users").select("project_id");
+      const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers({ perPage: 1000 });
+      const emailMap: Record<string, string> = {};
+      (authUsers || []).forEach((au: any) => { emailMap[au.id] = au.email || ""; });
+      const tableMap: Record<string, string[]> = {};
+      (tables || []).forEach((t: any) => {
+        if (!tableMap[t.project_id]) tableMap[t.project_id] = [];
+        tableMap[t.project_id].push(t.collection);
+      });
+      const userCount: Record<string, number> = {};
+      (rtUsers || []).forEach((u: any) => { userCount[u.project_id] = (userCount[u.project_id] || 0) + 1; });
+      const enriched = list.map((p: any) => {
+        const collections = tableMap[p.id] || [];
+        const status = !p.schema_name ? "pending" : collections.length > 0 ? "live" : "provisioned";
+        return {
+          id: p.id,
+          name: p.name,
+          scope: p.scope,
+          scope_key: p.scope_key,
+          schema_name: p.schema_name,
+          owner_email: emailMap[p.owner_id] || "",
+          collections,
+          table_count: collections.length,
+          app_users: userCount[p.id] || 0,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          status,
+        };
+      });
+      return new Response(JSON.stringify(enriched), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     console.error("Admin error:", err);

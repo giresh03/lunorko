@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
   CheckCircle, XCircle, Receipt, Video, Megaphone,
-  MessageSquare, Ban, UserPlus, Briefcase, FileText, Lock
+  MessageSquare, Ban, UserPlus, Briefcase, FileText, Lock, Globe, Database, Server
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
@@ -61,6 +61,7 @@ const AdminPanel = () => {
   const [applicants, setApplicants] = useState<any[]>([]);
   const [internshipApps, setInternshipApps] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
