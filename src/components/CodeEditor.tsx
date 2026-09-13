@@ -347,6 +347,20 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   return `untitled.${ext}`;
 }
 
+/** Derive a page filename from an HTML page's <title> (e.g. "Menu | Bella" -> menu.html). */
+function slugFromTitle(code: string, index: number): string {
+  const title = code.match(/<title>([^<]+)<\/title>/i)?.[1] || "";
+  const slug = title
+    .split(/[|\-–—•]/)[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .join("-");
+  return slug ? `${slug}.html` : `page-${index}.html`;
+}
+
 /** Pull the DataModel JSON block out of an assistant reply (real tables to create). */
 function extractDataModel(markdown: string): DataModelTable[] {
   const blocks = markdown.match(/```json\s*([\s\S]*?)```/g) || [];
@@ -390,9 +404,22 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
       if (unassigned) unassigned.filename = fnMatch[1];
     }
   }
-  // Generate proper filenames for blocks that still don't have one
+  // Generate proper filenames for blocks that still don't have one.
+  // Web files follow convention (first HTML is ALWAYS the homepage).
+  let htmlSeen = 0;
   blocks.forEach((block) => {
-    if (!block.filename) {
+    if (block.filename) {
+      if (/\.html$/i.test(block.filename)) htmlSeen++;
+      return;
+    }
+    const lang = LANG_MAP[block.language] || block.language;
+    if (lang === "html" || /<!DOCTYPE html|<html/i.test(block.code)) {
+      block.filename = htmlSeen++ === 0 ? "index.html" : slugFromTitle(block.code, htmlSeen);
+    } else if (lang === "css") {
+      block.filename = "styles.css";
+    } else if (lang === "javascript" && blocks.some((b) => /<!DOCTYPE html|<html/i.test(b.code))) {
+      block.filename = "script.js";
+    } else {
       block.filename = generateFileName(block.language, block.code, userPrompt);
     }
   });
@@ -442,7 +469,10 @@ function resolveTargetPath(
     }
   }
 
-  // 4. New file → place under src/
+  // 4. Web pages/assets belong at the project root so relative hrefs resolve
+  if (/\.(html|css)$/i.test(base) || base === "script.js") return base;
+
+  // 5. New file → place under src/
   return clean.startsWith("src/") ? clean : `src/${base}`;
 
 }
