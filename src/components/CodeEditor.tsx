@@ -2199,6 +2199,8 @@ ${jsCode}
     // streaming path so files, tables and the preview appear live (no AI credits used).
     const demo = online ? await findDemoBuild(input, domainId) : null;
     if (demo) {
+      // Each demo site runs on its own live backend so users, admins and data never mix.
+      setRuntimeScope({ key: `${domainId}::demo:${demo.slug}`, name: demo.title });
       const CHUNK = 600;
       for (let i = 0; i < demo.response.length; i += CHUNK) {
         upsert(demo.response.slice(i, i + CHUNK));
