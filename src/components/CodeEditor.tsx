@@ -2131,6 +2131,46 @@ ${jsCode}
             catch { buf = line + "\n" + buf; break; }
           }
         }
+        // A cut-off answer leaves an unclosed code fence (or an unfinished HTML file).
+        // Ask the model to continue, up to twice, so long builds finish instead of landing broken.
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const unclosed = (assistantSoFar.match(/```/g) || []).length % 2 === 1;
+          if (!unclosed) break;
+          const contResp = await fetchCodeEngine({
+            action: "generate",
+            domain: domainName,
+            model: selectedModel,
+            messages: [
+              ...messagesWithContext,
+              { role: "assistant", content: assistantSoFar },
+              {
+                role: "user",
+                content:
+                  "Your answer was cut off mid-file. Continue from the EXACT character where you stopped — do not repeat anything you already wrote, do not restart the file, do not add explanations. Close the current code block correctly, then continue with the remaining files in the same path + fenced-code-block format.",
+              },
+            ],
+          });
+          if (!contResp.ok || !contResp.body) break;
+          const cr = contResp.body.getReader();
+          const cd = new TextDecoder();
+          let cbuf = "";
+          while (true) {
+            const { done, value } = await cr.read();
+            if (done) break;
+            cbuf += cd.decode(value, { stream: true });
+            let ci: number;
+            while ((ci = cbuf.indexOf("\n")) !== -1) {
+              let line = cbuf.slice(0, ci); cbuf = cbuf.slice(ci + 1);
+              if (line.endsWith("\r")) line = line.slice(0, -1);
+              if (!line.startsWith("data: ") || line.trim() === "" || line.startsWith(":")) continue;
+              const json = line.slice(6).trim();
+              if (json === "[DONE]") break;
+              try { const p = JSON.parse(json); const c = p.choices?.[0]?.delta?.content; if (c) upsert(c); }
+              catch { cbuf = line + "\n" + cbuf; break; }
+            }
+          }
+        }
+
         // Cache the response for offline use
         if (assistantSoFar) cacheAIResponse(input, domainId, assistantSoFar);
       } catch (e) {
