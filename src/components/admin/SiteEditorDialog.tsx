@@ -135,6 +135,9 @@ const SiteEditorDialog = ({ site, open, onClose, onSaved, callAdmin }: Props) =>
 
   const activeFile = useMemo(() => files.find((f) => f.path === active) || null, [files, active]);
 
+  // Rebuilt on every keystroke / theme change — no save needed.
+  const previewHtml = useMemo(() => buildPreviewDoc(files, active, theme), [files, active, theme]);
+
   const updateContent = (value: string) => {
     if (!activeFile) return;
     setFiles((prev) => prev.map((f) => (f.path === activeFile.path ? { ...f, content: value } : f)));
@@ -293,14 +296,25 @@ const SiteEditorDialog = ({ site, open, onClose, onSaved, callAdmin }: Props) =>
                   </p>
                 )}
               </div>
-              <Textarea
-                value={activeFile?.content || ""}
-                onChange={(e) => updateContent(e.target.value)}
-                spellCheck={false}
-                disabled={!activeFile}
-                className="min-h-[360px] font-mono text-xs leading-relaxed"
-                placeholder="Select a page to edit its code"
-              />
+              <div className="grid gap-3 xl:grid-cols-2">
+                <Textarea
+                  value={activeFile?.content || ""}
+                  onChange={(e) => updateContent(e.target.value)}
+                  spellCheck={false}
+                  disabled={!activeFile}
+                  className="min-h-[360px] font-mono text-xs leading-relaxed"
+                  placeholder="Select a page to edit its code"
+                />
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Live preview — updates as you type</p>
+                  <iframe
+                    title="Site preview"
+                    srcDoc={previewHtml}
+                    sandbox="allow-scripts"
+                    className="min-h-[360px] w-full rounded-lg border border-border bg-white"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
