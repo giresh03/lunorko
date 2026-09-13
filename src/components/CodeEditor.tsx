@@ -29,6 +29,7 @@ import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
 import { useLiveRuntime } from "@/hooks/useLiveRuntime";
 import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/liveRuntime";
+import { resolveModelId } from "@/components/editor/ModelSelector";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
@@ -843,7 +844,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [recentProjects, setRecentProjects] = useState<SavedProject[]>(() => getSavedProjects());
 
   // AI Chat
-  const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
+  const [selectedModel, setSelectedModel] = useState<string>(() => resolveModelId(localStorage.getItem("lunor-ai-model")));
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);

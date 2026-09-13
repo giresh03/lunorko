@@ -744,7 +744,10 @@ const NATIVE_LANGUAGES = new Set(["javascript", "typescript"]);
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash";
-const DEFAULT_MODEL = "google/gemini-3-flash-preview";
+// Highest-quality build model (user-selected default). All ids below are live on the gateway.
+const DEFAULT_MODEL = "google/gemini-3.1-pro-preview";
+const FAST_MODEL = "google/gemini-3.8-flash";
+const LITE_MODEL = "google/gemini-3.1-flash-lite";
 
 async function callAINonStream(
   systemContent: string,
@@ -770,7 +773,7 @@ async function callAINonStream(
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "google/gemini-2.0-flash",
+      model: FAST_MODEL,
       messages: [
         { role: "system", content: systemContent },
         { role: "user", content: userContent },
@@ -786,10 +789,11 @@ async function callAINonStream(
 function normalizeLovableModel(requested?: string): string {
   const m = (requested || "").toLowerCase();
   if (!m) return DEFAULT_MODEL;
-  if (m.includes("gemini-3-pro")) return "google/gemini-3-pro-preview";
-  if (m.includes("gemini-2.5-pro")) return "google/gemini-2.5-pro";
-  if (m.includes("gemini-2.5-flash-lite")) return "google/gemini-2.5-flash-lite";
-  if (m.includes("gemini-2.5-flash")) return "google/gemini-2.5-flash";
+  // Any "pro" request (incl. legacy gemini-2.5-pro / gemini-3-pro) -> current Pro model.
+  if (m.includes("pro")) return DEFAULT_MODEL;
+  if (m.includes("flash-lite") || m.includes("lite")) return LITE_MODEL;
+  if (m.includes("gemini-3-flash")) return "google/gemini-3-flash-preview";
+  if (m.includes("flash")) return FAST_MODEL;
   return DEFAULT_MODEL;
 }
 
@@ -1685,7 +1689,7 @@ ${code}
     // ============= ACTION: autocomplete (ghost text) =============
     if (action === "autocomplete") {
       const { code, language, cursorLine, cursorColumn } = body as { code: string; language: string; cursorLine: number; cursorColumn: number };
-      const selectedModel = "google/gemini-2.5-flash-lite";
+      const selectedModel = LITE_MODEL;
       console.log(`[code-engine] autocomplete lang=${language}, line=${cursorLine}`);
 
       const lines = code.split("\n");
@@ -1714,7 +1718,7 @@ ${code}
     // ============= ACTION: analyze-code (real-time AI guidance) =============
     if (action === "analyze-code") {
       const { code, language, cursorLine, domain: actionDomain, teachingMode } = body as { code: string; language: string; cursorLine: number; domain: string; teachingMode: boolean };
-      const selectedModel = "google/gemini-2.5-flash-lite";
+      const selectedModel = LITE_MODEL;
       console.log(`[code-engine] analyze-code lang=${language}, line=${cursorLine}, teachingMode=${!!teachingMode}`);
 
       const lines = code.split("\n");
@@ -1782,7 +1786,7 @@ Keep responses concise.${teachingHint}`;
     // ============= ACTION: explain-error (AI explanation for errors) =============
     if (action === "explain-error") {
       const { error: codeError, code, language, domain: actionDomain, teachingMode } = body as { error: string; code: string; language: string; domain: string; teachingMode: boolean };
-      const selectedModel = "google/gemini-2.5-flash-lite";
+      const selectedModel = LITE_MODEL;
       console.log(`[code-engine] explain-error teachingMode=${!!teachingMode}`);
 
       const basePrompt = domainPrompts[actionDomain || domain] || `You are a coding mentor for ${actionDomain || domain}.`;
