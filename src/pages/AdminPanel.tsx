@@ -575,6 +575,7 @@ const AdminPanel = () => {
               {[
                 { value: "overview", label: "Overview", short: "Stats", Icon: LayoutDashboard },
                 { value: "system", label: "System", short: "Locks", Icon: Lock },
+                { value: "sites", label: "Sites", short: "Sites", Icon: Globe, count: sites.filter((s) => s.status === "live").length },
                 { value: "users", label: "Users", short: "Users", Icon: Users },
                 { value: "subscriptions", label: "Subscriptions", short: "Subs", Icon: CreditCard },
                 { value: "payment-requests", label: "Payments", short: "Pay", Icon: Receipt, count: paymentRequests.filter((p) => p.status === "pending").length },
