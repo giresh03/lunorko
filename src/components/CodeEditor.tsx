@@ -452,7 +452,7 @@ function resolveTargetPath(
 
   // 0. Static-site build: every page and asset lives at the project root, with its
   //    exact name, so relative <link>/<script>/<a> hrefs resolve in the preview.
-  if (rootWebFiles && (/\.(html|css)$/i.test(base) || /^(script|app|main)\.js$/i.test(base))) {
+  if (rootWebFiles && (/\.(html|css)$/i.test(base) || /^(script|app|main|api)\.js$/i.test(base))) {
     return base;
   }
 
