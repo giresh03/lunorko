@@ -696,6 +696,15 @@ GOAL
   <img> src, no empty image frames.
 - Apply a clean, professional light/white theme by default unless the user asks for dark mode.
 
+NEVER TRUNCATE
+- Every code block you open must be closed with a complete, working file. If you are running low on
+  room, finish the file you are writing, then STOP and say which pages remain — never leave a file
+  half-written and never start a page you cannot finish.
+- Quality over count: 6 outstanding, complete pages beat 10 shallow or broken ones.
+- Write styles.css FIRST and make it a real component library (900+ lines: tokens, buttons, cards,
+  badges, forms, nav, hero, grids, sections, footer, utilities). Every page must then reuse those
+  classes — a page may not introduce new layout CSS, so the page files stay lean and detailed.
+
 OUTPUT WORKFLOW (emit files in this order, each as a complete code block)
 1) TaskPlan JSON block, then the DataModel JSON block (real tables: e.g. menu_items, bookings,
    orders, messages, reviews — one per collection the pages use).
