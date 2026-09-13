@@ -225,9 +225,10 @@ const AdminPanel = () => {
         callAdmin("community-posts"),
         callAdmin("community-guidelines"),
         callAdmin("feedback"),
+        callAdmin("generated-sites"),
       ]);
 
-      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData, feedbackData] = results.map((r) =>
+      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData, feedbackData, sitesData] = results.map((r) =>
         r.status === "fulfilled" ? r.value : null
       );
 
@@ -241,6 +242,7 @@ const AdminPanel = () => {
       setCommunityPosts(Array.isArray(communityPostsData) ? communityPostsData : []);
       setCommunityGuidelines(Array.isArray(guidelinesData) ? guidelinesData : []);
       setFeedbacks(Array.isArray(feedbackData) ? feedbackData : []);
+      setSites(Array.isArray(sitesData) ? sitesData : []);
 
       const { data: applicantData } = await supabase.rpc("admin_list_profiles");
       setApplicants((applicantData as any[]) ?? []);
