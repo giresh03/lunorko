@@ -735,7 +735,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     scope: "domain",
     scopeKey: domainId,
     name: domainName,
-    enabled: projectNeedsBackend || backendNeeded,
+    // Every generated site gets a live backend on open.
+    enabled: true,
   });
   const liveApiUrlRef = useRef<string | null>(null);
   liveApiUrlRef.current = liveRuntime.apiUrl;
