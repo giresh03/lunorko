@@ -67,6 +67,11 @@ export function useLiveRuntime({ scope, scopeKey, name, enabled = true }: Option
     return p;
   }, [user, scopeKey, allowed, scope, name]);
 
+  // A different scope means a different backend: drop the stale info right away.
+  useEffect(() => {
+    setInfo(null);
+  }, [scopeKey]);
+
   // Auto-provision when enabled and plan is known.
   useEffect(() => {
     if (planLoading) return;
