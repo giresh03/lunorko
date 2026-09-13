@@ -758,10 +758,33 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   }, [fileTree]);
   // Set when the preview reports an /api call with no backend attached.
   const [backendNeeded, setBackendNeeded] = useState(false);
+  // Which live backend this workspace talks to. Pre-built demo sites each get their
+  // own backend (own users/admin/tables) instead of sharing the domain-wide one.
+  const runtimeScopeStorageKey = `lunor-runtime-scope:${domainId}`;
+  const [runtimeScope, setRuntimeScopeState] = useState<{ key: string; name: string } | null>(() => {
+    try {
+      const raw = localStorage.getItem(runtimeScopeStorageKey);
+      return raw ? (JSON.parse(raw) as { key: string; name: string }) : null;
+    } catch {
+      return null;
+    }
+  });
+  const setRuntimeScope = useCallback(
+    (next: { key: string; name: string } | null) => {
+      setRuntimeScopeState(next);
+      try {
+        if (next) localStorage.setItem(runtimeScopeStorageKey, JSON.stringify(next));
+        else localStorage.removeItem(runtimeScopeStorageKey);
+      } catch {
+        /* storage unavailable */
+      }
+    },
+    [runtimeScopeStorageKey],
+  );
   const liveRuntime = useLiveRuntime({
     scope: "domain",
-    scopeKey: domainId,
-    name: domainName,
+    scopeKey: runtimeScope?.key ?? domainId,
+    name: runtimeScope?.name ?? domainName,
     // Every generated site gets a live backend on open.
     enabled: true,
   });
