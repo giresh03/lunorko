@@ -9,6 +9,9 @@ const corsHeaders = {
 const jsonRes = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+/** Normalise "Web Development" and "web-development" to the same key. */
+const slug = (value: string) => value.toLowerCase().trim().replace(/[\s_]+/g, "-");
+
 // ------------------------------------------------------- generated-site theme
 interface SiteFile { path: string; content: string; language?: string }
 interface SiteTheme {
