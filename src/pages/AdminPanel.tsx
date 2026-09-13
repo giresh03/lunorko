@@ -13,6 +13,7 @@ import { AdminPanelCard, VisitorsAreaChart, RevenueBarChart, PlanDonutChart } fr
 import { AITrainingDataCard } from "@/components/admin/AITrainingDataCard";
 
 import { SystemControl } from "@/components/admin/SystemControl";
+import SiteEditorDialog from "@/components/admin/SiteEditorDialog";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,7 @@ const AdminPanel = () => {
   const [internshipApps, setInternshipApps] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
+  const [editSite, setEditSite] = useState<any | null>(null);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -1530,6 +1532,7 @@ const AdminPanel = () => {
                     <TableHead>Tables</TableHead>
                     <TableHead>App Users</TableHead>
                     <TableHead>Last Activity</TableHead>
+                    <TableHead className="text-right">Edit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1553,10 +1556,13 @@ const AdminPanel = () => {
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" variant="outline" className="btn-outline-glow" onClick={() => setEditSite(s)}>Edit</Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {sites.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No generated sites yet</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No generated sites yet</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -1600,6 +1606,14 @@ const AdminPanel = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      <SiteEditorDialog
+        site={editSite}
+        open={!!editSite}
+        onClose={() => setEditSite(null)}
+        onSaved={fetchAll}
+        callAdmin={callAdmin}
+      />
     </div>
   );
 };
