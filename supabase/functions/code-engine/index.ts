@@ -789,10 +789,11 @@ async function callAINonStream(
 function normalizeLovableModel(requested?: string): string {
   const m = (requested || "").toLowerCase();
   if (!m) return DEFAULT_MODEL;
-  if (m.includes("gemini-3-pro")) return "google/gemini-3-pro-preview";
-  if (m.includes("gemini-2.5-pro")) return "google/gemini-2.5-pro";
-  if (m.includes("gemini-2.5-flash-lite")) return "google/gemini-2.5-flash-lite";
-  if (m.includes("gemini-2.5-flash")) return "google/gemini-2.5-flash";
+  // Any "pro" request (incl. legacy gemini-2.5-pro / gemini-3-pro) -> current Pro model.
+  if (m.includes("pro")) return DEFAULT_MODEL;
+  if (m.includes("flash-lite") || m.includes("lite")) return LITE_MODEL;
+  if (m.includes("gemini-3-flash")) return "google/gemini-3-flash-preview";
+  if (m.includes("flash")) return FAST_MODEL;
   return DEFAULT_MODEL;
 }
 
