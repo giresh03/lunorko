@@ -1224,35 +1224,17 @@ serve(async (req) => {
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
 - Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
 
-FULL-STACK MODE (when the prompt needs auth, data, saving, dashboards, orders, bookings,
-comments, chat, admin, CRUD, or "backend"):
-- Design the data model BEFORE the UI, then produce a real backend layer as extra files:
-  * db/schema.sql — CREATE TABLE (uuid pk, created_at), indexes, then for EVERY public table:
-    GRANT SELECT/INSERT/UPDATE/DELETE to authenticated (+ SELECT to anon only for public data),
-    GRANT ALL to service_role, ENABLE ROW LEVEL SECURITY, and owner-scoped policies
-    (using auth.uid() = user_id). Roles live in a separate user_roles table — never on profiles.
-  * db/seed.sql — a few realistic demo rows so screens are never empty.
-  * api/README.md — endpoint/function list, request+response shapes, env vars, deploy steps.
-  * server/api.js — the ONLY module the pages talk to. Async functions per resource
-    (signUp, signIn, signOut, getSession, listX, getX, createX, updateX, removeX).
-    EVERY function returns the uniform shape { data, error } — never throws to the caller.
-  * server/backend.js — the adapter behind api.js. It uses Supabase (supabase-js v2 via CDN
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>) when
-    window.__ENV__.SUPABASE_URL and SUPABASE_ANON_KEY are set, and otherwise falls back to a
-    localStorage-backed mock with IDENTICAL signatures and seeded demo data — so the preview
-    always runs with zero configuration. Wrap all localStorage access in try/catch.
-  * server/guard.js — requireAuth()/requireRole() helpers that redirect unauthenticated or
-    unauthorized visitors to login.html and expose the current user to the page.
-  * config.js — window.__ENV__ = { SUPABASE_URL: "", SUPABASE_ANON_KEY: "" }; with a comment
-    telling the user where to paste real values.
-- Pages NEVER call fetch/supabase directly — always through server/api.js, and always handle
-  the { data, error } result with a visible error/empty/loading state.
-- Include real app behavior: form validation, optimistic UI where useful, pagination or search
-  on list screens, role-aware admin views, and auth-gated pages via server/guard.js.
-- Serverless functions, when the prompt needs secrets or server logic:
-  functions/<name>/index.ts (Deno, Deno.serve, CORS headers, zod-style input validation,
-  never trusting client input) + deploy notes in api/README.md. Secrets stay server-side only.
-- No artificial file limit in this mode: emit every file the architecture needs, fully wired.`
+FULL-STACK MODE (DEFAULT for every website prompt — see SITEFORGE MODE):
+- Design the data model BEFORE the UI and declare it in the DataModel JSON block; Lunor creates
+  those tables in a real Postgres database before the preview runs.
+- The backend is Lunor's live runtime (/api/auth/*, /api/<collection>, /api/uploads). Pages talk
+  to it ONLY through api.js (request() helper). No Supabase CDN, no config.js, no
+  server/backend.js, no localStorage mock, no in-memory users — real requests only.
+- Also emit database/SCHEMA.md (tables + columns you declared) and docs/API.md (routes each page
+  uses) so the user can read the backend design.
+- Auth-gated pages call requireAuth() from api.js at the top of their script and redirect to
+  login.html when GET /api/auth/me fails.
+- No artificial file limit: emit every page, api.js, styles.css, script.js, fully wired.`
 
         : "";
 
