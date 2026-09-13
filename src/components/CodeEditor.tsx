@@ -444,10 +444,17 @@ function flattenFiles(nodes: FileNode[]): { path: string; name: string; content:
 function resolveTargetPath(
   filename: string,
   language: string,
-  existing: { path: string; name: string; language?: string }[]
+  existing: { path: string; name: string; language?: string }[],
+  rootWebFiles = false
 ): string {
   const clean = filename.replace(/^\.?\//, "");
   const base = clean.split("/").pop() || clean;
+
+  // 0. Static-site build: every page and asset lives at the project root, with its
+  //    exact name, so relative <link>/<script>/<a> hrefs resolve in the preview.
+  if (rootWebFiles && (/\.(html|css)$/i.test(base) || /^(script|app|main)\.js$/i.test(base))) {
+    return base;
+  }
 
   // 1. Exact path match
   const byPath = existing.find((f) => f.path === clean || f.path === `src/${clean}`);
