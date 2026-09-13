@@ -1991,6 +1991,8 @@ ${jsCode}
     setMessages(updated);
     setChatInput("");
     setChatLoading(true);
+    liveAppliedRef.current.clear();
+    lastLiveApplyRef.current = 0;
     let assistantSoFar = "";
 
     const upsert = (chunk: string) => {
@@ -2001,6 +2003,10 @@ ${jsCode}
           return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
+      if (Date.now() - lastLiveApplyRef.current > 900) {
+        lastLiveApplyRef.current = Date.now();
+        liveApplyBlocks(assistantSoFar, input);
+      }
     };
 
     // Check for cached response when offline
