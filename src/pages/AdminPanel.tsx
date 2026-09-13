@@ -13,6 +13,7 @@ import { AdminPanelCard, VisitorsAreaChart, RevenueBarChart, PlanDonutChart } fr
 import { AITrainingDataCard } from "@/components/admin/AITrainingDataCard";
 
 import { SystemControl } from "@/components/admin/SystemControl";
+import SiteEditorDialog from "@/components/admin/SiteEditorDialog";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,7 @@ const AdminPanel = () => {
   const [internshipApps, setInternshipApps] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
+  const [editSite, setEditSite] = useState<any | null>(null);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
