@@ -459,7 +459,11 @@ function resolveTargetPath(
     .sort((a, b) => (a.path.startsWith("src/") ? -1 : 1) - (b.path.startsWith("src/") ? -1 : 1));
   if (byName[0]) return byName[0].path;
 
-  // 3. Untitled/generic name but a single existing file of the same extension → edit that file
+  // 3. Web pages/assets keep their exact name at the project root so the
+  //    relative <link>/<script> hrefs in the generated pages resolve.
+  if (/\.(html|css)$/i.test(base) || base === "script.js") return base;
+
+  // 4. Untitled/generic name but a single existing file of the same extension → edit that file
   const ext = base.split(".").pop()?.toLowerCase() || "";
   const isGeneric = /^(untitled|index|main|app|script|style|styles)\./i.test(base);
   if (ext) {
@@ -468,9 +472,6 @@ function resolveTargetPath(
       return sameExt[0].path;
     }
   }
-
-  // 4. Web pages/assets belong at the project root so relative hrefs resolve
-  if (/\.(html|css)$/i.test(base) || base === "script.js") return base;
 
   // 5. New file → place under src/
   return clean.startsWith("src/") ? clean : `src/${base}`;
