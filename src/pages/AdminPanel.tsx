@@ -1556,7 +1556,8 @@ const AdminPanel = () => {
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button size="sm" variant="outline" className="btn-outline-glow mr-2" onClick={() => setContentSite(s)}>Content</Button>
                         <Button size="sm" variant="outline" className="btn-outline-glow" onClick={() => setEditSite(s)}>Edit</Button>
                       </TableCell>
                     </TableRow>
