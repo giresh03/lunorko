@@ -29,6 +29,7 @@ import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
 import { useLiveRuntime } from "@/hooks/useLiveRuntime";
 import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/liveRuntime";
+import { resolveModelId } from "@/components/editor/ModelSelector";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
