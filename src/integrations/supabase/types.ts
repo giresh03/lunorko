@@ -622,6 +622,54 @@ export type Database = {
         }
         Relationships: []
       }
+      demo_builds: {
+        Row: {
+          created_at: string
+          description: string | null
+          domain: string
+          file_count: number
+          id: string
+          level: string
+          prompt: string
+          prompt_key: string
+          response: string
+          slug: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          domain?: string
+          file_count?: number
+          id?: string
+          level?: string
+          prompt: string
+          prompt_key: string
+          response: string
+          slug: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          domain?: string
+          file_count?: number
+          id?: string
+          level?: string
+          prompt?: string
+          prompt_key?: string
+          response?: string
+          slug?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       design_projects: {
         Row: {
           canvas_data: Json

@@ -696,6 +696,10 @@ GOAL
 - Data-driven pages read from /api/<collection>; every list has loading, empty and error states.
 - Auth: signup/login call /api/auth/register and /api/auth/login, store the token, protect
   dashboard/admin pages via GET /api/auth/me, offer logout (reset to Sign In afterwards).
+- Roles: the FIRST account registered on a site automatically gets role "admin" (lowercase);
+  everyone after is "user". Gate admin pages with user.role === 'admin' (lowercase, never
+  'ADMIN'), show the Admin nav link only for that role, and never ask users to pick a role at
+  sign-up. Tell the visitor on admin.html: "The first account created on this site is the owner."
 - Images: inline SVG, CSS patterns/gradients, or the image rules already defined above. No broken
   <img> src, no empty image frames.
 - Apply a clean, professional light/white theme by default unless the user asks for dark mode.
@@ -746,6 +750,38 @@ QUALITY BAR
 - Seed content: when a data page would be empty on first load, the page offers a one-click
   "Load sample data" button that POSTs realistic rows through the API (never hardcoded arrays).
   Marketing pages may still render their own static copy/images so they never look empty.
+
+PAYMENTS (LunorPay sandbox — the live runtime's built-in payment gateway)
+- MANDATORY whenever the site sells, books, enrols, subscribes or the user mentions payment,
+  checkout, paid, pricing, order, ticket, booking with payment or a payment gateway.
+- Runtime routes (test mode, real payment records in the "payments" table — never declare
+  "payments" in the DataModel, the runtime owns it):
+    POST /api/payments/create      { amount_cents, currency: "INR", description, metadata }
+                                   -> { success, payment: { id, amount_cents, status: "created" } }
+    POST /api/payments/<id>/confirm { method: "card", card_number, expiry, cvc, name }
+                                   or { method: "upi", upi_id }
+                                   -> 200 { success, payment: { status: "paid", last4 } }
+                                   -> 402 { success: false, message } when declined (card ending 0002)
+- api.js MUST export window.LunorPay = { checkout(options) } where
+  checkout({ amountCents, currency = "INR", description, metadata, onSuccess, onCancel })
+  opens a branded, accessible modal (built with DOM + classes from styles.css — .lp-overlay,
+  .lp-modal, .lp-tabs, .lp-field, .lp-pay-btn) showing: the order summary (description + amount
+  formatted as ₹1,299.00), Card / UPI tabs, card number with auto-spacing, expiry (MM/YY), CVC,
+  name on card, a small hint "Test mode · use 4242 4242 4242 4242 · any future date · any CVC",
+  a "Pay ₹X" button with loading state, and a "Secured by LunorPay" footer. It calls
+  /api/payments/create then /api/payments/<id>/confirm with request(); decline errors (402) are
+  shown inline in the modal so the user can retry; success shows a green check state for 900ms,
+  closes and calls onSuccess(payment).
+- Only AFTER onSuccess(payment) create the order / booking / enrollment / ticket via the API and
+  include payment_id: payment.id, amount_cents and status: "paid" on that record. Never create a
+  paid record before the payment is confirmed. Then redirect to a success/receipt page or show a
+  receipt panel (order number, items, amount, last4, date).
+- Prices are integers in cents/paise everywhere (₹1,299 = 129900) and formatted on display.
+- Admin/dashboard pages list payments from GET /api/payments?all=true (status badges paid/failed)
+  and revenue totals; the customer's dashboard lists their own orders/bookings with payment status.
+- E-commerce flow: products -> cart (cart_items, or a client cart persisted after login) ->
+  checkout.html with address form + order summary -> LunorPay.checkout -> POST /api/orders ->
+  order-success.html. Booking/enrollment flows follow the same pattern.
 
 DESIGN EXCELLENCE (this is what "impressive" means — non-negotiable)
 - Typography: load a real Google Fonts pairing via <link> (e.g. Sora/Outfit + Inter, or Instrument

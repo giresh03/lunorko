@@ -191,6 +191,8 @@ export function buildApiShimScript(apiUrl: string): string {
 /** Inject the shim as the very first script in an HTML document. */
 export function injectApiShim(html: string, apiUrl: string | null | undefined): string {
   if (!apiUrl) return html;
+  // Replace any previously injected shim so a backend switch takes effect.
+  html = html.replace(/<script data-lunor-runtime>[\s\S]*?<\/script>\n?/g, "");
   const tag = `<script data-lunor-runtime>${buildApiShimScript(apiUrl)}</script>`;
   if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => `${m}\n${tag}`);
   if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (m) => `${m}\n<head>${tag}</head>`);

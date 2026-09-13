@@ -16,6 +16,8 @@
 //   GET/POST /api/<table>, GET/PUT/PATCH/DELETE /api/<table>/:id
 //   POST /api/uploads (multipart "file", Bearer) -> { success, url, name, size, id }
 //   GET  /api/uploads -> my files;  GET /api/uploads/:id/raw (public);  DELETE /api/uploads/:id
+//   POST /api/payments/create { amount_cents, currency, description, metadata } -> { success, payment }   (LunorPay test mode)
+//   POST /api/payments/:id/confirm { method, card_number, expiry, cvc, name | upi_id } -> { success, payment } / 402 declined
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { z } from 'npm:zod@3.23.8';
@@ -312,10 +314,16 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
       const hash = await bcrypt.hash(password, 10);
       const profile: Row = {};
       for (const [k, v] of Object.entries(rest)) if (k !== 'passwordHash' && k !== 'password') profile[k] = v;
+      // The very first account of a site is its owner → 'admin'. Later sign-ups can never
+      // self-assign the admin role (they may still pick a harmless role like 'instructor').
+      const requestedRole = (role || '').trim().toLowerCase();
+      const finalRole = Number(count) === 0
+        ? 'admin'
+        : (requestedRole && requestedRole !== 'admin' ? requestedRole : 'user');
       const rows = await sql.unsafe<Row[]>(
         `INSERT INTO ${qi(schema)}."users" (name, email, password_hash, role, profile)
          VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-        [name, email.toLowerCase(), hash, role || 'user', JSON.stringify(profile)],
+        [name, email.toLowerCase(), hash, finalRole, JSON.stringify(profile)],
       );
       const user = rows[0];
       if (!user) return fail('Could not create user', 500);
@@ -439,6 +447,110 @@ async function handleRuntime(req: Request, projectId: string, apiPath: string): 
     }
 
     return fail('Method not allowed', 405);
+  }
+
+  // /api/payments — LunorPay sandbox gateway (test mode, real payment records)
+  //   POST /api/payments/create      { amount_cents, currency?, description?, metadata? } -> { payment }
+  //   POST /api/payments/:id/confirm { method: "card"|"upi", card_number?, expiry?, cvc?, name?, upi_id? } -> { payment }
+  //   GET  /api/payments[/:id]       -> handled by the generic table routes below
+  if (segments[0] === 'payments' && method === 'POST') {
+    const PAYMENT_COLUMNS: ColumnSpec[] = [
+      { name: 'amount_cents', type: 'integer', required: true },
+      { name: 'currency', type: 'string' },
+      { name: 'description', type: 'string' },
+      { name: 'status', type: 'string' },
+      { name: 'gateway', type: 'string' },
+      { name: 'mode', type: 'string' },
+      { name: 'method', type: 'string' },
+      { name: 'last4', type: 'string' },
+      { name: 'upi_id', type: 'string' },
+      { name: 'customer_name', type: 'string' },
+      { name: 'customer_email', type: 'string' },
+      { name: 'failure_reason', type: 'string' },
+      { name: 'metadata', type: 'json' },
+      { name: 'paid_at', type: 'timestamp' },
+    ];
+    const payer = await runtimeUser(req, projectId);
+
+    if (segments[1] === 'create' && !segments[2]) {
+      const body = await readBody(req);
+      const amountRaw = body.amount_cents ?? body.amountCents ?? body.amount;
+      const amount = Math.round(Number(amountRaw));
+      if (!Number.isFinite(amount) || amount <= 0) return fail('amount_cents must be a positive integer', 400);
+      if (amount > 100_000_000) return fail('Amount too large', 400);
+      const currency = String(body.currency || 'INR').toUpperCase().slice(0, 3);
+      const description = String(body.description || 'Payment').slice(0, 200);
+      const metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
+      await ensureTable(projectId, 'payments', PAYMENT_COLUMNS);
+      const rows = await sql.unsafe<Row[]>(
+        `INSERT INTO ${qi(schema)}."payments"
+           (owner_id, amount_cents, currency, description, status, gateway, mode, customer_name, customer_email, metadata)
+         VALUES ($1,$2,$3,$4,'created','lunorpay','test',$5,$6,$7) RETURNING *`,
+        [
+          payer?.id ?? null, amount, currency, description,
+          body.customer_name ? String(body.customer_name).slice(0, 120) : payer?.name ?? null,
+          body.customer_email ? String(body.customer_email).slice(0, 200) : payer?.email ?? null,
+          JSON.stringify(metadata),
+        ],
+      );
+      if (!rows[0]) return fail('Could not create payment', 500);
+      return json(
+        { success: true, data: publicRow(rows[0]), payment: publicRow(rows[0]), checkout: { gateway: 'lunorpay', mode: 'test', test_card: '4242 4242 4242 4242' } },
+        201, RUNTIME_CORS,
+      );
+    }
+
+    if (segments[1] && segments[2] === 'confirm') {
+      const pid = segments[1];
+      if (!uuidRe.test(pid) || !(await tableExists(schema, 'payments'))) return fail('Payment not found', 404);
+      const existing = (await sql.unsafe<Row[]>(`SELECT * FROM ${qi(schema)}."payments" WHERE id = $1`, [pid]))[0];
+      if (!existing) return fail('Payment not found', 404);
+      if (existing.owner_id && (!payer || (payer.id !== existing.owner_id && payer.role !== 'admin'))) return fail('Forbidden', 403);
+      if (existing.status === 'paid') return json({ success: true, data: publicRow(existing), payment: publicRow(existing) }, 200, RUNTIME_CORS);
+
+      const body = await readBody(req);
+      const payMethod = String(body.method || (body.upi_id || body.upiId ? 'upi' : 'card')).toLowerCase();
+      let last4: string | null = null;
+      let upiId: string | null = null;
+      let failure: string | null = null;
+
+      if (payMethod === 'upi') {
+        upiId = String(body.upi_id || body.upiId || '').trim();
+        if (!/^[\w.\-]{2,}@[a-zA-Z]{2,}$/.test(upiId)) return fail('Enter a valid UPI ID (e.g. name@upi)', 400);
+        if (/fail|decline/i.test(upiId)) failure = 'UPI payment was declined by the bank';
+      } else {
+        const digits = String(body.card_number || body.cardNumber || body.number || '').replace(/\D/g, '');
+        if (digits.length < 13 || digits.length > 19) return fail('Enter a valid card number', 400);
+        let sum = 0; let dbl = false;
+        for (let i = digits.length - 1; i >= 0; i--) {
+          let d = Number(digits[i]);
+          if (dbl) { d *= 2; if (d > 9) d -= 9; }
+          sum += d; dbl = !dbl;
+        }
+        if (sum % 10 !== 0) return fail('Card number is invalid', 400);
+        const expiry = String(body.expiry || body.exp || '').trim();
+        if (!/^(0[1-9]|1[0-2])\s*\/?\s*(\d{2}|\d{4})$/.test(expiry)) return fail('Enter a valid expiry (MM/YY)', 400);
+        if (!/^\d{3,4}$/.test(String(body.cvc || body.cvv || ''))) return fail('Enter a valid CVC', 400);
+        last4 = digits.slice(-4);
+        if (last4 === '0002') failure = 'Card declined — insufficient funds (test card)';
+        if (last4 === '0069') failure = 'Card expired (test card)';
+      }
+
+      const status = failure ? 'failed' : 'paid';
+      const rows = await sql.unsafe<Row[]>(
+        `UPDATE ${qi(schema)}."payments"
+            SET status = $2, method = $3, last4 = $4, upi_id = $5, failure_reason = $6,
+                paid_at = CASE WHEN $2 = 'paid' THEN now() ELSE NULL END,
+                customer_name = COALESCE($7, customer_name), updated_at = now()
+          WHERE id = $1 RETURNING *`,
+        [pid, status, payMethod, last4, upiId, failure, body.name ? String(body.name).slice(0, 120) : null],
+      );
+      const payment = publicRow(rows[0]);
+      if (failure) return json({ success: false, message: failure, data: payment, payment }, 402, RUNTIME_CORS);
+      return json({ success: true, data: payment, payment }, 200, RUNTIME_CORS);
+    }
+
+    return fail('Payment route not found', 404);
   }
 
   // Real tables: /api/<table>[/<id>]

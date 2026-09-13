@@ -32,6 +32,7 @@ import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/live
 import { resolveModelId } from "@/components/editor/ModelSelector";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
+import { findDemoBuild, listDemoBuilds, type DemoBuild } from "@/lib/demoBuilds";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useCredits } from "@/hooks/useCredits";
@@ -70,7 +71,7 @@ const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
   if (of) {
     window.fetch = function(input, init) {
       var url = typeof input === 'string' ? input : (input && input.url) || '';
-      if (/\/api\//.test(url) && !window.__LUNOR_API_URL__) {
+      if (/\\/api\\//.test(url) && !window.__LUNOR_API_URL__) {
         try { parent.postMessage({ __lunorPreview: true, type: 'backend_needed' }, '*'); } catch(e) {}
         return Promise.resolve(new Response(JSON.stringify({
           success: false,
@@ -104,6 +105,32 @@ function injectRuntimeGuard(html: string): string {
   if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + injected);
   if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + injected);
   return injected + html;
+}
+
+/**
+ * A sandboxed srcdoc preview cannot navigate by URL, so generated code that does
+ * `location.href = "dashboard.html"`, `location.assign(...)`, `location.reload()` or reads
+ * `location.search` is pointed at window.__lunorLoc — a virtual location provided by the
+ * in-iframe pager (see buildPreviewHtml). Applies to <script> bodies and inline on* handlers.
+ */
+const LOCATION_MEMBER_RE = /\b(?:window\.|document\.|self\.|top\.)?location\.(href|search|pathname|assign|replace|reload)\b/g;
+const LOCATION_ASSIGN_RE = /(?<!(?:const|let|var|\.)\s*)\b(?:window\.|self\.|top\.)?location\s*=(?![=>])/g;
+function rewriteLocationSource(src: string): string {
+  if (!src || src.includes("__lunorLoc")) return src;
+  return src
+    .replace(LOCATION_MEMBER_RE, "window.__lunorLoc.$1")
+    .replace(LOCATION_ASSIGN_RE, "window.__lunorLoc.href =");
+}
+function rewriteLocationForPreview(html: string): string {
+  if (!html) return html;
+  return html
+    .replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (_m, open: string, body: string, close: string) =>
+      open + rewriteLocationSource(body) + close)
+    .replace(/(\son[a-z]+=)("([^"]*)"|'([^']*)')/gi, (m, attr: string, _q: string, dq?: string, sq?: string) => {
+      if (dq != null) return `${attr}"${rewriteLocationSource(dq)}"`;
+      if (sq != null) return `${attr}'${rewriteLocationSource(sq)}'`;
+      return m;
+    });
 }
 
 
@@ -731,10 +758,33 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   }, [fileTree]);
   // Set when the preview reports an /api call with no backend attached.
   const [backendNeeded, setBackendNeeded] = useState(false);
+  // Which live backend this workspace talks to. Pre-built demo sites each get their
+  // own backend (own users/admin/tables) instead of sharing the domain-wide one.
+  const runtimeScopeStorageKey = `lunor-runtime-scope:${domainId}`;
+  const [runtimeScope, setRuntimeScopeState] = useState<{ key: string; name: string } | null>(() => {
+    try {
+      const raw = localStorage.getItem(runtimeScopeStorageKey);
+      return raw ? (JSON.parse(raw) as { key: string; name: string }) : null;
+    } catch {
+      return null;
+    }
+  });
+  const setRuntimeScope = useCallback(
+    (next: { key: string; name: string } | null) => {
+      setRuntimeScopeState(next);
+      try {
+        if (next) localStorage.setItem(runtimeScopeStorageKey, JSON.stringify(next));
+        else localStorage.removeItem(runtimeScopeStorageKey);
+      } catch {
+        /* storage unavailable */
+      }
+    },
+    [runtimeScopeStorageKey],
+  );
   const liveRuntime = useLiveRuntime({
     scope: "domain",
-    scopeKey: domainId,
-    name: domainName,
+    scopeKey: runtimeScope?.key ?? domainId,
+    name: runtimeScope?.name ?? domainName,
     // Every generated site gets a live backend on open.
     enabled: true,
   });
@@ -757,10 +807,11 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     setPreviewContent(injectApiShim(injectRuntimeGuard(html), liveApiUrlRef.current));
   }, []);
 
-  // Re-inject the shim into the current preview once the backend comes online.
+  // Re-inject the shim into the current preview once the backend comes online
+  // (or switches to a different site's backend).
   useEffect(() => {
     if (!liveRuntime.apiUrl) return;
-    setPreviewContent((html) => (html && !html.includes("data-lunor-runtime") ? injectApiShim(html, liveRuntime.apiUrl) : html));
+    setPreviewContent((html) => (html ? injectApiShim(html, liveRuntime.apiUrl) : html));
   }, [liveRuntime.apiUrl]);
 
   // Clear the "start backend" nudge once the backend is live.
@@ -890,6 +941,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  // Pre-built demo sites for this domain (one-click prompts above the chat box)
+  const [demoBuilds, setDemoBuilds] = useState<Omit<DemoBuild, "response">[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void listDemoBuilds(domainId).then((list) => { if (alive) setDemoBuilds(list); });
+    return () => { alive = false; };
+  }, [domainId]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Ghost text state
@@ -1312,47 +1370,77 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       (currentPage && (currentPage.split("/").pop() || currentPage)) ||
       Object.keys(allFiles).find((n) => n.endsWith(".html") && allFiles[n] === htmlContent)?.split("/").pop() ||
       "index.html";
-    let html = assemblePage(htmlContent, allFiles, activeName);
+    let html = rewriteLocationForPreview(assemblePage(htmlContent, allFiles, activeName));
 
-    // Multi-page navigation: pre-assemble every sibling .html page and swap in-iframe
+    // Multi-page navigation: pre-assemble every sibling .html page and swap in-iframe.
+    // Generated scripts that write `location.href = "page.html?x=1"` (or read location.search)
+    // are routed through window.__lunorLoc, because a sandboxed srcdoc frame cannot navigate by URL.
     const pageNames = Object.keys(allFiles).filter((n) => n.endsWith(".html"));
-    if (pageNames.length > 1) {
-      const pages: Record<string, string> = {};
-      for (const name of pageNames) {
-        const short = name.split("/").pop() || name;
-        const pageHtml = assemblePage(allFiles[name], allFiles, short);
-        pages[short] = btoa(unescape(encodeURIComponent(pageHtml)));
-      }
+    const pages: Record<string, string> = {};
+    for (const name of pageNames) {
+      const short = name.split("/").pop() || name;
+      const pageHtml = rewriteLocationForPreview(assemblePage(allFiles[name], allFiles, short));
+      pages[short] = btoa(unescape(encodeURIComponent(pageHtml)));
+    }
 
-      const shim = `<script>(function(){
+    const shim = `<script>(function(){
   var PAGES = ${JSON.stringify(pages)};
-  function nav(name){
+  var CUR = { name: ${JSON.stringify(activeName)}, search: '' };
+  function nav(name, search){
     var encoded = PAGES[name];
     if(!encoded) return;
+    CUR.name = name; CUR.search = search || '';
     var doc = decodeURIComponent(escape(atob(encoded)));
     document.open(); document.write(doc); document.close();
     if (window.__attachPreviewNav) window.__attachPreviewNav();
   }
+  function goTo(v){
+    v = String(v == null ? '' : v);
+    if (!v || v.charAt(0) === '#') return;
+    if (/^(https?:)?\\/\\//i.test(v) || /^(mailto|tel):/i.test(v)) { try { window.open(v, '_blank'); } catch (_) {} return; }
+    var noHash = v.split('#')[0];
+    var qi = noHash.indexOf('?');
+    var search = qi >= 0 ? noHash.slice(qi) : '';
+    var path = qi >= 0 ? noHash.slice(0, qi) : noHash;
+    var name = path.split('/').pop();
+    if (!name || name === '.' || name === '/') name = 'index.html';
+    if (!/\\.html?$/i.test(name)) name = name + '.html';
+    if (!PAGES[name]) { if (!path) { nav(CUR.name, search); } return; }
+    nav(name, search);
+  }
+  window.__lunorLoc = {
+    get href(){ return 'https://preview.lunor.local/' + CUR.name + CUR.search; },
+    set href(v){ goTo(v); },
+    get search(){ return CUR.search; },
+    get pathname(){ return '/' + CUR.name; },
+    assign: goTo,
+    replace: goTo,
+    reload: function(){ nav(CUR.name, CUR.search); }
+  };
   window.__attachPreviewNav = function(){
     document.addEventListener('click', function(e){
       var a = e.target && e.target.closest && e.target.closest('a[href]');
       if(!a) return;
-      var href = (a.getAttribute('href')||'').split('#')[0].split('?')[0];
+      var full = a.getAttribute('href') || '';
+      var href = full.split('#')[0];
       if(!href) return;
-      var name = href.split('/').pop();
+      var qi = href.indexOf('?');
+      var name = (qi >= 0 ? href.slice(0, qi) : href).split('/').pop();
       if(!name || !PAGES[name]) return;
       e.preventDefault();
-      nav(name);
+      nav(name, qi >= 0 ? href.slice(qi) : '');
     }, true);
   };
   window.__previewNavigate = nav;
   window.__attachPreviewNav();
 })();<\/script>`;
-      if (/<\/body>/i.test(html)) {
-        html = html.replace(/<\/body>/i, `${shim}</body>`);
-      } else {
-        html += shim;
-      }
+    // Inject at the top of <head> so __lunorLoc exists before any page script runs.
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head[^>]*>/i, (m) => m + shim);
+    } else if (/<body[^>]*>/i.test(html)) {
+      html = html.replace(/<body[^>]*>/i, (m) => m + shim);
+    } else {
+      html = shim + html;
     }
 
     return html;
@@ -2107,8 +2195,19 @@ ${jsCode}
       }
     };
 
-    // Check for cached response when offline
-    if (!online) {
+    // Pre-built demo site saved for this exact prompt: replay it through the normal
+    // streaming path so files, tables and the preview appear live (no AI credits used).
+    const demo = online ? await findDemoBuild(input, domainId) : null;
+    if (demo) {
+      // Each demo site runs on its own live backend so users, admins and data never mix.
+      setRuntimeScope({ key: `${domainId}::demo:${demo.slug}`, name: demo.title });
+      const CHUNK = 600;
+      for (let i = 0; i < demo.response.length; i += CHUNK) {
+        upsert(demo.response.slice(i, i + CHUNK));
+        await new Promise((r) => setTimeout(r, 30));
+      }
+    } else if (!online) {
+      // Check for cached response when offline
       const cached = findCachedAIResponse(input, domainId);
       if (cached) {
         upsert(cached.response);
@@ -2116,6 +2215,8 @@ ${jsCode}
         upsert("📴 **Offline mode** — no cached response found for this query.\n\nTry browsing the **Snippets** tab in the sidebar for pre-loaded code examples.");
       }
     } else {
+      // A brand-new (non-demo) build goes back to the workspace's own backend.
+      if (runtimeScope && updated.length <= 1) setRuntimeScope(null);
       try {
         // Append file context to the last user message for AI awareness
         const messagesWithContext = updated.map((m, i) => {
@@ -3764,6 +3865,28 @@ ${jsCode}
                 onToggleVoice={() => voice.setVoiceEnabled(!voice.voiceEnabled)}
                 onStopSpeaking={voice.stopSpeaking}
               />
+              {demoBuilds.length > 0 && (
+                <div className="mt-1.5 flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                  <span className="shrink-0 self-center text-[9px] uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Demo</span>
+                  {demoBuilds.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      title={d.prompt}
+                      disabled={chatLoading}
+                      onClick={() => { setChatInput(d.prompt); void handleChatSend(d.prompt); }}
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 hover:opacity-90"
+                      style={{
+                        backgroundColor: currentTheme.uiColors.accent + "18",
+                        color: currentTheme.uiColors.accent,
+                        border: `1px solid ${currentTheme.uiColors.accent}40`,
+                      }}
+                    >
+                      {d.title}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="mt-1 flex gap-1.5">
                 <input
                   value={chatInput}

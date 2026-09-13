@@ -57,6 +57,13 @@
       "when": 1789329937746,
       "tag": "0007_workspace_history_realtime",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789331695946,
+      "tag": "0008_create_demo_builds",
+      "breakpoints": true
     }
   ]
 }
