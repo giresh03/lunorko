@@ -563,14 +563,16 @@ serve(async (req) => {
         .eq("id", projectId)
         .maybeSingle();
       if (!p) return jsonRes({ error: "Site not found" }, 404);
-      const { data: hist } = await adminClient
+      // History rows may store the domain as a display name ("Web Development")
+      // while runtime projects use the slug ("web-development") — match on the slug.
+      const { data: histRows } = await adminClient
         .from("workspace_history")
-        .select("client_id, project_name, files, prompt, created_at")
+        .select("client_id, project_name, files, prompt, created_at, domain")
         .eq("user_id", p.owner_id)
-        .eq("domain", p.scope_key)
         .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(60);
+      const wanted = slug(p.scope_key || "");
+      const hist = (histRows || []).find((h: any) => slug(h.domain || "") === wanted) || (histRows || [])[0];
       return jsonRes({
         id: p.id,
         name: p.name,
