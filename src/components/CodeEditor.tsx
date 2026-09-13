@@ -2215,6 +2215,8 @@ ${jsCode}
         upsert("📴 **Offline mode** — no cached response found for this query.\n\nTry browsing the **Snippets** tab in the sidebar for pre-loaded code examples.");
       }
     } else {
+      // A brand-new (non-demo) build goes back to the workspace's own backend.
+      if (runtimeScope && updated.length <= 1) setRuntimeScope(null);
       try {
         // Append file context to the last user message for AI awareness
         const messagesWithContext = updated.map((m, i) => {
