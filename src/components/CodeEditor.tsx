@@ -807,10 +807,11 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     setPreviewContent(injectApiShim(injectRuntimeGuard(html), liveApiUrlRef.current));
   }, []);
 
-  // Re-inject the shim into the current preview once the backend comes online.
+  // Re-inject the shim into the current preview once the backend comes online
+  // (or switches to a different site's backend).
   useEffect(() => {
     if (!liveRuntime.apiUrl) return;
-    setPreviewContent((html) => (html && !html.includes("data-lunor-runtime") ? injectApiShim(html, liveRuntime.apiUrl) : html));
+    setPreviewContent((html) => (html ? injectApiShim(html, liveRuntime.apiUrl) : html));
   }, [liveRuntime.apiUrl]);
 
   // Clear the "start backend" nudge once the backend is live.
