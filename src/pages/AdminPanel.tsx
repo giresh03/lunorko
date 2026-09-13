@@ -14,6 +14,7 @@ import { AITrainingDataCard } from "@/components/admin/AITrainingDataCard";
 
 import { SystemControl } from "@/components/admin/SystemControl";
 import SiteEditorDialog from "@/components/admin/SiteEditorDialog";
+import SiteContentDialog from "@/components/admin/SiteContentDialog";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,6 +65,7 @@ const AdminPanel = () => {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
   const [editSite, setEditSite] = useState<any | null>(null);
+  const [contentSite, setContentSite] = useState<any | null>(null);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -1556,7 +1558,8 @@ const AdminPanel = () => {
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button size="sm" variant="outline" className="btn-outline-glow mr-2" onClick={() => setContentSite(s)}>Content</Button>
                         <Button size="sm" variant="outline" className="btn-outline-glow" onClick={() => setEditSite(s)}>Edit</Button>
                       </TableCell>
                     </TableRow>
@@ -1611,6 +1614,13 @@ const AdminPanel = () => {
         site={editSite}
         open={!!editSite}
         onClose={() => setEditSite(null)}
+        onSaved={fetchAll}
+        callAdmin={callAdmin}
+      />
+      <SiteContentDialog
+        site={contentSite}
+        open={!!contentSite}
+        onClose={() => setContentSite(null)}
         onSaved={fetchAll}
         callAdmin={callAdmin}
       />

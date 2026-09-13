@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import postgres from "npm:postgres@3.4.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,79 @@ const jsonRes = (body: unknown, status = 200) =>
 
 /** Normalise "Web Development" and "web-development" to the same key. */
 const slug = (value: string) => value.toLowerCase().trim().replace(/[\s_]+/g, "-");
+
+// ------------------------------------------------------- generated-site content (real tables)
+// Direct access to each site's own schema (app_<projectId>), same layout as the live runtime.
+let pgClient: ReturnType<typeof postgres> | null = null;
+const pg = () => {
+  if (pgClient) return pgClient;
+  const url = Deno.env.get("SUPABASE_DB_URL");
+  if (!url) throw new Error("SUPABASE_DB_URL is not configured");
+  pgClient = postgres(url, { prepare: false, max: 2, idle_timeout: 20, connect_timeout: 15 });
+  return pgClient;
+};
+const schemaFor = (projectId: string) => `app_${projectId.replace(/-/g, "")}`;
+const safeName = (input: unknown): string | null => {
+  const n = String(input || "").trim().toLowerCase().replace(/[-\s]+/g, "_").replace(/[^a-z0-9_]/g, "");
+  if (!/^[a-z_][a-z0-9_]{0,40}$/.test(n) || n.startsWith("pg_")) return null;
+  return n;
+};
+const qi = (n: string) => `"${n.replace(/"/g, "")}"`;
+const SYSTEM_TABLES = new Set(["users", "uploads"]);
+const RESERVED_COLS = new Set(["id", "_id", "owner_id", "ownerid", "created_at", "createdat", "updated_at", "updatedat"]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const TYPE_MAP: Record<string, string> = {
+  string: "text", text: "text", email: "text", url: "text",
+  int: "integer", integer: "integer", money: "integer", cents: "integer",
+  number: "double precision", float: "double precision", decimal: "numeric",
+  bool: "boolean", boolean: "boolean",
+  date: "timestamptz", datetime: "timestamptz", timestamp: "timestamptz",
+  json: "jsonb", jsonb: "jsonb", object: "jsonb", array: "jsonb",
+  uuid: "uuid", ref: "uuid", reference: "uuid",
+};
+const pgType = (declared: unknown) => TYPE_MAP[String(declared || "text").toLowerCase().trim()] || "text";
+
+/** Same rules as project-runtime/db.ts coerce(); `undefined` means "skip". */
+function coerceValue(value: unknown, type: string): unknown {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const t = type.toLowerCase();
+  if (t.includes("json")) return typeof value === "string" ? value : JSON.stringify(value);
+  if (t === "integer" || t === "bigint" || t === "smallint") {
+    const n = Math.round(Number(value));
+    return Number.isFinite(n) ? n : null;
+  }
+  if (t.includes("double") || t === "numeric" || t === "real") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (t === "boolean") return value === true || value === "true" || value === 1 || value === "1";
+  if (t.includes("timestamp")) {
+    const d = new Date(String(value));
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  if (t === "uuid") return UUID_RE.test(String(value)) ? String(value) : null;
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+async function siteColumns(schema: string, table: string): Promise<{ name: string; type: string }[]> {
+  const sql = pg();
+  const rows = await sql<{ column_name: string; data_type: string }[]>`
+    SELECT column_name, data_type FROM information_schema.columns
+    WHERE table_schema = ${schema} AND table_name = ${table}
+    ORDER BY ordinal_position
+  `;
+  return rows.map((r) => ({ name: r.column_name, type: r.data_type }));
+}
+
+async function siteTableExists(schema: string, table: string): Promise<boolean> {
+  const sql = pg();
+  const rows = await sql<{ one: number }[]>`
+    SELECT 1 AS one FROM information_schema.tables
+    WHERE table_schema = ${schema} AND table_name = ${table} LIMIT 1
+  `;
+  return rows.length > 0;
+}
 
 // ------------------------------------------------------- generated-site theme
 interface SiteFile { path: string; content: string; language?: string }
@@ -404,6 +478,145 @@ serve(async (req) => {
           if (upErr) return jsonRes({ error: upErr.message }, 500);
         }
         return jsonRes({ success: true, files: next });
+      }
+
+      // ================= Content editor: real records in a site's own database =================
+      if (action.startsWith("site-content-")) {
+        const projectId = typeof body.projectId === "string" ? body.projectId : "";
+        if (!UUID_RE.test(projectId)) return jsonRes({ error: "projectId is required" }, 400);
+        const { data: p } = await adminClient
+          .from("runtime_projects")
+          .select("id, name, owner_id")
+          .eq("id", projectId)
+          .maybeSingle();
+        if (!p) return jsonRes({ error: "Site not found" }, 404);
+        const schema = schemaFor(p.id);
+        const sql = pg();
+
+        // --- list a site's content tables with columns + row counts ---
+        if (action === "site-content-tables") {
+          await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS ${qi(schema)}`);
+          const names = await sql<{ table_name: string }[]>`
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema = ${schema} AND table_type = 'BASE TABLE'
+            ORDER BY table_name
+          `;
+          const tables: { name: string; rows: number; columns: { name: string; type: string }[] }[] = [];
+          for (const { table_name } of names) {
+            if (SYSTEM_TABLES.has(table_name)) continue;
+            const [row] = await sql.unsafe<{ count: string }[]>(`SELECT count(*)::text AS count FROM ${qi(schema)}.${qi(table_name)}`);
+            tables.push({ name: table_name, rows: Number(row?.count ?? 0), columns: await siteColumns(schema, table_name) });
+          }
+          return jsonRes({ schemaName: schema, tables });
+        }
+
+        // --- create a new content table (Articles / Products / Blog posts / custom) ---
+        if (action === "site-content-create-table") {
+          const table = safeName(body.table);
+          if (!table) return jsonRes({ error: "Table name must be lowercase letters, numbers and underscores" }, 400);
+          if (SYSTEM_TABLES.has(table)) return jsonRes({ error: `"${table}" is reserved` }, 400);
+          const specs = Array.isArray(body.columns) ? (body.columns as { name?: unknown; type?: unknown }[]) : [];
+          if (specs.length > 60) return jsonRes({ error: "Too many columns (60 max)" }, 400);
+          await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS ${qi(schema)}`);
+          await sql.unsafe(`CREATE TABLE IF NOT EXISTS ${qi(schema)}.${qi(table)} (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            owner_id uuid,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            updated_at timestamptz NOT NULL DEFAULT now()
+          )`);
+          for (const spec of specs) {
+            const col = safeName(spec.name);
+            if (!col || RESERVED_COLS.has(col)) continue;
+            await sql.unsafe(`ALTER TABLE ${qi(schema)}.${qi(table)} ADD COLUMN IF NOT EXISTS ${qi(col)} ${pgType(spec.type)}`);
+          }
+          const columns = await siteColumns(schema, table);
+          await sql`
+            INSERT INTO public.runtime_tables (project_id, collection, schema_name, table_name, columns)
+            VALUES (${p.id}, ${table}, ${schema}, ${table}, ${sql.json(columns)})
+            ON CONFLICT (project_id, collection)
+            DO UPDATE SET columns = EXCLUDED.columns, updated_at = now()
+          `;
+          await sql`UPDATE public.runtime_projects SET schema_name = ${schema}, updated_at = now()
+                    WHERE id = ${p.id} AND schema_name IS DISTINCT FROM ${schema}`;
+          return jsonRes({ success: true, table, columns });
+        }
+
+        const table = safeName(body.table);
+        if (!table || SYSTEM_TABLES.has(table)) return jsonRes({ error: "Invalid table" }, 400);
+        if (!(await siteTableExists(schema, table))) return jsonRes({ error: "Table not found" }, 404);
+        const columns = await siteColumns(schema, table);
+        const typeOf: Record<string, string> = Object.fromEntries(columns.map((c) => [c.name, c.type]));
+
+        // --- list rows ---
+        if (action === "site-content-rows") {
+          const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 500);
+          const offset = Math.max(Number(body.offset) || 0, 0);
+          const q = typeof body.q === "string" ? body.q.trim().slice(0, 200) : "";
+          const params: unknown[] = [];
+          let clause = "";
+          if (q) {
+            const textCols = columns.filter((c) => c.type === "text" || c.type.includes("char")).map((c) => c.name);
+            if (textCols.length) {
+              params.push(`%${q}%`);
+              clause = `WHERE (${textCols.map((c) => `${qi(c)} ILIKE $1`).join(" OR ")})`;
+            }
+          }
+          const rows = await sql.unsafe<Record<string, unknown>[]>(
+            `SELECT * FROM ${qi(schema)}.${qi(table)} ${clause} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+            params,
+          );
+          const [{ count }] = await sql.unsafe<{ count: string }[]>(
+            `SELECT count(*)::text AS count FROM ${qi(schema)}.${qi(table)} ${clause}`,
+            params,
+          );
+          return jsonRes({ rows, columns, total: Number(count) });
+        }
+
+        // --- create or update one record ---
+        if (action === "site-content-save") {
+          const id = typeof body.id === "string" && UUID_RE.test(body.id) ? body.id : null;
+          const values = body.values && typeof body.values === "object" ? (body.values as Record<string, unknown>) : {};
+          if (JSON.stringify(values).length > 200_000) return jsonRes({ error: "Record too large (200KB max)" }, 413);
+          const cols: string[] = [];
+          const vals: unknown[] = [];
+          for (const [key, value] of Object.entries(values)) {
+            const col = safeName(key);
+            if (!col || RESERVED_COLS.has(col) || !typeOf[col]) continue;
+            const v = coerceValue(value, typeOf[col]);
+            if (v === undefined) continue;
+            cols.push(col);
+            vals.push(v);
+          }
+          let rows: Record<string, unknown>[];
+          if (id) {
+            const sets = cols.map((c, i) => `${qi(c)} = $${i + 1}`);
+            sets.push("updated_at = now()");
+            vals.push(id);
+            rows = await sql.unsafe<Record<string, unknown>[]>(
+              `UPDATE ${qi(schema)}.${qi(table)} SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING *`,
+              vals,
+            );
+            if (!rows[0]) return jsonRes({ error: "Record not found" }, 404);
+          } else {
+            if (!cols.length) return jsonRes({ error: "Nothing to save" }, 400);
+            // owner_id NULL = site-published content, visible to every visitor.
+            rows = await sql.unsafe<Record<string, unknown>[]>(
+              `INSERT INTO ${qi(schema)}.${qi(table)} (${cols.map(qi).join(", ")})
+               VALUES (${cols.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING *`,
+              vals,
+            );
+          }
+          await sql`UPDATE public.runtime_projects SET updated_at = now() WHERE id = ${p.id}`;
+          return jsonRes({ success: true, row: rows[0] });
+        }
+
+        // --- delete one record ---
+        if (action === "site-content-delete") {
+          const id = typeof body.id === "string" && UUID_RE.test(body.id) ? body.id : null;
+          if (!id) return jsonRes({ error: "id is required" }, 400);
+          await sql.unsafe(`DELETE FROM ${qi(schema)}.${qi(table)} WHERE id = $1`, [id]);
+          return jsonRes({ success: true });
+        }
       }
 
       return new Response(JSON.stringify({ error: `Unknown POST action: ${action || "(empty)"}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

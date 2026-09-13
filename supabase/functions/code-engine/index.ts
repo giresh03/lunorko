@@ -622,7 +622,11 @@ LUNOR LIVE RUNTIME (how the preview actually runs your backend):
 
   - <collection> is a plural lowercase noun (tasks, products, orders, posts, bookings...).
   - Records are plain JSON; the server adds _id, id, ownerId, createdAt, updatedAt.
-  - Filters: ?status=done&limit=50&offset=0&sort=asc&q=search&mine=true
+  - Filters: ?status=done&limit=50&offset=0&sort=asc&q=search
+  - Scoping: GET /api/<collection> returns site-published content (products, posts, menu_items —
+    managed by the site owner in the Lunor admin content editor) plus the signed-in user's own
+    records. Use ?mine=true for strictly personal lists (my orders, my bookings) and ?all=true on
+    admin pages that must see every user's records.
   - Client: read from data.data (list or single), user from data.user, token from data.token.
     Keep the token in localStorage under "token" and send "Authorization: Bearer <token>".
   - Always read the API base from import.meta.env.VITE_API_URL with fallback "/api"
