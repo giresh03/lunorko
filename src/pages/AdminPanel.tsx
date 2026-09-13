@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Shield, Loader2, LogOut,
   Plus, Trash2, Edit, ArrowLeft, Eye, Mail, Clock, User,
   CheckCircle, XCircle, Receipt, Video, Megaphone,
-  MessageSquare, Ban, UserPlus, Briefcase, FileText, Lock
+  MessageSquare, Ban, UserPlus, Briefcase, FileText, Lock, Globe, Database, Server
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
@@ -61,6 +61,7 @@ const AdminPanel = () => {
   const [applicants, setApplicants] = useState<any[]>([]);
   const [internshipApps, setInternshipApps] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
   const [clearChatsOpen, setClearChatsOpen] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
@@ -224,9 +225,10 @@ const AdminPanel = () => {
         callAdmin("community-posts"),
         callAdmin("community-guidelines"),
         callAdmin("feedback"),
+        callAdmin("generated-sites"),
       ]);
 
-      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData, feedbackData] = results.map((r) =>
+      const [statsData, usersData, subsData, prData, trendsData, resourcesData, popAdsData, communityPostsData, guidelinesData, feedbackData, sitesData] = results.map((r) =>
         r.status === "fulfilled" ? r.value : null
       );
 
@@ -240,6 +242,7 @@ const AdminPanel = () => {
       setCommunityPosts(Array.isArray(communityPostsData) ? communityPostsData : []);
       setCommunityGuidelines(Array.isArray(guidelinesData) ? guidelinesData : []);
       setFeedbacks(Array.isArray(feedbackData) ? feedbackData : []);
+      setSites(Array.isArray(sitesData) ? sitesData : []);
 
       const { data: applicantData } = await supabase.rpc("admin_list_profiles");
       setApplicants((applicantData as any[]) ?? []);
@@ -572,6 +575,7 @@ const AdminPanel = () => {
               {[
                 { value: "overview", label: "Overview", short: "Stats", Icon: LayoutDashboard },
                 { value: "system", label: "System", short: "Locks", Icon: Lock },
+                { value: "sites", label: "Sites", short: "Sites", Icon: Globe, count: sites.filter((s) => s.status === "live").length },
                 { value: "users", label: "Users", short: "Users", Icon: Users },
                 { value: "subscriptions", label: "Subscriptions", short: "Subs", Icon: CreditCard },
                 { value: "payment-requests", label: "Payments", short: "Pay", Icon: Receipt, count: paymentRequests.filter((p) => p.status === "pending").length },
@@ -1488,6 +1492,72 @@ const AdminPanel = () => {
                     </TableRow>
                   ))}
                   {applicants.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No student profiles yet</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+
+          <TabsContent value="sites">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2">
+                <Globe className="h-5 w-5 text-primary" /> Generated Sites ({sites.length})
+              </h2>
+              <Button variant="outline" size="sm" className="btn-outline-glow" onClick={fetchAll}>Refresh</Button>
+            </div>
+
+            <div className="mb-6 grid gap-3 sm:gap-4 grid-cols-3">
+              {[
+                { label: "Total Sites", value: sites.length, Icon: Globe, tone: "text-primary" },
+                { label: "Live Backends", value: sites.filter((s) => s.status === "live").length, Icon: Server, tone: "text-green-400" },
+                { label: "App Users", value: sites.reduce((n, s) => n + (s.app_users || 0), 0), Icon: Database, tone: "text-yellow-400" },
+              ].map(({ label, value, Icon, tone }) => (
+                <div key={label} className="rounded-xl border border-border gradient-card p-4">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className={`h-4 w-4 ${tone}`} /> {label}</div>
+                  <p className="mt-2 text-2xl font-bold text-foreground">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Site</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Workspace</TableHead>
+                    <TableHead>Backend</TableHead>
+                    <TableHead>Tables</TableHead>
+                    <TableHead>App Users</TableHead>
+                    <TableHead>Last Activity</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sites.map((s: any) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium text-sm">{s.name || "Untitled site"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{s.owner_email || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.scope_key || s.scope}</TableCell>
+                      <TableCell>
+                        {s.status === "live" && <Badge className="bg-green-500/15 text-green-400 border-green-500/30">Live</Badge>}
+                        {s.status === "provisioned" && <Badge className="bg-yellow-500/15 text-yellow-400 border-yellow-500/30">Provisioned</Badge>}
+                        {s.status === "pending" && <Badge variant="outline" className="text-muted-foreground">No backend</Badge>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <span className="font-semibold text-foreground">{s.table_count || 0}</span>
+                        {s.collections?.length > 0 && (
+                          <span className="ml-2 text-xs text-muted-foreground">{s.collections.slice(0, 4).join(", ")}{s.collections.length > 4 ? "…" : ""}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{s.app_users || 0}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {s.updated_at ? new Date(s.updated_at).toLocaleString() : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {sites.length === 0 && (
+                    <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No generated sites yet</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
