@@ -1170,6 +1170,9 @@ comments, chat, admin, CRUD, or "backend"):
 
         : "";
 
+      // Service client for the training-data lookups below (RPCs are service-role only).
+      const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
       // ===== Retrieval-augmented grounding: inject curated exemplars =====
       let exemplarBlock = "";
       try {
