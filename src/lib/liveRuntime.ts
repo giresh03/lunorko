@@ -108,6 +108,9 @@ export function filesNeedBackend(files: { path: string; content: string }[]): bo
     (f) =>
       /^(server|backend|api)\//i.test(f.path) ||
       /\/(server|backend)\//i.test(f.path) ||
+      /(^|\/)api\.js$/i.test(f.path) ||
+      /(^|\/)(login|signin|signup|sign-up|register|dashboard|admin|account)\.html$/i.test(f.path) ||
+      /__LUNOR_API_URL__|lunorApi|["'`]\/api\//.test(f.content) ||
       /VITE_API_URL|\/api\/auth\/(login|register|me)|fetch\(\s*[`'"](\/api|https?:\/\/localhost:\d+\/api)/.test(f.content),
   );
 }

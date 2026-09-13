@@ -729,11 +729,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     walk(fileTree);
     return filesNeedBackend(flat);
   }, [fileTree]);
+  // Set when the preview reports an /api call with no backend attached.
+  const [backendNeeded, setBackendNeeded] = useState(false);
   const liveRuntime = useLiveRuntime({
     scope: "domain",
     scopeKey: domainId,
     name: domainName,
-    enabled: projectNeedsBackend,
+    enabled: projectNeedsBackend || backendNeeded,
   });
   const liveApiUrlRef = useRef<string | null>(null);
   liveApiUrlRef.current = liveRuntime.apiUrl;
@@ -742,7 +744,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // Preview runtime errors reported by the sandboxed iframe
   const [previewErrors, setPreviewErrors] = useState<{ message: string; stack?: string }[]>([]);
-  const [backendNeeded, setBackendNeeded] = useState(false);
   const [resolvingError, setResolvingError] = useState(false);
   const previewErrorLogRef = useRef<string[]>([]);
   const verifyPendingRef = useRef(false);
