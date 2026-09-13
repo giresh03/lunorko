@@ -744,7 +744,10 @@ const NATIVE_LANGUAGES = new Set(["javascript", "typescript"]);
 
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash";
-const DEFAULT_MODEL = "google/gemini-3-flash-preview";
+// Highest-quality build model (user-selected default). All ids below are live on the gateway.
+const DEFAULT_MODEL = "google/gemini-3.1-pro-preview";
+const FAST_MODEL = "google/gemini-3.8-flash";
+const LITE_MODEL = "google/gemini-3.1-flash-lite";
 
 async function callAINonStream(
   systemContent: string,
