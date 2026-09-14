@@ -633,6 +633,7 @@ export type Database = {
           prompt: string
           prompt_key: string
           response: string
+          seed_data: Json | null
           slug: string
           sort_order: number
           title: string
@@ -648,6 +649,7 @@ export type Database = {
           prompt: string
           prompt_key: string
           response: string
+          seed_data?: Json | null
           slug: string
           sort_order?: number
           title: string
@@ -663,6 +665,7 @@ export type Database = {
           prompt?: string
           prompt_key?: string
           response?: string
+          seed_data?: Json | null
           slug?: string
           sort_order?: number
           title?: string

@@ -104,7 +104,7 @@ const ColumnSchema = z.object({
 });
 
 const ManageSchema = z.object({
-  action: z.enum(['ensure', 'reset', 'stats', 'schema', 'credentials']),
+  action: z.enum(['ensure', 'reset', 'stats', 'schema', 'credentials', 'seed']),
   scope: z.enum(['domain', 'level', 'team']),
   scopeKey: z.string().min(1).max(200),
   name: z.string().min(1).max(120).optional(),
@@ -113,6 +113,9 @@ const ManageSchema = z.object({
     .array(z.object({ table: z.string().min(1).max(48), columns: z.array(ColumnSchema).max(60).default([]) }))
     .max(30)
     .optional(),
+  // Sample content for a pre-built demo site: { table: [ {...row}, ... ] }.
+  // Rows are inserted as site-published content (no owner) and only when the table is empty.
+  seed: z.record(z.array(z.record(z.unknown())).max(200)).optional(),
 });
 
 async function handleManage(req: Request): Promise<Response> {
@@ -130,7 +133,7 @@ async function handleManage(req: Request): Promise<Response> {
 
   const parsed = ManageSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return json({ error: parsed.error.flatten().fieldErrors }, 400);
-  const { action, scope, scopeKey, name, model, rotate } = parsed.data;
+  const { action, scope, scopeKey, name, model, rotate, seed } = parsed.data;
 
   const db = admin();
 
@@ -191,11 +194,50 @@ async function handleManage(req: Request): Promise<Response> {
 
   if (action === 'reset') await resetApp(projectId);
 
-  if (action === 'schema' && model) {
+  if ((action === 'schema' || action === 'seed') && model) {
     for (const entry of model) {
       const table = safeName(entry.table);
       if (!table || table === 'users' || table === 'uploads') continue;
       await ensureTable(projectId, table, entry.columns as ColumnSpec[]);
+    }
+  }
+
+  // Sample content for pre-built demo sites: fill each table once, as published
+  // site content (owner_id NULL) so every visitor of that app sees it.
+  let seeded: Record<string, number> | undefined;
+  if (action === 'seed' && seed) {
+    seeded = {};
+    const sql = pg();
+    for (const [rawTable, rows] of Object.entries(seed)) {
+      const table = safeName(rawTable);
+      if (!table || table === 'users' || table === 'uploads' || !Array.isArray(rows) || rows.length === 0) continue;
+      try {
+        const { columns } = await ensureTable(projectId, table, specsFromBody(rows[0] as Row));
+        const [{ count }] = await sql.unsafe<{ count: number }[]>(
+          `SELECT COUNT(*)::int AS count FROM "${schema}"."${table}"`,
+        );
+        if (count > 0) { seeded[table] = 0; continue; }
+        let inserted = 0;
+        for (const raw of rows.slice(0, 200)) {
+          const row: Row = {};
+          for (const [k, v] of Object.entries(raw as Row)) {
+            const col = safeName(k);
+            if (!col || RESERVED.has(col) || !columns[col]) continue;
+            row[col] = v !== null && typeof v === 'object' ? JSON.stringify(v) : v;
+          }
+          if (Object.keys(row).length === 0) continue;
+          const cols = Object.keys(row);
+          const params = cols.map((_, i) => `$${i + 1}`).join(', ');
+          await sql.unsafe(
+            `INSERT INTO "${schema}"."${table}" (${cols.map((c) => `"${c}"`).join(', ')}) VALUES (${params})`,
+            cols.map((c) => row[c]) as never[],
+          );
+          inserted += 1;
+        }
+        seeded[table] = inserted;
+      } catch (e) {
+        console.error('seed failed', table, e);
+      }
     }
   }
 
@@ -218,6 +260,7 @@ async function handleManage(req: Request): Promise<Response> {
     schemaName: schema,
     stats: { users: stats.users, documents: stats.documents, tables: stats.tables, collections: stats.tables.map((t) => t.name) },
     credentials,
+    seeded,
     createdAt: projectRow!.created_at,
   });
 }

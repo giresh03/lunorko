@@ -8,7 +8,9 @@ import {
   runtimeCredentials,
   runtimeStats,
   RuntimeError,
+  seedRuntime,
   type DataModelTable,
+  type SeedData,
   type RuntimeCredentials,
   type RuntimeInfo,
   type RuntimeScope,
@@ -148,6 +150,21 @@ export function useLiveRuntime({ scope, scopeKey, name, enabled = true }: Option
     [scope, allowed, commit],
   );
 
+  /** Load a demo site's sample content into its backend (empty tables only). */
+  const seed = useCallback(
+    async (data: SeedData, model?: DataModelTable[]) => {
+      const key = keyRef.current;
+      if (!key || !allowed || !data || Object.keys(data).length === 0) return;
+      try {
+        if (inflight.current?.key === key) await inflight.current.p;
+        commit(await seedRuntime(scope, key, data, model));
+      } catch (e) {
+        console.error("Could not load sample content", e);
+      }
+    },
+    [scope, allowed, commit],
+  );
+
   /** Read-only database credentials for outside tools. */
   const credentials = useCallback(async (): Promise<RuntimeCredentials | null> => {
     const key = keyRef.current;
@@ -179,6 +196,7 @@ export function useLiveRuntime({ scope, scopeKey, name, enabled = true }: Option
     refresh,
     reset,
     applySchema,
+    seed,
     credentials,
   };
 }

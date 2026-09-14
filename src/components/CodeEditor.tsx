@@ -33,6 +33,7 @@ import { resolveModelId } from "@/components/editor/ModelSelector";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
 import { findDemoBuild, type DemoBuild } from "@/lib/demoBuilds";
+import { seedForDemo } from "@/lib/demoSeeds";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useCredits } from "@/hooks/useCredits";
@@ -48,7 +49,6 @@ import {
 
 // -- Preview runtime guard: sandbox-safe storage + error reporting --
 const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
-  if (window.__lunorGuard) return; window.__lunorGuard = true;
   function memStore(){
     var m = {};
     return {
@@ -2194,6 +2194,10 @@ ${jsCode}
     if (demo) {
       // Each demo site runs on its own live backend so users, admins and data never mix.
       setRuntimeScope({ key: `${domainId}::demo:${demo.slug}`, name: demo.title });
+      // Load the site's sample content while the files stream in, so the very first
+      // page already lists rooms / products / dishes instead of an empty state.
+      const demoSeed = demo.seedData ?? seedForDemo(demo.slug);
+      if (demoSeed) void liveRuntime.seed(demoSeed, extractDataModel(demo.response));
       const CHUNK = 600;
       for (let i = 0; i < demo.response.length; i += CHUNK) {
         upsert(demo.response.slice(i, i + CHUNK));
