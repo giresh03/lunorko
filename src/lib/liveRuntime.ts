@@ -37,6 +37,9 @@ export interface DataModelTable {
   columns: { name: string; type?: string; required?: boolean }[];
 }
 
+/** Sample content for a pre-built demo site: table name -> rows. */
+export type SeedData = Record<string, Record<string, unknown>[]>;
+
 export interface RuntimeInfo {
   projectId: string;
   scope: RuntimeScope;
@@ -60,7 +63,7 @@ export class RuntimeError extends Error {
 }
 
 async function manage(
-  action: "ensure" | "reset" | "stats" | "schema" | "credentials",
+  action: "ensure" | "reset" | "stats" | "schema" | "credentials" | "seed",
   scope: RuntimeScope,
   scopeKey: string,
   name?: string,
@@ -98,6 +101,9 @@ export const runtimeStats = (scope: RuntimeScope, scopeKey: string) => manage("s
 /** Create/extend the app's real tables from a declared data model. */
 export const applyDataModel = (scope: RuntimeScope, scopeKey: string, model: DataModelTable[]) =>
   manage("schema", scope, scopeKey, undefined, { model });
+/** Load a demo site's sample content (only fills tables that are still empty). */
+export const seedRuntime = (scope: RuntimeScope, scopeKey: string, seed: SeedData, model?: DataModelTable[]) =>
+  manage("seed", scope, scopeKey, undefined, { seed, model });
 /** Read-only database credentials for outside tools (psql, TablePlus, DBeaver). */
 export const runtimeCredentials = (scope: RuntimeScope, scopeKey: string, rotate = false) =>
   manage("credentials", scope, scopeKey, undefined, { rotate });

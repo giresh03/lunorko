@@ -14,6 +14,8 @@ export interface DemoBuild {
   domain: string;
   response: string;
   fileCount: number;
+  /** Sample content loaded into this site's backend on replay. */
+  seedData: Record<string, Record<string, unknown>[]> | null;
 }
 
 /** Case/punctuation/whitespace-insensitive key used for exact-prompt matching. */
@@ -29,6 +31,7 @@ export function normalizePrompt(text: string): string {
 const mapRow = (r: {
   id: string; slug: string; title: string; description: string | null; level: string;
   prompt: string; domain: string; response: string; file_count: number;
+  seed_data?: unknown;
 }): DemoBuild => ({
   id: r.id,
   slug: r.slug,
@@ -39,6 +42,9 @@ const mapRow = (r: {
   domain: r.domain,
   response: r.response,
   fileCount: r.file_count,
+  seedData: (r.seed_data && typeof r.seed_data === "object" && !Array.isArray(r.seed_data)
+    ? (r.seed_data as Record<string, Record<string, unknown>[]>)
+    : null),
 });
 
 /** Find a saved build whose prompt matches the user's prompt exactly (normalized). */
@@ -48,7 +54,7 @@ export async function findDemoBuild(prompt: string, domain?: string): Promise<De
   try {
     let q = supabase
       .from("demo_builds")
-      .select("id, slug, title, description, level, prompt, domain, response, file_count")
+      .select("id, slug, title, description, level, prompt, domain, response, file_count, seed_data")
       .eq("prompt_key", key)
       .limit(1);
     if (domain) q = q.eq("domain", domain);

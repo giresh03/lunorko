@@ -1,0 +1,1 @@
+ALTER TABLE public.demo_builds ADD COLUMN IF NOT EXISTS seed_data jsonb;
