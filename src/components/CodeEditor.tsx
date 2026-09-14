@@ -32,7 +32,7 @@ import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/live
 import { resolveModelId } from "@/components/editor/ModelSelector";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
-import { findDemoBuild, listDemoBuilds, type DemoBuild } from "@/lib/demoBuilds";
+import { findDemoBuild, type DemoBuild } from "@/lib/demoBuilds";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useCredits } from "@/hooks/useCredits";
@@ -941,13 +941,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  // Pre-built demo sites for this domain (one-click prompts above the chat box)
-  const [demoBuilds, setDemoBuilds] = useState<Omit<DemoBuild, "response">[]>([]);
-  useEffect(() => {
-    let alive = true;
-    void listDemoBuilds(domainId).then((list) => { if (alive) setDemoBuilds(list); });
-    return () => { alive = false; };
-  }, [domainId]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Ghost text state
