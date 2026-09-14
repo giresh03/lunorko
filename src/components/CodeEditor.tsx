@@ -32,7 +32,7 @@ import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/live
 import { resolveModelId } from "@/components/editor/ModelSelector";
 import { hasJSX } from "@/lib/sandpackProject";
 import { scaffoldPage } from "@/lib/siteScaffold";
-import { findDemoBuild, listDemoBuilds, type DemoBuild } from "@/lib/demoBuilds";
+import { findDemoBuild, type DemoBuild } from "@/lib/demoBuilds";
 import VoiceAssistant from "@/components/editor/VoiceAssistant";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useCredits } from "@/hooks/useCredits";
@@ -941,13 +941,6 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  // Pre-built demo sites for this domain (one-click prompts above the chat box)
-  const [demoBuilds, setDemoBuilds] = useState<Omit<DemoBuild, "response">[]>([]);
-  useEffect(() => {
-    let alive = true;
-    void listDemoBuilds(domainId).then((list) => { if (alive) setDemoBuilds(list); });
-    return () => { alive = false; };
-  }, [domainId]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Ghost text state
@@ -3865,28 +3858,6 @@ ${jsCode}
                 onToggleVoice={() => voice.setVoiceEnabled(!voice.voiceEnabled)}
                 onStopSpeaking={voice.stopSpeaking}
               />
-              {demoBuilds.length > 0 && (
-                <div className="mt-1.5 flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                  <span className="shrink-0 self-center text-[9px] uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Demo</span>
-                  {demoBuilds.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      title={d.prompt}
-                      disabled={chatLoading}
-                      onClick={() => { setChatInput(d.prompt); void handleChatSend(d.prompt); }}
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-50 hover:opacity-90"
-                      style={{
-                        backgroundColor: currentTheme.uiColors.accent + "18",
-                        color: currentTheme.uiColors.accent,
-                        border: `1px solid ${currentTheme.uiColors.accent}40`,
-                      }}
-                    >
-                      {d.title}
-                    </button>
-                  ))}
-                </div>
-              )}
               <div className="mt-1 flex gap-1.5">
                 <input
                   value={chatInput}
