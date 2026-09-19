@@ -3151,13 +3151,12 @@ ${jsCode}
               </div>
             ))}
             <div className="flex-1" />
-            <div className="flex items-center gap-1 px-2 shrink-0">
+            <div className="flex items-center gap-1.5 px-2 shrink-0">
               {credits && (
                 <span
-                  className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold"
+                  className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-secondary/40 px-2 py-0.5 text-[10px] font-semibold"
                   style={{
                     color: credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444",
-                    backgroundColor: (credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444") + "15",
                   }}
                   title={`${credits.planCredits} plan + ${credits.topupCredits} top-up credits`}
                 >
@@ -3167,28 +3166,35 @@ ${jsCode}
                 </span>
               )}
 
-              <button onClick={handleCopy} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Copy">
-                {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
-              <button onClick={handleReset} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Reset">
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Tests">
-                <TestTube2 className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Docs">
-                <BookOpen className="h-3.5 w-3.5" />
-              </button>
-              <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-6 gap-1 px-2.5 text-[10px]">
-                {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              <div className="flex items-center gap-0.5">
+                <button onClick={handleCopy} className={iconBtn} title="Copy">
+                  {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                <button onClick={handleReset} className={iconBtn} title="Reset">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-0.5">
+                <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className={`${iconBtn} disabled:opacity-30 disabled:hover:bg-transparent`} title="Generate Tests">
+                  <TestTube2 className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className={`${iconBtn} disabled:opacity-30 disabled:hover:bg-transparent`} title="Generate Docs">
+                  <BookOpen className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-7 gap-1 px-3 text-[11px] font-medium shadow-sm">
+                {isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                 Run
               </Button>
               <RunLocallyDialog fileTree={fileTree} domainName={domainName} projectName={currentProjectName || "my-app"}>
-                <Button size="sm" variant="outline" className="h-6 gap-1 px-2.5 text-[10px]">
-                  <Download className="h-3 w-3" />
+                <Button size="sm" variant="outline" className="h-7 gap-1 px-3 text-[11px] font-medium">
+                  <Download className="h-3.5 w-3.5" />
                   Run Locally
                 </Button>
               </RunLocallyDialog>
+              <div className="w-px h-4 bg-border" />
               {activeTab && (
                 (activeTab.language === "html" || activeTab.name.endsWith(".html") ||
                   (isAppDomain && (["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name)))
@@ -3196,7 +3202,7 @@ ${jsCode}
               ) && (
                 <button
                   onClick={() => setShowPreview(!showPreview)}
-                  className={`p-1 transition-colors ${showPreview ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`${iconBtn} ${showPreview ? "text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
                   title={showPreview ? "Hide Preview" : isAppDomain ? "Show App Preview" : "Show Web Preview"}
                 >
                   {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : isAppDomain ? <Smartphone className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
