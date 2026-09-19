@@ -649,6 +649,10 @@ const LAYOUT_SUGGESTIONS = [
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   const { credits, refetch: refetchCredits } = useCredits();
+
+  // Shared icon-button surfaces for a clean, consistent toolbar
+  const iconBtn = "inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors";
+  const iconBtnSm = "inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors";
   const initialWorkspace = useMemo(() => {
     const saved = getSavedProjects()
       .filter((project) => project.domain === domainName && project.fileTree.length > 0)
@@ -2917,8 +2921,8 @@ ${jsCode}
         <div className="flex items-center gap-1">
           {/* Theme picker */}
           <div className="relative">
-            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
-              <Palette className="h-3 w-3" />
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
+              <Palette className="h-3.5 w-3.5" />
             </Button>
             {showThemeMenu && (
               <>
@@ -2947,29 +2951,35 @@ ${jsCode}
               </>
             )}
           </div>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={handleSaveProject} title="Save Project">
-            <Save className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-1.5 text-[10px]"
-            onClick={() => setShowGitHub(true)}
-            title={githubStatus.connected ? `Push to GitHub (${githubStatus.login})` : "Push to GitHub"}
-          >
-            <Github className="h-3 w-3" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
-            {showAIPanel ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowSidebar(!showSidebar)}>
-            <Settings className="h-3 w-3" />
-          </Button>
-          {onExit && (
-            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={onExit}>
-              <Minimize2 className="h-3 w-3" />
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleSaveProject} title="Save Project">
+              <Save className="h-3.5 w-3.5" />
             </Button>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setShowGitHub(true)}
+              title={githubStatus.connected ? `Push to GitHub (${githubStatus.login})` : "Push to GitHub"}
+            >
+              <Github className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="w-px h-4 bg-border" />
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
+            {showAIPanel ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+          </Button>
+          <div className="w-px h-4 bg-border" />
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowSidebar(!showSidebar)} title="Explorer">
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+            {onExit && (
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onExit} title="Exit editor">
+                <Minimize2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -3141,13 +3151,12 @@ ${jsCode}
               </div>
             ))}
             <div className="flex-1" />
-            <div className="flex items-center gap-1 px-2 shrink-0">
+            <div className="flex items-center gap-1.5 px-2 shrink-0">
               {credits && (
                 <span
-                  className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold"
+                  className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-secondary/40 px-2 py-0.5 text-[10px] font-semibold"
                   style={{
                     color: credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444",
-                    backgroundColor: (credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444") + "15",
                   }}
                   title={`${credits.planCredits} plan + ${credits.topupCredits} top-up credits`}
                 >
@@ -3157,28 +3166,35 @@ ${jsCode}
                 </span>
               )}
 
-              <button onClick={handleCopy} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Copy">
-                {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
-              <button onClick={handleReset} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Reset">
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Tests">
-                <TestTube2 className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Docs">
-                <BookOpen className="h-3.5 w-3.5" />
-              </button>
-              <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-6 gap-1 px-2.5 text-[10px]">
-                {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+              <div className="flex items-center gap-0.5">
+                <button onClick={handleCopy} className={iconBtn} title="Copy">
+                  {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                <button onClick={handleReset} className={iconBtn} title="Reset">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-0.5">
+                <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className={`${iconBtn} disabled:opacity-30 disabled:hover:bg-transparent`} title="Generate Tests">
+                  <TestTube2 className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className={`${iconBtn} disabled:opacity-30 disabled:hover:bg-transparent`} title="Generate Docs">
+                  <BookOpen className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-7 gap-1 px-3 text-[11px] font-medium shadow-sm">
+                {isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                 Run
               </Button>
               <RunLocallyDialog fileTree={fileTree} domainName={domainName} projectName={currentProjectName || "my-app"}>
-                <Button size="sm" variant="outline" className="h-6 gap-1 px-2.5 text-[10px]">
-                  <Download className="h-3 w-3" />
+                <Button size="sm" variant="outline" className="h-7 gap-1 px-3 text-[11px] font-medium">
+                  <Download className="h-3.5 w-3.5" />
                   Run Locally
                 </Button>
               </RunLocallyDialog>
+              <div className="w-px h-4 bg-border" />
               {activeTab && (
                 (activeTab.language === "html" || activeTab.name.endsWith(".html") ||
                   (isAppDomain && (["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name)))
@@ -3186,7 +3202,7 @@ ${jsCode}
               ) && (
                 <button
                   onClick={() => setShowPreview(!showPreview)}
-                  className={`p-1 transition-colors ${showPreview ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`${iconBtn} ${showPreview ? "text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
                   title={showPreview ? "Hide Preview" : isAppDomain ? "Show App Preview" : "Show Web Preview"}
                 >
                   {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : isAppDomain ? <Smartphone className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -3248,13 +3264,18 @@ ${jsCode}
               const showSandpackPreview = isAppDomainOnly && isReactProjectPreview;
               return (
               <div className={`flex flex-col border-l border-border overflow-hidden ${previewFullscreen ? "fixed inset-0 z-50 w-full h-full border-l-0" : "w-1/2"}`}>
-                <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0 gap-1">
-                  {isAppDomain ? <Smartphone className="h-3 w-3 text-primary" /> : <Eye className="h-3 w-3 text-primary" />}
-                  <span className="text-[10px] font-medium text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
-                  <span className="text-[9px] text-muted-foreground ml-0.5">— Live</span>
+                <div className="flex items-center h-8 bg-card border-b border-border px-2 shrink-0 gap-1.5">
+                  {/* Preview label + live status */}
+                  <div className="flex items-center gap-1.5">
+                    {isAppDomain ? <Smartphone className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
+                    <span className="text-[10px] font-semibold text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
+                    </span>
+                  </div>
                   {/* Device label & dimensions indicator */}
                   {isAppDomain && currentDevice.type !== "desktop" && (
-                    <div className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
+                    <div className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20">
                       <span className="text-[9px] font-semibold text-primary">{currentDevice.label}</span>
                       <span className="text-[8px] text-primary/70">·</span>
                       <span className="text-[8px] font-mono text-primary/70">{currentDevice.w}×{currentDevice.h}</span>
@@ -3263,7 +3284,7 @@ ${jsCode}
                     </div>
                   )}
                   {isAppDomain && currentDevice.type === "desktop" && (
-                    <div className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-secondary/50">
+                    <div className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-md bg-secondary/50">
                       <span className="text-[9px] font-semibold text-secondary-foreground/80">Desktop</span>
                       <span className="text-[8px] text-muted-foreground">· Responsive</span>
                     </div>
@@ -3274,7 +3295,7 @@ ${jsCode}
                     <div className="relative">
                       <button
                         onClick={() => setShowDeviceMenu(!showDeviceMenu)}
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors hover:bg-secondary/50"
+                        className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[9px] font-medium transition-colors hover:bg-secondary/60"
                         style={{ color: currentTheme.uiColors.text }}
                       >
                         {currentDevice.type === "phone" ? <Smartphone className="h-3 w-3" /> : currentDevice.type === "tablet" ? <Tablet className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
@@ -3320,33 +3341,33 @@ ${jsCode}
                       )}
                     </div>
                   ) : (
-                    <>
-                      <button onClick={() => setPreviewDevice("iphone-15")} className={`p-0.5 transition-colors ${currentDevice.type === "phone" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Mobile">
-                        <Smartphone className="h-3 w-3" />
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={() => setPreviewDevice("iphone-15")} className={`${iconBtnSm} ${currentDevice.type === "phone" ? "text-primary bg-primary/10" : ""}`} title="Mobile">
+                        <Smartphone className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => setPreviewDevice("ipad-mini")} className={`p-0.5 transition-colors ${currentDevice.type === "tablet" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Tablet">
-                        <Tablet className="h-3 w-3" />
+                      <button onClick={() => setPreviewDevice("ipad-mini")} className={`${iconBtnSm} ${currentDevice.type === "tablet" ? "text-primary bg-primary/10" : ""}`} title="Tablet">
+                        <Tablet className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => setPreviewDevice("desktop")} className={`p-0.5 transition-colors ${previewDevice === "desktop" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Desktop">
-                        <Monitor className="h-3 w-3" />
+                      <button onClick={() => setPreviewDevice("desktop")} className={`${iconBtnSm} ${previewDevice === "desktop" ? "text-primary bg-primary/10" : ""}`} title="Desktop">
+                        <Monitor className="h-3.5 w-3.5" />
                       </button>
-                    </>
+                    </div>
                   )}
                   {isAppDomain && currentDevice.type !== "desktop" && (
                     <>
-                      <div className="w-px h-3.5 bg-border mx-0.5" />
+                      <div className="w-px h-4 bg-border" />
                       <button
                         onClick={() => setDebugOverlay(!debugOverlay)}
-                        className={`p-0.5 transition-colors ${debugOverlay ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`${iconBtnSm} ${debugOverlay ? "text-primary bg-primary/10" : ""}`}
                         title="Layout Debug Overlay"
                       >
-                        <Grid3X3 className="h-3 w-3" />
+                        <Grid3X3 className="h-3.5 w-3.5" />
                       </button>
                     </>
                   )}
                   {(projectNeedsBackend || liveRuntime.status === "live") && (
                     <>
-                      <div className="w-px h-3.5 bg-border mx-0.5" />
+                      <div className="w-px h-4 bg-border" />
                       <LiveBackendPanel
                         compact
                         status={liveRuntime.status}
@@ -3360,111 +3381,98 @@ ${jsCode}
                       />
                     </>
                   )}
-                  <div className="w-px h-3.5 bg-border mx-0.5" />
-                  <button
-                    onClick={() => {
-                      const isHtml = !!activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html"));
-                      if (!isHtml && !visualEditMode) {
-                        toast.error("Open an .html page to use Visual Edit");
-                        return;
-                      }
-                      setVisualEditMode((v) => !v);
-                    }}
-                    className={`p-0.5 transition-all duration-200 ${visualEditMode ? "text-primary scale-110 drop-shadow-[0_0_6px_hsl(var(--primary))]" : "text-muted-foreground hover:text-foreground"}`}
-                    title="Visual Edit — click text to edit, drag to reorder, drop images"
-                  >
-                    <MousePointerClick className="h-3 w-3" />
-                  </button>
-                  {visualEditMode && (
-                    <>
-                      <button
-                        onClick={undoVisualEdit}
-                        disabled={!visualUndo.length}
-                        className="p-0.5 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
-                        title="Undo visual edit (Ctrl+Z)"
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={redoVisualEdit}
-                        disabled={!visualRedo.length}
-                        className="p-0.5 transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
-                        title="Redo visual edit (Ctrl+Shift+Z)"
-                      >
-                        <Redo2 className="h-3 w-3" />
-                      </button>
-                    </>
-                  )}
-                  <button
-                    onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Zoom out"
-                  >
-                    <ZoomOut className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setPreviewZoom(100)}
-                    className="text-[9px] font-mono text-muted-foreground hover:text-foreground transition-colors px-0.5"
-                    title="Reset zoom"
-                  >
-                    {previewZoom}%
-                  </button>
-                  <button
-                    onClick={() => setPreviewZoom((z) => Math.min(150, z + 10))}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Zoom in"
-                  >
-                    <ZoomIn className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={copyPreviewHtml}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Copy preview HTML"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={downloadPreviewHtml}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Download page as .html"
-                  >
-                    <Download className="h-3 w-3" />
-                  </button>
-                  <div className="w-px h-3.5 bg-border mx-0.5" />
-                  <button
-                    onClick={hardRefreshPreview}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-transform duration-300 hover:rotate-180"
-                    title="Refresh Preview (hard reload)"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </button>
-
-                  <button
-                    onClick={() => setPreviewFullscreen(!previewFullscreen)}
-                    className={`p-0.5 transition-colors ${previewFullscreen ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                    title={previewFullscreen ? "Exit Fullscreen" : "Fullscreen Preview"}
-                  >
-                    {previewFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const newWindow = window.open("", "_blank");
-                      if (newWindow && previewContent) {
-                        newWindow.document.open();
-                        newWindow.document.write(previewContent);
-                        newWindow.document.close();
-                      }
-                    }}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Open in New Tab"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setShowPreview(false)}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="h-3 w-3" />
+                  <div className="w-px h-4 bg-border" />
+                  {/* Visual edit */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => {
+                        const isHtml = !!activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html"));
+                        if (!isHtml && !visualEditMode) {
+                          toast.error("Open an .html page to use Visual Edit");
+                          return;
+                        }
+                        setVisualEditMode((v) => !v);
+                      }}
+                      className={`${iconBtnSm} ${visualEditMode ? "text-primary bg-primary/15 hover:bg-primary/20" : ""}`}
+                      title="Visual Edit — click text to edit, drag to reorder, drop images"
+                    >
+                      <MousePointerClick className="h-3.5 w-3.5" />
+                    </button>
+                    {visualEditMode && (
+                      <>
+                        <button
+                          onClick={undoVisualEdit}
+                          disabled={!visualUndo.length}
+                          className={`${iconBtnSm} disabled:opacity-30 disabled:hover:bg-transparent`}
+                          title="Undo visual edit (Ctrl+Z)"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={redoVisualEdit}
+                          disabled={!visualRedo.length}
+                          className={`${iconBtnSm} disabled:opacity-30 disabled:hover:bg-transparent`}
+                          title="Redo visual edit (Ctrl+Shift+Z)"
+                        >
+                          <Redo2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  {/* Zoom */}
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))} className={iconBtnSm} title="Zoom out">
+                      <ZoomOut className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => setPreviewZoom(100)} className="h-6 min-w-9 px-1 rounded-md text-[9px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors" title="Reset zoom">
+                      {previewZoom}%
+                    </button>
+                    <button onClick={() => setPreviewZoom((z) => Math.min(150, z + 10))} className={iconBtnSm} title="Zoom in">
+                      <ZoomIn className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  {/* Export */}
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={copyPreviewHtml} className={iconBtnSm} title="Copy preview HTML">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={downloadPreviewHtml} className={iconBtnSm} title="Download page as .html">
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  {/* View controls */}
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={hardRefreshPreview} className={`${iconBtnSm} hover:rotate-180`} title="Refresh Preview (hard reload)">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setPreviewFullscreen(!previewFullscreen)}
+                      className={`${iconBtnSm} ${previewFullscreen ? "text-primary bg-primary/10" : ""}`}
+                      title={previewFullscreen ? "Exit Fullscreen" : "Fullscreen Preview"}
+                    >
+                      {previewFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newWindow = window.open("", "_blank");
+                        if (newWindow && previewContent) {
+                          newWindow.document.open();
+                          newWindow.document.write(previewContent);
+                          newWindow.document.close();
+                        }
+                      }}
+                      className={iconBtnSm}
+                      title="Open in New Tab"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  <button onClick={() => setShowPreview(false)} className={iconBtnSm} title="Close preview">
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 {visualEditMode && (
