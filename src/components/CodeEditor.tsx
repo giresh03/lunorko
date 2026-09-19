@@ -2921,8 +2921,8 @@ ${jsCode}
         <div className="flex items-center gap-1">
           {/* Theme picker */}
           <div className="relative">
-            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
-              <Palette className="h-3 w-3" />
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
+              <Palette className="h-3.5 w-3.5" />
             </Button>
             {showThemeMenu && (
               <>
