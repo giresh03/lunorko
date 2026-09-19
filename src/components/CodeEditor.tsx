@@ -2951,29 +2951,35 @@ ${jsCode}
               </>
             )}
           </div>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={handleSaveProject} title="Save Project">
-            <Save className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 px-1.5 text-[10px]"
-            onClick={() => setShowGitHub(true)}
-            title={githubStatus.connected ? `Push to GitHub (${githubStatus.login})` : "Push to GitHub"}
-          >
-            <Github className="h-3 w-3" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
-            {showAIPanel ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowSidebar(!showSidebar)}>
-            <Settings className="h-3 w-3" />
-          </Button>
-          {onExit && (
-            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={onExit}>
-              <Minimize2 className="h-3 w-3" />
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleSaveProject} title="Save Project">
+              <Save className="h-3.5 w-3.5" />
             </Button>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setShowGitHub(true)}
+              title={githubStatus.connected ? `Push to GitHub (${githubStatus.login})` : "Push to GitHub"}
+            >
+              <Github className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="w-px h-4 bg-border" />
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
+            {showAIPanel ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+          </Button>
+          <div className="w-px h-4 bg-border" />
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowSidebar(!showSidebar)} title="Explorer">
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+            {onExit && (
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onExit} title="Exit editor">
+                <Minimize2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
