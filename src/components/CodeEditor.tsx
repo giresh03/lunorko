@@ -649,6 +649,10 @@ const LAYOUT_SUGGESTIONS = [
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   const { credits, refetch: refetchCredits } = useCredits();
+
+  // Shared icon-button surfaces for a clean, consistent toolbar
+  const iconBtn = "inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors";
+  const iconBtnSm = "inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors";
   const initialWorkspace = useMemo(() => {
     const saved = getSavedProjects()
       .filter((project) => project.domain === domainName && project.fileTree.length > 0)
