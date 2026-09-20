@@ -221,6 +221,33 @@ export type Database = {
         }
         Relationships: []
       }
+      analytics_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          institution_id: string | null
+          properties: Json
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          institution_id?: string | null
+          properties?: Json
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          institution_id?: string | null
+          properties?: Json
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       assistant_messages: {
         Row: {
           content: string
@@ -826,6 +853,130 @@ export type Database = {
         }
         Relationships: []
       }
+      institution_invites: {
+        Row: {
+          code: string
+          cohort: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          institution_id: string
+          max_uses: number | null
+          role: string
+          uses: number
+        }
+        Insert: {
+          code: string
+          cohort?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          institution_id: string
+          max_uses?: number | null
+          role?: string
+          uses?: number
+        }
+        Update: {
+          code?: string
+          cohort?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          institution_id?: string
+          max_uses?: number | null
+          role?: string
+          uses?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institution_invites_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institution_members: {
+        Row: {
+          cohort: string | null
+          id: string
+          institution_id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          cohort?: string | null
+          id?: string
+          institution_id: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          cohort?: string | null
+          id?: string
+          institution_id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institution_members_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institutions: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          email_domain: string | null
+          expires_at: string | null
+          id: string
+          name: string
+          plan_id: string
+          seats: number
+          slug: string
+          status: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          email_domain?: string | null
+          expires_at?: string | null
+          id?: string
+          name: string
+          plan_id?: string
+          seats?: number
+          slug: string
+          status?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          email_domain?: string | null
+          expires_at?: string | null
+          id?: string
+          name?: string
+          plan_id?: string
+          seats?: number
+          slug?: string
+          status?: string
+        }
+        Relationships: []
+      }
       internship_applications: {
         Row: {
           admin_notes: string | null
@@ -1056,6 +1207,48 @@ export type Database = {
           role?: string
           tech_stack?: string[] | null
           years_experience?: number
+        }
+        Relationships: []
+      }
+      payment_orders: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          id: string
+          kind: string
+          paid_at: string | null
+          plan_id: string
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency?: string
+          id?: string
+          kind?: string
+          paid_at?: string | null
+          plan_id: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          kind?: string
+          paid_at?: string | null
+          plan_id?: string
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
+          status?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1823,6 +2016,97 @@ export type Database = {
           },
         ]
       }
+      user_project_versions: {
+        Row: {
+          created_at: string
+          files: Json
+          id: string
+          label: string | null
+          project_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          files: Json
+          id?: string
+          label?: string | null
+          project_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          files?: Json
+          id?: string
+          label?: string | null
+          project_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_project_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "user_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_projects: {
+        Row: {
+          created_at: string
+          domain: string
+          files: Json
+          id: string
+          is_full_stack: boolean
+          name: string
+          prompt: string | null
+          runtime_project_id: string | null
+          share_slug: string | null
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          domain?: string
+          files?: Json
+          id?: string
+          is_full_stack?: boolean
+          name: string
+          prompt?: string | null
+          runtime_project_id?: string | null
+          share_slug?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          files?: Json
+          id?: string
+          is_full_stack?: boolean
+          name?: string
+          prompt?: string | null
+          runtime_project_id?: string | null
+          share_slug?: string | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_projects_runtime_project_id_fkey"
+            columns: ["runtime_project_id"]
+            isOneToOne: false
+            referencedRelation: "runtime_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1944,6 +2228,15 @@ export type Database = {
       }
     }
     Functions: {
+      activate_subscription: {
+        Args: {
+          _order_id?: string
+          _payment_id?: string
+          _plan_id: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       add_topup_credits: {
         Args: { _credits: number; _user_id: string }
         Returns: Json
@@ -2022,6 +2315,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_institution_member: {
+        Args: { _institution_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_institution_staff: {
+        Args: { _institution_id: string; _user_id: string }
+        Returns: boolean
+      }
       match_exemplars: {
         Args: { _limit?: number; _query: string }
         Returns: {
@@ -2047,7 +2348,40 @@ export type Database = {
           score: number
         }[]
       }
+      metrics_by_institution: {
+        Args: never
+        Returns: {
+          builds: number
+          institution_id: string
+          levels_completed: number
+          name: string
+          students: number
+        }[]
+      }
+      metrics_daily: {
+        Args: { _days?: number }
+        Returns: {
+          active_users: number
+          builds: number
+          day: string
+          revenue_cents: number
+          signups: number
+        }[]
+      }
+      metrics_overview: { Args: never; Returns: Json }
+      metrics_retention: {
+        Args: never
+        Returns: {
+          cohort_size: number
+          cohort_week: string
+          week1: number
+          week2: number
+          week4: number
+        }[]
+      }
+      my_institution_ids: { Args: { _user_id: string }; Returns: string[] }
       plan_credit_allowance: { Args: { _plan_id: string }; Returns: number }
+      redeem_institution_invite: { Args: { _code: string }; Returns: Json }
       sync_ai_credits: {
         Args: { _user_id: string }
         Returns: {

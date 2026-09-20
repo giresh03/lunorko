@@ -71,6 +71,20 @@
       "when": 1789373093674,
       "tag": "0009_add_demo_builds_seed_data",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789895702341,
+      "tag": "0010_startup_backend_core",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789895923557,
+      "tag": "0011_tighten_new_function_grants",
+      "breakpoints": true
     }
   ]
 }

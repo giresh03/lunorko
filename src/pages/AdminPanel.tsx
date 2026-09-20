@@ -11,6 +11,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { AdminPanelCard, VisitorsAreaChart, RevenueBarChart, PlanDonutChart } from "@/components/admin/AdminCharts";
 import { AITrainingDataCard } from "@/components/admin/AITrainingDataCard";
+import MetricsTab from "@/components/admin/MetricsTab";
 
 import { SystemControl } from "@/components/admin/SystemControl";
 import SiteEditorDialog from "@/components/admin/SiteEditorDialog";
@@ -578,6 +579,7 @@ const AdminPanel = () => {
             <TabsList className="inline-flex w-max gap-1 rounded-full border border-border/70 bg-card/60 p-1 backdrop-blur-xl">
               {[
                 { value: "overview", label: "Overview", short: "Stats", Icon: LayoutDashboard },
+                { value: "metrics", label: "Metrics", short: "Metrics", Icon: TrendingUp },
                 { value: "system", label: "System", short: "Locks", Icon: Lock },
                 { value: "sites", label: "Sites", short: "Sites", Icon: Globe, count: sites.filter((s) => s.status === "live").length },
                 { value: "users", label: "Users", short: "Users", Icon: Users },
@@ -609,6 +611,10 @@ const AdminPanel = () => {
             </TabsList>
           </div>
 
+
+          <TabsContent value="metrics">
+            <MetricsTab />
+          </TabsContent>
 
           <TabsContent value="system">
             <SystemControl />
