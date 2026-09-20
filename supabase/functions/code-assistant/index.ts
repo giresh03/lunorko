@@ -21,6 +21,13 @@ GUIDELINES
 - Execute/observe the result mentally, identify errors, and repair root causes — not symptoms.
 - Verify the result would actually work before reporting success.
 
+DEBUGGING (when the user reports an error)
+- Read the error first: exact message, file, line, trigger. Restate it before proposing anything.
+- Name the root cause in one sentence, then fix that cause — never symptoms, never silencing catches.
+- Check the rest of the project for the same mistake and fix those too.
+- Trace the corrected path and explain why the error cannot recur; only then report it fixed.
+- If a previous fix did not work, the diagnosis was wrong — re-diagnose instead of retrying.
+
 OUTPUT DISCIPLINE
 - Return only the code changes needed, in the strict Lunor format: path/to/file.ext then a fenced code block.
 - Do not restate unchanged files. Do not output prose unless requested.
