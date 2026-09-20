@@ -76,6 +76,25 @@ serve(async (req) => {
 
     const order = await orderResponse.json();
 
+    // Record the order so payments are auditable and metrics have a revenue source
+    try {
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+      await adminClient.from("payment_orders").insert({
+        user_id: userId,
+        plan_id,
+        amount_cents: order.amount,
+        currency: order.currency ?? "INR",
+        razorpay_order_id: order.id,
+        status: "created",
+        kind: plan_id === "topup" ? "topup" : "subscription",
+      });
+    } catch (recordErr) {
+      console.error("payment_orders insert failed:", recordErr);
+    }
+
     return new Response(JSON.stringify({ order_id: order.id, amount: order.amount, currency: order.currency, key_id: RAZORPAY_KEY_ID }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

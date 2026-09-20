@@ -104,35 +104,40 @@ serve(async (req) => {
         console.error("Top-up error:", topupError);
         return new Response(JSON.stringify({ error: "Failed to add credits" }), { status: 500, headers: corsHeaders });
       }
+      await adminClient
+        .from("payment_orders")
+        .update({ status: "paid", paid_at: new Date().toISOString(), razorpay_payment_id })
+        .eq("razorpay_order_id", razorpay_order_id);
+      await adminClient.from("analytics_events").insert({
+        user_id: userId,
+        event: "payment_paid",
+        properties: { plan_id, amount, kind: "topup" },
+      });
       return new Response(JSON.stringify({ success: true, plan_id, credits_added: TOPUP_CREDITS }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 1);
-
-    const { error: insertError } = await adminClient.from("subscriptions").insert({
-      user_id: userId,
-      plan_id,
-      status: "active",
-      razorpay_payment_id,
-      razorpay_order_id,
-      razorpay_signature,
-      amount,
-      domain_id,
-      expires_at: expiresAt.toISOString(),
+    // Activate the plan atomically: mark order paid, create/extend subscription, grant credits
+    const { data: activation, error: activateError } = await adminClient.rpc("activate_subscription", {
+      _user_id: userId,
+      _plan_id: plan_id,
+      _order_id: razorpay_order_id,
+      _payment_id: razorpay_payment_id,
     });
 
-    if (insertError) {
-      console.error("Insert error:", insertError);
-      return new Response(JSON.stringify({ error: "Failed to save subscription" }), { status: 500, headers: corsHeaders });
+    if (activateError) {
+      console.error("Activation error:", activateError);
+      return new Response(JSON.stringify({ error: "Failed to activate subscription" }), { status: 500, headers: corsHeaders });
     }
 
-    // Refresh plan credits for the new plan
-    await adminClient.rpc("sync_ai_credits", { _user_id: userId });
+    await adminClient.from("analytics_events").insert({
+      user_id: userId,
+      event: "payment_paid",
+      properties: { plan_id, domain_id, amount, kind: "subscription" },
+    });
 
-    return new Response(JSON.stringify({ success: true, plan_id, domain_id }), {
+    return new Response(JSON.stringify({ success: true, plan_id, domain_id, activation }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
