@@ -63,6 +63,7 @@ const AdminPanel = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [applicants, setApplicants] = useState<any[]>([]);
   const [internshipApps, setInternshipApps] = useState<any[]>([]);
+  const [internshipSubs, setInternshipSubs] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
   const [editSite, setEditSite] = useState<any | null>(null);
@@ -89,6 +90,15 @@ const AdminPanel = () => {
     }
     setInternshipApps((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     toast({ title: `Application marked ${status}` });
+  };
+
+  const updateSubmission = async (id: string, patch: Record<string, any>) => {
+    const { error } = await supabase.from("internship_submissions").update(patch).eq("id", id);
+    if (error) {
+      toast({ title: "Could not update submission", description: error.message, variant: "destructive" });
+      return;
+    }
+    setInternshipSubs((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
   // Resource form
@@ -257,6 +267,12 @@ const AdminPanel = () => {
         .select("*")
         .order("created_at", { ascending: false });
       setInternshipApps((internshipData as any[]) ?? []);
+
+      const { data: submissionData } = await supabase
+        .from("internship_submissions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setInternshipSubs((submissionData as any[]) ?? []);
 
       await loadChatMessages();
     } catch (e: any) {
@@ -591,6 +607,7 @@ const AdminPanel = () => {
                 { value: "guidelines", label: "Guidelines", short: "Rules", Icon: Shield },
                 { value: "talent", label: "Talent", short: "Team", Icon: Briefcase, count: applicants.length },
                 { value: "internships", label: "Internships", short: "Interns", Icon: UserPlus, count: internshipApps.filter((a) => a.status === "pending").length },
+                { value: "submissions", label: "Submissions", short: "Tasks", Icon: FileText, count: internshipSubs.filter((s) => s.status === "submitted").length },
                 { value: "feedback", label: "Feedback", short: "FB", Icon: MessageSquare, count: feedbacks.length },
               ].map(({ value, label, short, Icon, count }) => (
                 <TabsTrigger
@@ -1439,6 +1456,95 @@ const AdminPanel = () => {
                   ))}
                   {internshipApps.length === 0 && (
                     <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No internship applications yet</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
+          {/* Assignment submissions */}
+          <TabsContent value="submissions">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Assignment Submissions ({internshipSubs.length})
+            </h2>
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Assignment</TableHead>
+                    <TableHead>GitHub repo</TableHead>
+                    <TableHead>Deployment</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Review notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {internshipSubs.map((s: any) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-sm">
+                        <div className="font-medium">{s.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{s.email}</div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-primary whitespace-nowrap">
+                          {String(s.role || "").replace(/-/g, " ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-[180px] text-xs text-muted-foreground truncate">{s.assignment_title || "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        <a href={s.github_repo_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open repo</a>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <a href={s.deployment_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open live site</a>
+                      </TableCell>
+                      <TableCell className="max-w-[220px] text-xs text-muted-foreground whitespace-pre-wrap">{s.notes || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          defaultValue={s.score ?? ""}
+                          className="h-8 w-16 text-xs"
+                          onBlur={(e) => {
+                            const raw = e.target.value.trim();
+                            const val = raw === "" ? null : Number(raw);
+                            if (val !== (s.score ?? null)) updateSubmission(s.id, { score: val });
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <select
+                          value={s.status}
+                          onChange={(e) => updateSubmission(s.id, { status: e.target.value })}
+                          className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        >
+                          <option value="submitted">submitted</option>
+                          <option value="under_review">under_review</option>
+                          <option value="approved">approved</option>
+                          <option value="rejected">rejected</option>
+                        </select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          defaultValue={s.admin_notes ?? ""}
+                          placeholder="Add note"
+                          className="h-8 w-40 text-xs"
+                          onBlur={(e) => {
+                            const val = e.target.value.trim() || null;
+                            if (val !== (s.admin_notes ?? null)) updateSubmission(s.id, { admin_notes: val });
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {internshipSubs.length === 0 && (
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No assignment submissions yet</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

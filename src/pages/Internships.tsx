@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   Award, FileSignature, Rocket, IndianRupee, Upload, Loader2, CheckCircle2,
   Code2, Layout, Server, Layers, Brain, Megaphone, PenTool, ArrowRight,
+  Sparkles, Github, Globe, FileCheck2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -18,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const ROLES = [
+  { id: "gen-ai-intern", label: "Gen AI Intern", Icon: Sparkles, blurb: "Build generative-AI features: LLM apps, agents, RAG and evaluation.", stipend: "₹15,000 / month", duration: "6 months" },
   { id: "web-development", label: "Web Development", Icon: Code2, blurb: "Build responsive, production-grade websites end to end." },
   { id: "frontend-developer", label: "Frontend Developer", Icon: Layout, blurb: "Craft pixel-perfect UI with React, Tailwind and motion." },
   { id: "backend-developer", label: "Backend Developer", Icon: Server, blurb: "Design APIs, databases, auth and scalable services." },
@@ -55,6 +57,21 @@ const emptyForm = {
   portfolio_url: "", github_url: "", linkedin_url: "", skills: "", why_join: "",
 };
 
+const submissionSchema = z.object({
+  full_name: z.string().trim().min(2, "Enter your full name").max(100),
+  email: z.string().trim().email("Enter a valid email").max(255),
+  role: z.string().trim().min(1, "Select your internship role"),
+  assignment_title: z.string().trim().max(150).optional().or(z.literal("")),
+  github_repo_url: z.string().trim().url("Enter a valid GitHub repository link").max(300),
+  deployment_url: z.string().trim().url("Enter a valid deployment link").max(300),
+  notes: z.string().trim().max(1000).optional().or(z.literal("")),
+});
+
+const emptySubmission = {
+  full_name: "", email: "", role: ROLES[0].id, assignment_title: "",
+  github_repo_url: "", deployment_url: "", notes: "",
+};
+
 const Internships = () => {
   const { user } = useAuth();
   const { profile, uploadResume } = useProfile();
@@ -66,7 +83,55 @@ const Internships = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const [openAssignment, setOpenAssignment] = useState(false);
+  const [assignment, setAssignment] = useState(emptySubmission);
+  const [sendingAssignment, setSendingAssignment] = useState(false);
+  const [assignmentDone, setAssignmentDone] = useState(false);
+
   const activeRole = ROLES.find((r) => r.id === openRole) || null;
+
+  const startAssignment = () => {
+    setAssignment({
+      ...emptySubmission,
+      full_name: profile?.display_name || "",
+      email: user?.email || "",
+    });
+    setAssignmentDone(false);
+    setOpenAssignment(true);
+  };
+
+  const submitAssignment = async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please sign in to submit your assignment." });
+      return;
+    }
+    const parsed = submissionSchema.safeParse(assignment);
+    if (!parsed.success) {
+      toast({ title: "Check your details", description: parsed.error.errors[0].message, variant: "destructive" });
+      return;
+    }
+    setSendingAssignment(true);
+    try {
+      const v = parsed.data;
+      const { error } = await supabase.from("internship_submissions").insert({
+        user_id: user.id,
+        full_name: v.full_name,
+        email: v.email,
+        role: v.role,
+        assignment_title: v.assignment_title || null,
+        github_repo_url: v.github_repo_url,
+        deployment_url: v.deployment_url,
+        notes: v.notes || null,
+      });
+      if (error) throw error;
+      setAssignmentDone(true);
+      toast({ title: "Assignment submitted", description: "Our team will review your repo and live link." });
+    } catch (e: any) {
+      toast({ title: "Could not submit", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setSendingAssignment(false);
+    }
+  };
 
   const startApply = (roleId: string) => {
     setForm({
@@ -209,7 +274,7 @@ const Internships = () => {
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {ROLES.map(({ id, label, Icon, blurb }) => (
+            {ROLES.map(({ id, label, Icon, blurb, stipend, duration }: any) => (
               <article
                 key={id}
                 className="flex flex-col rounded-2xl border border-border/70 bg-card/60 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-glow"
@@ -223,7 +288,14 @@ const Internships = () => {
                 <p className="mt-3 flex-1 text-sm text-muted-foreground">{blurb}</p>
                 <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                   <span className="rounded-full border border-border/70 px-2 py-0.5">Remote</span>
-                  <span className="rounded-full border border-border/70 px-2 py-0.5">Stipend based on work</span>
+                  {stipend ? (
+                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                      {stipend}
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-border/70 px-2 py-0.5">Stipend based on work</span>
+                  )}
+                  {duration && <span className="rounded-full border border-border/70 px-2 py-0.5">{duration}</span>}
                   <span className="rounded-full border border-border/70 px-2 py-0.5">PPO possible</span>
                 </div>
                 <Button className="mt-5 btn-sheen font-semibold" onClick={() => startApply(id)}>
@@ -233,7 +305,33 @@ const Internships = () => {
             ))}
           </div>
         </section>
+
+        {/* Assignment submission */}
+        <section id="submit-assignment" className="container mx-auto px-4 lg:px-6 pb-20">
+          <div className="rounded-3xl border border-border/70 bg-card/60 p-6 sm:p-10 backdrop-blur-xl">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-xl">
+                <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                  <FileCheck2 className="h-3.5 w-3.5" /> Assignment round
+                </span>
+                <h2 className="mt-4 text-2xl sm:text-3xl font-bold text-foreground">Submit your internship assignment</h2>
+                <p className="mt-3 text-sm sm:text-base text-muted-foreground">
+                  Shortlisted candidates submit their task here. Share your GitHub repository and a working
+                  deployment link — both are required so we can review your code and the live product.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-0.5"><Github className="h-3 w-3" /> GitHub repo required</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-0.5"><Globe className="h-3 w-3" /> Live deployment required</span>
+                </div>
+              </div>
+              <Button size="lg" className="btn-sheen font-semibold shadow-glow shrink-0" onClick={startAssignment}>
+                Submit assignment <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
+
 
       <Footer />
 
@@ -334,6 +432,84 @@ const Internships = () => {
 
               <Button className="w-full btn-sheen font-semibold" disabled={submitting} onClick={submit}>
                 {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</> : "Submit application"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Assignment submission dialog */}
+      <Dialog open={openAssignment} onOpenChange={setOpenAssignment}>
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{assignmentDone ? "Assignment received" : "Submit your assignment"}</DialogTitle>
+            <DialogDescription>
+              {assignmentDone
+                ? "We review every submission manually and reply over email."
+                : "GitHub repository and deployment links are mandatory."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {assignmentDone ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <CheckCircle2 className="h-12 w-12 text-primary" />
+              <p className="text-sm text-muted-foreground">
+                Thanks {assignment.full_name || "there"} — your assignment is with our review team.
+              </p>
+              <Button onClick={() => setOpenAssignment(false)}>Done</Button>
+            </div>
+          ) : !user ? (
+            <div className="space-y-4 py-4 text-center">
+              <p className="text-sm text-muted-foreground">Sign in so we can link the submission to your profile.</p>
+              <Button asChild className="w-full"><Link to="/auth">Sign in to continue</Link></Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="as-name">Full name *</Label>
+                  <Input id="as-name" maxLength={100} value={assignment.full_name} onChange={(e) => setAssignment({ ...assignment, full_name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="as-email">Email *</Label>
+                  <Input id="as-email" type="email" maxLength={255} value={assignment.email} onChange={(e) => setAssignment({ ...assignment, email: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-role">Internship role *</Label>
+                <select
+                  id="as-role"
+                  value={assignment.role}
+                  onChange={(e) => setAssignment({ ...assignment, role: e.target.value })}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-title">Assignment title</Label>
+                <Input id="as-title" maxLength={150} placeholder="e.g. RAG chatbot task" value={assignment.assignment_title} onChange={(e) => setAssignment({ ...assignment, assignment_title: e.target.value })} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-repo">GitHub repository link *</Label>
+                <Input id="as-repo" placeholder="https://github.com/you/project" value={assignment.github_repo_url} onChange={(e) => setAssignment({ ...assignment, github_repo_url: e.target.value })} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-deploy">Deployment / live link *</Label>
+                <Input id="as-deploy" placeholder="https://your-project.vercel.app" value={assignment.deployment_url} onChange={(e) => setAssignment({ ...assignment, deployment_url: e.target.value })} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-notes">Notes for the reviewer</Label>
+                <Textarea id="as-notes" rows={3} maxLength={1000} value={assignment.notes} onChange={(e) => setAssignment({ ...assignment, notes: e.target.value })} />
+              </div>
+
+              <Button className="w-full btn-sheen font-semibold" disabled={sendingAssignment} onClick={submitAssignment}>
+                {sendingAssignment ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</> : "Submit assignment"}
               </Button>
             </div>
           )}
