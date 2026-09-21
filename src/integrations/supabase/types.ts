@@ -1043,6 +1043,57 @@ export type Database = {
         }
         Relationships: []
       }
+      internship_submissions: {
+        Row: {
+          admin_notes: string | null
+          assignment_title: string | null
+          created_at: string
+          deployment_url: string
+          email: string
+          full_name: string
+          github_repo_url: string
+          id: string
+          notes: string | null
+          role: string
+          score: number | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          assignment_title?: string | null
+          created_at?: string
+          deployment_url: string
+          email: string
+          full_name: string
+          github_repo_url: string
+          id?: string
+          notes?: string | null
+          role: string
+          score?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          assignment_title?: string | null
+          created_at?: string
+          deployment_url?: string
+          email?: string
+          full_name?: string
+          github_repo_url?: string
+          id?: string
+          notes?: string | null
+          role?: string
+          score?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       level_progress: {
         Row: {
           completed_at: string | null
