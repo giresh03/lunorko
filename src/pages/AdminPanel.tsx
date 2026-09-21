@@ -1462,6 +1462,95 @@ const AdminPanel = () => {
             </div>
           </TabsContent>
 
+          {/* Assignment submissions */}
+          <TabsContent value="submissions">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" /> Assignment Submissions ({internshipSubs.length})
+            </h2>
+            <div className="rounded-xl border border-border gradient-card overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Assignment</TableHead>
+                    <TableHead>GitHub repo</TableHead>
+                    <TableHead>Deployment</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Score</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Review notes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {internshipSubs.map((s: any) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-sm">
+                        <div className="font-medium">{s.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{s.email}</div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-primary whitespace-nowrap">
+                          {String(s.role || "").replace(/-/g, " ")}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-[180px] text-xs text-muted-foreground truncate">{s.assignment_title || "—"}</TableCell>
+                      <TableCell className="text-xs">
+                        <a href={s.github_repo_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open repo</a>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <a href={s.deployment_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Open live site</a>
+                      </TableCell>
+                      <TableCell className="max-w-[220px] text-xs text-muted-foreground whitespace-pre-wrap">{s.notes || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{new Date(s.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          defaultValue={s.score ?? ""}
+                          className="h-8 w-16 text-xs"
+                          onBlur={(e) => {
+                            const raw = e.target.value.trim();
+                            const val = raw === "" ? null : Number(raw);
+                            if (val !== (s.score ?? null)) updateSubmission(s.id, { score: val });
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <select
+                          value={s.status}
+                          onChange={(e) => updateSubmission(s.id, { status: e.target.value })}
+                          className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        >
+                          <option value="submitted">submitted</option>
+                          <option value="under_review">under_review</option>
+                          <option value="approved">approved</option>
+                          <option value="rejected">rejected</option>
+                        </select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          defaultValue={s.admin_notes ?? ""}
+                          placeholder="Add note"
+                          className="h-8 w-40 text-xs"
+                          onBlur={(e) => {
+                            const val = e.target.value.trim() || null;
+                            if (val !== (s.admin_notes ?? null)) updateSubmission(s.id, { admin_notes: val });
+                          }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {internshipSubs.length === 0 && (
+                    <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">No assignment submissions yet</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
           {/* Talent / student profiles */}
           <TabsContent value="talent">
             <h2 className="text-lg sm:text-xl font-bold text-foreground mb-4 flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> Student Profiles ({applicants.length})</h2>
