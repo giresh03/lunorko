@@ -305,7 +305,33 @@ const Internships = () => {
             ))}
           </div>
         </section>
+
+        {/* Assignment submission */}
+        <section id="submit-assignment" className="container mx-auto px-4 lg:px-6 pb-20">
+          <div className="rounded-3xl border border-border/70 bg-card/60 p-6 sm:p-10 backdrop-blur-xl">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-xl">
+                <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                  <FileCheck2 className="h-3.5 w-3.5" /> Assignment round
+                </span>
+                <h2 className="mt-4 text-2xl sm:text-3xl font-bold text-foreground">Submit your internship assignment</h2>
+                <p className="mt-3 text-sm sm:text-base text-muted-foreground">
+                  Shortlisted candidates submit their task here. Share your GitHub repository and a working
+                  deployment link — both are required so we can review your code and the live product.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-0.5"><Github className="h-3 w-3" /> GitHub repo required</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-0.5"><Globe className="h-3 w-3" /> Live deployment required</span>
+                </div>
+              </div>
+              <Button size="lg" className="btn-sheen font-semibold shadow-glow shrink-0" onClick={startAssignment}>
+                Submit assignment <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
+
 
       <Footer />
 
