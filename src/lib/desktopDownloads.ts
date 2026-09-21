@@ -1,10 +1,6 @@
-import { supabase } from "@/integrations/supabase/client";
-
 export const DESKTOP_APP_VERSION = "1.0.0";
 
-const DOWNLOAD_ENDPOINT = `${
-  (supabase as unknown as { supabaseUrl: string }).supabaseUrl
-}/functions/v1/desktop-download`;
+const DOWNLOAD_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/desktop-download`;
 
 /** Signed, short-lived download link served by the desktop-download function. */
 export function downloadUrl(platform: DesktopPlatformId): string {
