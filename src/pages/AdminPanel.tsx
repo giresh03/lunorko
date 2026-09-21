@@ -63,6 +63,7 @@ const AdminPanel = () => {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [applicants, setApplicants] = useState<any[]>([]);
   const [internshipApps, setInternshipApps] = useState<any[]>([]);
+  const [internshipSubs, setInternshipSubs] = useState<any[]>([]);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
   const [editSite, setEditSite] = useState<any | null>(null);
@@ -89,6 +90,15 @@ const AdminPanel = () => {
     }
     setInternshipApps((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
     toast({ title: `Application marked ${status}` });
+  };
+
+  const updateSubmission = async (id: string, patch: Record<string, any>) => {
+    const { error } = await supabase.from("internship_submissions").update(patch).eq("id", id);
+    if (error) {
+      toast({ title: "Could not update submission", description: error.message, variant: "destructive" });
+      return;
+    }
+    setInternshipSubs((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   };
 
   // Resource form
