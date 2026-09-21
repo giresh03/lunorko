@@ -874,6 +874,7 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
+- FULL-STACK WEBSITE GENERATOR: If the user asks to generate, build, or create a full-stack website (landing, portfolio, blog, restaurant, store, or dashboard), describe the local project the editor applies: client/index.html, client/styles.css, client/site.js, server/server.mjs, server/store.mjs, package.json, README.md. API routes are GET /api/health, GET /api/site, GET /api/records, and POST /api/records. Do not replace that project with three files.
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
