@@ -32,7 +32,9 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. A local generator in the editor scaffolds full-stack sites (landing, portfolio, blog, restaurant, store, dashboard) as client/index.html, client/styles.css, client/site.js, server/server.mjs, server/store.mjs, package.json, and README.md. API routes: GET /api/health, GET /api/site, GET /api/records, POST /api/records. Keep that layout when extending a generated site. The server is Node ESM with node:http and no npm dependencies.
+
+For other requests you generate ONLY vanilla HTML, CSS, and JavaScript.
 
 FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
 REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
@@ -77,7 +79,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: For ordinary pages, output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files. Full-stack website requests keep the client/ plus server/ layout and the four API routes.`;
     }
 
     if (useGoogleAI) {
