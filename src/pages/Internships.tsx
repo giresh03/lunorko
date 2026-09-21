@@ -57,6 +57,21 @@ const emptyForm = {
   portfolio_url: "", github_url: "", linkedin_url: "", skills: "", why_join: "",
 };
 
+const submissionSchema = z.object({
+  full_name: z.string().trim().min(2, "Enter your full name").max(100),
+  email: z.string().trim().email("Enter a valid email").max(255),
+  role: z.string().trim().min(1, "Select your internship role"),
+  assignment_title: z.string().trim().max(150).optional().or(z.literal("")),
+  github_repo_url: z.string().trim().url("Enter a valid GitHub repository link").max(300),
+  deployment_url: z.string().trim().url("Enter a valid deployment link").max(300),
+  notes: z.string().trim().max(1000).optional().or(z.literal("")),
+});
+
+const emptySubmission = {
+  full_name: "", email: "", role: ROLES[0].id, assignment_title: "",
+  github_repo_url: "", deployment_url: "", notes: "",
+};
+
 const Internships = () => {
   const { user } = useAuth();
   const { profile, uploadResume } = useProfile();
@@ -68,7 +83,55 @@ const Internships = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const [openAssignment, setOpenAssignment] = useState(false);
+  const [assignment, setAssignment] = useState(emptySubmission);
+  const [sendingAssignment, setSendingAssignment] = useState(false);
+  const [assignmentDone, setAssignmentDone] = useState(false);
+
   const activeRole = ROLES.find((r) => r.id === openRole) || null;
+
+  const startAssignment = () => {
+    setAssignment({
+      ...emptySubmission,
+      full_name: profile?.display_name || "",
+      email: user?.email || "",
+    });
+    setAssignmentDone(false);
+    setOpenAssignment(true);
+  };
+
+  const submitAssignment = async () => {
+    if (!user) {
+      toast({ title: "Sign in required", description: "Please sign in to submit your assignment." });
+      return;
+    }
+    const parsed = submissionSchema.safeParse(assignment);
+    if (!parsed.success) {
+      toast({ title: "Check your details", description: parsed.error.errors[0].message, variant: "destructive" });
+      return;
+    }
+    setSendingAssignment(true);
+    try {
+      const v = parsed.data;
+      const { error } = await supabase.from("internship_submissions").insert({
+        user_id: user.id,
+        full_name: v.full_name,
+        email: v.email,
+        role: v.role,
+        assignment_title: v.assignment_title || null,
+        github_repo_url: v.github_repo_url,
+        deployment_url: v.deployment_url,
+        notes: v.notes || null,
+      });
+      if (error) throw error;
+      setAssignmentDone(true);
+      toast({ title: "Assignment submitted", description: "Our team will review your repo and live link." });
+    } catch (e: any) {
+      toast({ title: "Could not submit", description: e?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setSendingAssignment(false);
+    }
+  };
 
   const startApply = (roleId: string) => {
     setForm({
