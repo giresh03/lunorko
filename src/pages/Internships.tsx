@@ -211,7 +211,7 @@ const Internships = () => {
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {ROLES.map(({ id, label, Icon, blurb }) => (
+            {ROLES.map(({ id, label, Icon, blurb, stipend, duration }: any) => (
               <article
                 key={id}
                 className="flex flex-col rounded-2xl border border-border/70 bg-card/60 p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-glow"
@@ -225,7 +225,14 @@ const Internships = () => {
                 <p className="mt-3 flex-1 text-sm text-muted-foreground">{blurb}</p>
                 <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                   <span className="rounded-full border border-border/70 px-2 py-0.5">Remote</span>
-                  <span className="rounded-full border border-border/70 px-2 py-0.5">Stipend based on work</span>
+                  {stipend ? (
+                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                      {stipend}
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-border/70 px-2 py-0.5">Stipend based on work</span>
+                  )}
+                  {duration && <span className="rounded-full border border-border/70 px-2 py-0.5">{duration}</span>}
                   <span className="rounded-full border border-border/70 px-2 py-0.5">PPO possible</span>
                 </div>
                 <Button className="mt-5 btn-sheen font-semibold" onClick={() => startApply(id)}>
