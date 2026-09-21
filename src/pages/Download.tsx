@@ -10,6 +10,7 @@ import {
   DESKTOP_BUILDS,
   DESKTOP_APP_VERSION,
   detectPlatform,
+  downloadUrl,
   isDesktopApp,
   type DesktopPlatformId,
 } from "@/lib/desktopDownloads";
@@ -64,7 +65,7 @@ const Download = () => {
           ) : (
             <div className="mt-10 flex flex-col items-center gap-4">
               <Button asChild size="lg" className="h-14 px-8 text-base">
-                <a href={active.url}>
+                <a href={downloadUrl(active.id)}>
                   <ActiveIcon className="mr-2 h-5 w-5" />
                   Download for {active.name}
                 </a>
