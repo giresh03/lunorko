@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Menu, X, LogOut, User, LayoutDashboard, Shield, Loader2, Trophy, Radar, FileText, CreditCard, Video, Sparkles, ChevronDown, Code2, Users, Palette, Boxes, Brain, Briefcase, Trophy as TrophyIcon, Home as HomeIcon } from "lucide-react";
+import { Menu, X, LogOut, User, LayoutDashboard, Shield, Loader2, Trophy, Radar, FileText, CreditCard, Video, Sparkles, ChevronDown, Code2, Users, Palette, Boxes, Brain, Briefcase, Download as DownloadIcon, Trophy as TrophyIcon, Home as HomeIcon } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -56,6 +56,7 @@ const flatLinks: MenuChild[] = [
   { to: "/community", label: "Community", icon: Users },
   { to: "/pricing", label: "Pricing", icon: CreditCard },
   { to: "/about", label: "About", icon: TrophyIcon },
+  { to: "/download", label: "Download", icon: DownloadIcon },
 ];
 
 const Navbar = () => {
