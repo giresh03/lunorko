@@ -10,12 +10,14 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.
+
+FULL-STACK WEBSITE GENERATOR: When the user asks to generate, build, or create a full-stack website (landing, portfolio, blog, restaurant, store, or dashboard), the Web Development assistant applies a local project instead of a single HTML file. Layout: client/index.html, client/styles.css, client/site.js, server/server.mjs, server/store.mjs, package.json, README.md. API: GET /api/health, GET /api/site, GET /api/records, POST /api/records. Do not replace that project with one HTML file.`,
     starterPrompts: [
+      "Generate a full-stack portfolio website",
+      "Generate a full-stack restaurant website",
       "Build a counter with HTML, CSS, and JS (one file)",
       "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
     ],
   },
   "app-development": {

@@ -22,6 +22,15 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  detectWebsiteRequest,
+  generateWebsite,
+  SITE_KIND_LABELS,
+  SITE_KINDS,
+  websiteFilesToTree,
+  type GeneratedWebsite,
+  type SiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -56,6 +65,7 @@ function deleteProject(id: string) {
 const PROJECT_TEMPLATES = [
   { id: "blank", name: "Blank Project", description: "Empty project with a single file", icon: "📄" },
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
+  { id: "full-stack-site", name: "Full-Stack Website", description: "Client, API, and live preview", icon: "🏗️" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
 ];
@@ -81,6 +91,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
         ]},
         { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "main": "src/server.js",\n  "scripts": { "start": "node src/server.js" }\n}\n` },
       ];
+    case "full-stack-site":
+      return websiteFilesToTree(generateWebsite({ kind: "landing", name: projectName }).files) as FileNode[];
     case "react":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -334,6 +346,68 @@ const FileItem = ({
   );
 };
 
+function WebsiteGeneratorPanel({
+  theme,
+  onGenerate,
+}: {
+  theme: EditorTheme["uiColors"];
+  onGenerate: (kind: SiteKind, name: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const [kind, setKind] = useState<SiteKind>("portfolio");
+  const [name, setName] = useState("");
+
+  return (
+    <div className="border-b shrink-0" style={{ borderColor: theme.border, backgroundColor: theme.card }}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+      >
+        <Wand2 className="h-3.5 w-3.5" style={{ color: theme.accent }} />
+        <span className="text-[11px] font-semibold" style={{ color: theme.text }}>Website generator</span>
+        <span className="ml-auto text-[9px]" style={{ color: theme.muted }}>{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          <div className="grid grid-cols-3 gap-1">
+            {SITE_KINDS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setKind(item)}
+                className="rounded px-1.5 py-1 text-[10px] font-medium"
+                style={{
+                  backgroundColor: kind === item ? theme.accent : theme.bg,
+                  color: kind === item ? "#ffffff" : theme.text,
+                  border: `1px solid ${kind === item ? theme.accent : theme.border}`,
+                }}
+              >
+                {SITE_KIND_LABELS[item]}
+              </button>
+            ))}
+          </div>
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Site name"
+            className="w-full rounded-md px-2 py-1.5 text-xs outline-none"
+            style={{ backgroundColor: theme.bg, color: theme.text, border: `1px solid ${theme.border}` }}
+          />
+          <button
+            type="button"
+            onClick={() => onGenerate(kind, name)}
+            className="w-full rounded-md px-2 py-1.5 text-[11px] font-semibold"
+            style={{ backgroundColor: theme.accent, color: "#ffffff" }}
+          >
+            Generate full-stack site
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // -- Main Component --
 export interface CodeEditorHandle {
   setExternalCode: (code: string, language: string) => void;
@@ -485,9 +559,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const webDev = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === "web-development";
+    return [{
+      role: "assistant",
+      content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n${webDev ? "- **Generate a full-stack website** — use the generator above, or say “Generate a full-stack portfolio website”\n" : ""}\nCode I generate is **automatically applied** to your files. 🚀`,
+    }];
+  });
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -1306,9 +1384,62 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedSite = useCallback((site: GeneratedWebsite, userText?: string) => {
+    const tree = websiteFilesToTree(site.files) as FileNode[];
+    const fileMap: Record<string, string> = {};
+    for (const file of site.files) {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop();
+      if (base && !fileMap[base]) fileMap[base] = file.content;
+    }
+    const html = site.files.find((file) => file.path === "client/index.html");
+    const openIds = new Set(["client/index.html", "client/site.js", "server/server.mjs", "README.md"]);
+    setFileTree(tree);
+    setCurrentProjectName(site.name);
+    const projectId = `proj-${Date.now()}`;
+    setCurrentProjectId(projectId);
+    setOpenTabs(site.files.filter((file) => openIds.has(file.path)).map((file) => ({
+      id: file.path,
+      name: file.path.split("/").pop() || file.path,
+      language: file.language,
+      content: file.content,
+      isModified: false,
+    })));
+    setActiveTabId("client/index.html");
+    setShowPreview(true);
+    setShowWelcome(false);
+    if (html) setPreviewContent(buildPreviewHtml(html.content, fileMap));
+    saveProject({
+      id: projectId,
+      name: site.name,
+      domain: domainName,
+      fileTree: tree,
+      lastOpened: Date.now(),
+      createdAt: Date.now(),
+    });
+    setRecentProjects(getSavedProjects());
+    setMessages((prev) => [
+      ...prev,
+      ...(userText ? [{ role: "user" as const, content: userText }] : []),
+      { role: "assistant", content: site.assistantMessage },
+    ]);
+    setOutput((prev) => [...prev, `🌐 Generated ${site.name} (${site.kind}). Preview updated. Run npm start for the API.`]);
+    setShowTerminal(true);
+  }, [buildPreviewHtml, domainName]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development") {
+      const request = detectWebsiteRequest(chatInput);
+      if (request) {
+        const named = chatInput.match(/\b(?:called|named)\s+["']?([^"'\n]{2,48})/);
+        const site = generateWebsite({ kind: request.kind, name: named?.[1]?.trim() });
+        applyGeneratedSite(site, chatInput.trim());
+        setChatInput("");
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1659,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedSite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -1575,16 +1706,29 @@ ${jsCode}
     setFileTree(newTree);
     setCurrentProjectId(newId);
     setCurrentProjectName(newProjectName.trim());
-    setOpenTabs([]);
-    setActiveTabId(null);
     setShowNewProject(false);
     setShowWelcome(false);
+    if (newProjectTemplate === "full-stack-site") {
+      const htmlNode = findFile(newTree, "client/index.html");
+      if (htmlNode?.content) {
+        setOpenTabs([{ id: htmlNode.id, name: htmlNode.name, language: htmlNode.language || "html", content: htmlNode.content, isModified: false }]);
+        setActiveTabId(htmlNode.id);
+        setShowPreview(true);
+        setPreviewContent(buildPreviewHtml(htmlNode.content, collectFiles(newTree)));
+      } else {
+        setOpenTabs([]);
+        setActiveTabId(null);
+      }
+    } else {
+      setOpenTabs([]);
+      setActiveTabId(null);
+    }
     // Save the new project
     const proj: SavedProject = { id: newId, name: newProjectName.trim(), domain: domainName, fileTree: newTree, lastOpened: Date.now(), createdAt: Date.now() };
     saveProject(proj);
     setRecentProjects(getSavedProjects());
     setNewProjectName("");
-  }, [newProjectName, newProjectTemplate, domainName, handleSaveProject]);
+  }, [newProjectName, newProjectTemplate, domainName, handleSaveProject, findFile, buildPreviewHtml, collectFiles]);
 
   const handleDeleteProject = useCallback((id: string) => {
     deleteProject(id);
@@ -1731,7 +1875,7 @@ ${jsCode}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-2 block">Choose Template</label>
             <div className="grid grid-cols-2 gap-2">
-              {PROJECT_TEMPLATES.map((tmpl) => (
+              {PROJECT_TEMPLATES.filter((tmpl) => tmpl.id !== "full-stack-site" || domainId === "web-development").map((tmpl) => (
                 <button
                   key={tmpl.id}
                   onClick={() => setNewProjectTemplate(tmpl.id)}
@@ -2422,6 +2566,13 @@ ${jsCode}
                 <X className="h-3 w-3" />
               </button>
             </div>
+
+            {domainId === "web-development" && (
+              <WebsiteGeneratorPanel
+                theme={currentTheme.uiColors}
+                onGenerate={(kind, name) => applyGeneratedSite(generateWebsite({ kind, name }))}
+              />
+            )}
 
             {/* Chat messages */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3" style={{ backgroundColor: currentTheme.uiColors.bg }}>
