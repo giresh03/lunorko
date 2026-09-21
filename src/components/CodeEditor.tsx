@@ -3264,7 +3264,7 @@ ${jsCode}
               const showSandpackPreview = isAppDomainOnly && isReactProjectPreview;
               return (
               <div className={`flex flex-col border-l border-border overflow-hidden ${previewFullscreen ? "fixed inset-0 z-50 w-full h-full border-l-0" : "w-1/2"}`}>
-                <div className="flex items-center h-8 bg-card border-b border-border px-2 shrink-0 gap-1.5">
+                <div className="flex items-center h-10 bg-card border-b border-border px-2.5 shrink-0 gap-1.5">
                   {/* Preview label + live status */}
                   <div className="flex items-center gap-1.5">
                     {isAppDomain ? <Smartphone className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
