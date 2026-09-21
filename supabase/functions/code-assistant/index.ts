@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. The Web Development assistant includes a full-stack website generator that writes client/index.html, client/styles.css, client/site.js, server/server.mjs, server/store.mjs, package.json, and README.md, with an Express API at /api/site and /api/records. For small demos, you generate ONLY vanilla HTML, CSS, and JavaScript.
 
 FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
 REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
