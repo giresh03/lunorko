@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.project-runtime]
 verify_jwt = false
+
+[functions.desktop-download]
+verify_jwt = false
