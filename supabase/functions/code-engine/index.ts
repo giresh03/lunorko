@@ -819,6 +819,44 @@ A site without login.html, signup.html, a DataModel block and api.js is an INCOM
 Only drop the backend if the user literally wrote "static", "no backend" or "UI only".
 `;
 
+// Appended ONLY for shop/e-commerce prompts: a proven MERN-shop architecture mapped onto
+// Lunor's live runtime (vanilla multi-page + /api/*).
+const COMMERCE_BLUEPRINT = `
+
+COMMERCE BLUEPRINT (this request is a shop/store — follow this reference architecture exactly)
+
+DATA MODEL (declare in the DataModel block; never declare id/owner_id/created_at/updated_at/users/uploads/payments)
+- products: name, slug, brand, category, description, price_cents (int), count_in_stock (int),
+  image_url, rating (numeric), num_reviews (int)
+- reviews: product_id (uuid), author_name, rating (int), comment
+- cart_items: product_id (uuid), name, image_url, price_cents (int), qty (int)
+- orders: order_items (json), shipping_name, shipping_address, shipping_city, shipping_postal_code,
+  shipping_country, payment_method, items_cents (int), tax_cents (int), shipping_cents (int),
+  total_cents (int), payment_id, is_paid (bool), paid_at, is_delivered (bool), delivered_at, status
+
+PAGES (minimum): index.html, shop.html, product.html, cart.html, checkout.html, orders.html,
+order.html, admin.html, login.html, signup.html, about.html, contact.html
+
+BEHAVIOUR
+- shop.html: GET /api/products?category=&search=&sort=lowest|highest|newest, category sidebar
+  derived from the data itself, search box, sort select, loading/empty/error states.
+- product.html (?id=): stock-limited quantity selector, add-to-cart, reviews list plus a
+  signed-in-only review form POSTing /api/reviews; after a review, recompute and PATCH the
+  product's rating and num_reviews.
+- cart.html: rows from /api/cart_items with qty change + remove, subtotal, navbar cart badge.
+  A guest cart kept in the guarded storage helper is pushed to /api/cart_items on login.
+- checkout.html: 4-step indicator (Sign In -> Shipping -> Payment -> Place Order). Steps 2+ require
+  requireAuth(). Totals computed in cents: tax_cents = round(items_cents * 0.18),
+  shipping_cents = items_cents >= 500000 ? 0 : 5000. LunorPay.checkout fires FIRST; the order is
+  created only inside onSuccess with payment_id, is_paid true, paid_at and status 'paid'.
+- orders.html: GET /api/orders?mine=true with paid/delivered badges; order.html shows one order.
+- admin.html: gate on role === 'admin' from GET /api/auth/me (never trust the client); manage
+  products, mark orders delivered (is_delivered, delivered_at), list payments and revenue.
+- Currency: one money(cents) helper in api.js, used everywhere (₹1,299.00).
+- No hardcoded product arrays — offer a one-click "Load sample products" button that POSTs 8-12
+  realistic products through the API.`
+
+
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
