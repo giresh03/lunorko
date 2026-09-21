@@ -25,7 +25,6 @@ import ProjectBuilder from "./pages/ProjectBuilder";
 import AIVideoInterview from "./pages/AIVideoInterview";
 import Hackathons from "./pages/Hackathons";
 import VisualBuilderPage from "./visual-builder/pages/VisualBuilderPage";
-import Hackathons from "./pages/Hackathons";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
 import AuthEntryModal from "./components/AuthEntryModal";
