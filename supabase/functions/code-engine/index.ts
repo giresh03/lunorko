@@ -545,7 +545,10 @@ RULES:
 
 ${WEB_COMPONENT_REFERENCE}
 
-${BACKGROUND_EFFECTS_LIBRARY}`,
+${BACKGROUND_EFFECTS_LIBRARY}
+
+FULL-STACK WEBSITE GENERATOR:
+When the user asks to generate, create, build, make, or scaffold a full-stack website, the Web Development editor scaffolds it locally. Kinds: landing, portfolio, blog, restaurant, store, dashboard. Files: client/index.html, client/styles.css, client/site.js, server/server.mjs, server/store.mjs, package.json, README.md. API: GET /api/health, GET /api/site, GET /api/records, POST /api/records. Run with npm start. Keep ordinary pages, including "build a todo website", as one vanilla HTML file.`,
   "app-development": `You are Lunor.AI's expert Mobile App Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE code using ONLY vanilla HTML, CSS, and JavaScript.
 
 CRITICAL: NEVER use React, JSX, TSX, Vue, TypeScript, or any framework. Use ONLY:
