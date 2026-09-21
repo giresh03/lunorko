@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   Award, FileSignature, Rocket, IndianRupee, Upload, Loader2, CheckCircle2,
   Code2, Layout, Server, Layers, Brain, Megaphone, PenTool, ArrowRight,
+  Sparkles, Github, Globe, FileCheck2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -18,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const ROLES = [
+  { id: "gen-ai-intern", label: "Gen AI Intern", Icon: Sparkles, blurb: "Build generative-AI features: LLM apps, agents, RAG and evaluation.", stipend: "₹15,000 / month", duration: "6 months" },
   { id: "web-development", label: "Web Development", Icon: Code2, blurb: "Build responsive, production-grade websites end to end." },
   { id: "frontend-developer", label: "Frontend Developer", Icon: Layout, blurb: "Craft pixel-perfect UI with React, Tailwind and motion." },
   { id: "backend-developer", label: "Backend Developer", Icon: Server, blurb: "Design APIs, databases, auth and scalable services." },
