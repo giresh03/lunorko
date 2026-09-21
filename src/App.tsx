@@ -37,6 +37,7 @@ import PopAd from "./components/PopAd";
 import OnboardingDialog from "./components/onboarding/OnboardingDialog";
 import AssistantLauncher from "./components/assistant/AssistantLauncher";
 import LunorLoader from "./components/LunorLoader";
+import RequireAuth from "./components/auth/RequireAuth";
 
 const queryClient = new QueryClient();
 
