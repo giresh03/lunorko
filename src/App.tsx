@@ -31,6 +31,7 @@ import GitHubCallback from "./pages/GitHubCallback";
 import Assistant from "./pages/Assistant";
 import Studio from "./pages/Studio";
 import Internships from "./pages/Internships";
+import DownloadPage from "./pages/Download";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
 import OnboardingDialog from "./components/onboarding/OnboardingDialog";
@@ -98,6 +99,7 @@ const AppContent = () => {
         <Route path="/assistant/:threadId" element={<Assistant />} />
         <Route path="/studio" element={<Studio />} />
         <Route path="/internships" element={<Internships />} />
+        <Route path="/download" element={<DownloadPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
