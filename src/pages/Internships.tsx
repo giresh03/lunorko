@@ -437,6 +437,84 @@ const Internships = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Assignment submission dialog */}
+      <Dialog open={openAssignment} onOpenChange={setOpenAssignment}>
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{assignmentDone ? "Assignment received" : "Submit your assignment"}</DialogTitle>
+            <DialogDescription>
+              {assignmentDone
+                ? "We review every submission manually and reply over email."
+                : "GitHub repository and deployment links are mandatory."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {assignmentDone ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <CheckCircle2 className="h-12 w-12 text-primary" />
+              <p className="text-sm text-muted-foreground">
+                Thanks {assignment.full_name || "there"} — your assignment is with our review team.
+              </p>
+              <Button onClick={() => setOpenAssignment(false)}>Done</Button>
+            </div>
+          ) : !user ? (
+            <div className="space-y-4 py-4 text-center">
+              <p className="text-sm text-muted-foreground">Sign in so we can link the submission to your profile.</p>
+              <Button asChild className="w-full"><Link to="/auth">Sign in to continue</Link></Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="as-name">Full name *</Label>
+                  <Input id="as-name" maxLength={100} value={assignment.full_name} onChange={(e) => setAssignment({ ...assignment, full_name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="as-email">Email *</Label>
+                  <Input id="as-email" type="email" maxLength={255} value={assignment.email} onChange={(e) => setAssignment({ ...assignment, email: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-role">Internship role *</Label>
+                <select
+                  id="as-role"
+                  value={assignment.role}
+                  onChange={(e) => setAssignment({ ...assignment, role: e.target.value })}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  {ROLES.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-title">Assignment title</Label>
+                <Input id="as-title" maxLength={150} placeholder="e.g. RAG chatbot task" value={assignment.assignment_title} onChange={(e) => setAssignment({ ...assignment, assignment_title: e.target.value })} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-repo">GitHub repository link *</Label>
+                <Input id="as-repo" placeholder="https://github.com/you/project" value={assignment.github_repo_url} onChange={(e) => setAssignment({ ...assignment, github_repo_url: e.target.value })} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-deploy">Deployment / live link *</Label>
+                <Input id="as-deploy" placeholder="https://your-project.vercel.app" value={assignment.deployment_url} onChange={(e) => setAssignment({ ...assignment, deployment_url: e.target.value })} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="as-notes">Notes for the reviewer</Label>
+                <Textarea id="as-notes" rows={3} maxLength={1000} value={assignment.notes} onChange={(e) => setAssignment({ ...assignment, notes: e.target.value })} />
+              </div>
+
+              <Button className="w-full btn-sheen font-semibold" disabled={sendingAssignment} onClick={submitAssignment}>
+                {sendingAssignment ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting…</> : "Submit assignment"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
