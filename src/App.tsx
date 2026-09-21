@@ -37,6 +37,7 @@ import PopAd from "./components/PopAd";
 import OnboardingDialog from "./components/onboarding/OnboardingDialog";
 import AssistantLauncher from "./components/assistant/AssistantLauncher";
 import LunorLoader from "./components/LunorLoader";
+import RequireAuth from "./components/auth/RequireAuth";
 
 const queryClient = new QueryClient();
 
@@ -98,7 +99,14 @@ const AppContent = () => {
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/assistant/:threadId" element={<Assistant />} />
         <Route path="/studio" element={<Studio />} />
-        <Route path="/internships" element={<Internships />} />
+        <Route
+          path="/internships"
+          element={
+            <RequireAuth>
+              <Internships />
+            </RequireAuth>
+          }
+        />
         <Route path="/download" element={<DownloadPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
