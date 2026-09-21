@@ -268,6 +268,12 @@ const AdminPanel = () => {
         .order("created_at", { ascending: false });
       setInternshipApps((internshipData as any[]) ?? []);
 
+      const { data: submissionData } = await supabase
+        .from("internship_submissions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setInternshipSubs((submissionData as any[]) ?? []);
+
       await loadChatMessages();
     } catch (e: any) {
       console.error(e);
@@ -601,6 +607,7 @@ const AdminPanel = () => {
                 { value: "guidelines", label: "Guidelines", short: "Rules", Icon: Shield },
                 { value: "talent", label: "Talent", short: "Team", Icon: Briefcase, count: applicants.length },
                 { value: "internships", label: "Internships", short: "Interns", Icon: UserPlus, count: internshipApps.filter((a) => a.status === "pending").length },
+                { value: "submissions", label: "Submissions", short: "Tasks", Icon: FileText, count: internshipSubs.filter((s) => s.status === "submitted").length },
                 { value: "feedback", label: "Feedback", short: "FB", Icon: MessageSquare, count: feedbacks.length },
               ].map(({ value, label, short, Icon, count }) => (
                 <TabsTrigger
