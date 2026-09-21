@@ -3341,14 +3341,26 @@ ${jsCode}
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-0.5">
-                      <button onClick={() => setPreviewDevice("iphone-15")} className={`${iconBtnSm} ${currentDevice.type === "phone" ? "text-primary bg-primary/10" : ""}`} title="Mobile">
+                    <div className="flex items-center gap-0.5 rounded-lg border border-border bg-secondary/40 p-0.5">
+                      <button
+                        onClick={() => setPreviewDevice("iphone-15")}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-all hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${currentDevice.type === "phone" ? "bg-card text-primary shadow-sm" : "hover:bg-secondary/60"}`}
+                        title="Mobile"
+                      >
                         <Smartphone className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => setPreviewDevice("ipad-mini")} className={`${iconBtnSm} ${currentDevice.type === "tablet" ? "text-primary bg-primary/10" : ""}`} title="Tablet">
+                      <button
+                        onClick={() => setPreviewDevice("ipad-mini")}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-all hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${currentDevice.type === "tablet" ? "bg-card text-primary shadow-sm" : "hover:bg-secondary/60"}`}
+                        title="Tablet"
+                      >
                         <Tablet className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => setPreviewDevice("desktop")} className={`${iconBtnSm} ${previewDevice === "desktop" ? "text-primary bg-primary/10" : ""}`} title="Desktop">
+                      <button
+                        onClick={() => setPreviewDevice("desktop")}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-all hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${previewDevice === "desktop" ? "bg-card text-primary shadow-sm" : "hover:bg-secondary/60"}`}
+                        title="Desktop"
+                      >
                         <Monitor className="h-3.5 w-3.5" />
                       </button>
                     </div>
