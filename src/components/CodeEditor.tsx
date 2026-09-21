@@ -22,6 +22,12 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  FULL_STACK_SITE_TEMPLATE,
+  detectWebsiteRequest,
+  generateWebsite,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -81,6 +87,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
         ]},
         { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "main": "src/server.js",\n  "scripts": { "start": "node src/server.js" }\n}\n` },
       ];
+    case "full-stack-site":
+      return generateWebsite({ kind: "landing", title: projectName }).tree;
     case "react":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -123,7 +131,7 @@ const LANG_MAP: Record<string, string> = {
   js: "javascript", ts: "typescript", py: "python", html: "html",
   css: "css", json: "json", jsx: "javascript", tsx: "typescript",
   md: "markdown", txt: "plaintext", xml: "xml", yaml: "yaml", yml: "yaml",
-  sh: "shell", bash: "shell", sql: "sql",
+  sh: "shell", bash: "shell", sql: "sql", mjs: "javascript",
 };
 const getLang = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
@@ -395,6 +403,70 @@ const LAYOUT_SUGGESTIONS = [
   { id: "form", icon: "📝", label: "Adaptive Form", desc: "Keyboard-aware", prompt: "Generate a keyboard-aware form with TextInput fields, validation, and proper spacing that adapts to screen size" },
 ];
 
+const WEBSITE_KIND_OPTIONS: { id: WebsiteKind; label: string }[] = [
+  { id: "landing", label: "Landing" },
+  { id: "portfolio", label: "Portfolio" },
+  { id: "blog", label: "Blog" },
+  { id: "restaurant", label: "Restaurant" },
+  { id: "store", label: "Store" },
+  { id: "dashboard", label: "Dashboard" },
+];
+
+function WebsiteGeneratorPanel({
+  colors,
+  onGenerate,
+}: {
+  colors: { bg: string; card: string; border: string; text: string; muted: string; accent: string };
+  onGenerate: (kind: WebsiteKind, title: string) => void;
+}) {
+  const [kind, setKind] = useState<WebsiteKind>("portfolio");
+  const [title, setTitle] = useState("");
+
+  return (
+    <div className="border-b px-3 py-2 shrink-0" style={{ borderColor: colors.border, backgroundColor: colors.card }}>
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <Wand2 className="h-3.5 w-3.5" style={{ color: colors.accent }} />
+        <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: colors.text }}>Full-stack website</span>
+      </div>
+      <p className="mb-2 text-[10px] leading-snug" style={{ color: colors.muted }}>
+        Builds the page, styles, client script, and a Node API for health, site content, and records.
+      </p>
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Site name (optional)"
+        className="mb-2 w-full rounded-md px-2 py-1 text-[11px] outline-none"
+        style={{ backgroundColor: colors.bg, color: colors.text, border: `1px solid ${colors.border}` }}
+      />
+      <div className="mb-2 grid grid-cols-3 gap-1">
+        {WEBSITE_KIND_OPTIONS.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            onClick={() => setKind(option.id)}
+            className="rounded px-1.5 py-1 text-[10px] font-medium"
+            style={{
+              color: kind === option.id ? "#ffffff" : colors.text,
+              backgroundColor: kind === option.id ? colors.accent : colors.bg,
+              border: `1px solid ${kind === option.id ? colors.accent : colors.border}`,
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => onGenerate(kind, title)}
+        className="w-full rounded-md py-1.5 text-[11px] font-semibold"
+        style={{ backgroundColor: colors.accent, color: "#ffffff" }}
+      >
+        Generate website
+      </button>
+    </div>
+  );
+}
+
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
@@ -485,9 +557,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const id = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const content = id === "web-development"
+      ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Full-stack website** above to scaffold a landing page, portfolio, blog, restaurant, store, or dashboard — or ask me to **Generate a full-stack portfolio website**.\n\nThe generator writes the client, a Node API, and opens the preview. Other code I write is still applied to your files.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`;
+    return [{ role: "assistant" as const, content }];
+  });
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -1306,9 +1382,74 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((kind: WebsiteKind, title: string, prompt?: string) => {
+    const site = generateWebsite({ kind, title: title.trim() || undefined, prompt });
+    const html = site.files.find((file) => file.path === "client/index.html");
+    if (!html) return site;
+    if (fileTree.length) {
+      saveProject({
+        id: currentProjectId,
+        name: currentProjectName,
+        domain: domainName,
+        fileTree,
+        lastOpened: Date.now(),
+        createdAt: Date.now(),
+      });
+    }
+    const newId = `proj-${Date.now()}`;
+    saveProject({
+      id: newId,
+      name: site.title,
+      domain: domainName,
+      fileTree: site.tree,
+      lastOpened: Date.now(),
+      createdAt: Date.now(),
+    });
+    setRecentProjects(getSavedProjects());
+    setCurrentProjectId(newId);
+    setCurrentProjectName(site.title);
+    setFileTree(site.tree);
+    setOpenTabs([{ id: html.path, name: html.name, language: "html", content: html.content, isModified: false }]);
+    setActiveTabId(html.path);
+    setShowPreview(true);
+    setShowTerminal(true);
+    const files: Record<string, string> = {};
+    const walk = (nodes: typeof site.tree) => {
+      for (const node of nodes) {
+        if (node.type === "file" && node.content) {
+          files[node.id] = node.content;
+          if (!files[node.name]) files[node.name] = node.content;
+        }
+        if (node.children) walk(node.children);
+      }
+    };
+    walk(site.tree);
+    setPreviewContent(buildPreviewHtml(html.content, files));
+    setOutput((prev) => [
+      ...prev,
+      `$ Generated ${site.kind} website "${site.title}"`,
+      "GET /api/health  GET /api/site  GET /api/records  POST /api/records",
+      "Run locally: node server/server.mjs",
+    ]);
+    return site;
+  }, [buildPreviewHtml, currentProjectId, currentProjectName, domainName, fileTree]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development") {
+      const request = detectWebsiteRequest(chatInput);
+      if (request) {
+        const site = applyGeneratedWebsite(request.kind, request.title, chatInput);
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: chatInput },
+          { role: "assistant", content: site.summary },
+        ]);
+        setChatInput("");
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1669,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -1575,8 +1716,21 @@ ${jsCode}
     setFileTree(newTree);
     setCurrentProjectId(newId);
     setCurrentProjectName(newProjectName.trim());
-    setOpenTabs([]);
-    setActiveTabId(null);
+    if (newProjectTemplate === "full-stack-site") {
+      const htmlNode = findFile(newTree, "client/index.html");
+      if (htmlNode?.content) {
+        setOpenTabs([{ id: htmlNode.id, name: htmlNode.name, language: "html", content: htmlNode.content, isModified: false }]);
+        setActiveTabId(htmlNode.id);
+        setShowPreview(true);
+        setPreviewContent(buildPreviewHtml(htmlNode.content, collectFiles(newTree)));
+      } else {
+        setOpenTabs([]);
+        setActiveTabId(null);
+      }
+    } else {
+      setOpenTabs([]);
+      setActiveTabId(null);
+    }
     setShowNewProject(false);
     setShowWelcome(false);
     // Save the new project
@@ -1584,7 +1738,7 @@ ${jsCode}
     saveProject(proj);
     setRecentProjects(getSavedProjects());
     setNewProjectName("");
-  }, [newProjectName, newProjectTemplate, domainName, handleSaveProject]);
+  }, [newProjectName, newProjectTemplate, domainName, handleSaveProject, findFile, buildPreviewHtml, collectFiles]);
 
   const handleDeleteProject = useCallback((id: string) => {
     deleteProject(id);
@@ -1731,7 +1885,7 @@ ${jsCode}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-2 block">Choose Template</label>
             <div className="grid grid-cols-2 gap-2">
-              {PROJECT_TEMPLATES.map((tmpl) => (
+              {(domainId === "web-development" ? [FULL_STACK_SITE_TEMPLATE, ...PROJECT_TEMPLATES] : PROJECT_TEMPLATES).map((tmpl) => (
                 <button
                   key={tmpl.id}
                   onClick={() => setNewProjectTemplate(tmpl.id)}
@@ -2422,6 +2576,16 @@ ${jsCode}
                 <X className="h-3 w-3" />
               </button>
             </div>
+
+            {domainId === "web-development" && (
+              <WebsiteGeneratorPanel
+                colors={currentTheme.uiColors}
+                onGenerate={(kind, title) => {
+                  const site = applyGeneratedWebsite(kind, title);
+                  setMessages((prev) => [...prev, { role: "assistant", content: site.summary }]);
+                }}
+              />
+            )}
 
             {/* Chat messages */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3" style={{ backgroundColor: currentTheme.uiColors.bg }}>

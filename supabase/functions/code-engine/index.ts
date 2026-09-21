@@ -876,6 +876,7 @@ serve(async (req) => {
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
+- FULL-STACK WEBSITES: If the user explicitly asks for a full-stack website (landing, portfolio, blog, restaurant, store, or dashboard), describe this layout instead of the 3-file bundle: client/index.html, client/styles.css, client/site.js, server/server.mjs, server/store.mjs, package.json, README.md. Routes: GET /api/health, GET /api/site, GET /api/records, POST /api/records. The Node server uses node:http, ESM, and no npm dependencies. The client stays vanilla HTML, CSS, and JavaScript.
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
