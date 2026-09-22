@@ -507,6 +507,8 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
 
+FULL-STACK WEBSITE GENERATOR: If the user asks to generate a full-stack website (landing, portfolio, blog, restaurant, store, or dashboard), the editor writes client/index.html, client/styles.css, client/site.js, server/server.mjs, server/store.mjs, package.json, and README.md. The Node server exposes GET /api/health, GET /api/site, GET /api/records, and POST /api/records. Explain that layout when they ask how the generated site works.
+
 CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, TypeScript, or any framework. Use ONLY:
 - index.html
 - styles.css
