@@ -5,6 +5,8 @@ import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
+import { WebsiteGeneratorBar } from "@/components/editor/WebsiteGeneratorBar";
+import { generateWebsite, matchWebsiteRequest, websiteToMarkdown } from "@/lib/websiteGenerator";
 
 interface Message {
   role: "user" | "assistant";
@@ -28,7 +30,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+      content: domainId === "web-development"
+        ? `👋 Hi! I'm your **Web Development** AI assistant. Use **Website generator** for a full-stack site (HTML, CSS, JavaScript, and a Node API), or ask me to build one.`
+        : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -41,10 +45,23 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
-    const userMsg: Message = { role: "user", content: input };
+    const prompt = input;
+    const userMsg: Message = { role: "user", content: prompt };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setInput("");
+
+    if (domainId === "web-development") {
+      const brief = matchWebsiteRequest(prompt);
+      if (brief) {
+        const site = generateWebsite(brief);
+        const html = site.files.find((file) => file.path.endsWith(".html"));
+        if (html && onSendToEditor) onSendToEditor(html.content, "html");
+        setMessages((prev) => [...prev, { role: "assistant", content: websiteToMarkdown(site) }]);
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     let assistantSoFar = "";
@@ -136,13 +153,15 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainId, onSendToEditor]);
 
   const handleClear = () => {
     setMessages([
       {
         role: "assistant",
-        content: `👋 Chat cleared! I'm your **${domainName}** AI assistant. How can I help?`,
+        content: domainId === "web-development"
+          ? `👋 Chat cleared. I'm your **Web Development** AI assistant. Use **Website generator** for a full-stack site, or ask me to build one.`
+          : `👋 Chat cleared! I'm your **${domainName}** AI assistant. How can I help?`,
       },
     ]);
   };
@@ -224,6 +243,22 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         )}
         <div ref={endRef} />
       </div>
+
+      {domainId === "web-development" && (
+        <WebsiteGeneratorBar
+          disabled={isLoading}
+          onGenerate={(brief) => {
+            const site = generateWebsite(brief);
+            const html = site.files.find((file) => file.path.endsWith(".html"));
+            if (html && onSendToEditor) onSendToEditor(html.content, "html");
+            setMessages((prev) => [
+              ...prev,
+              { role: "user", content: `Build a ${brief.kind} website called ${site.name}` },
+              { role: "assistant", content: websiteToMarkdown(site) },
+            ]);
+          }}
+        />
+      )}
 
       {/* Starter Prompts */}
       {messages.length <= 1 && !isLoading && (
