@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isFullStackWebsiteRequest, WEBSITE_GENERATOR_SYSTEM_PROMPT } from "../_shared/websiteGenerator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, domain } = await req.json();
+    const { messages, domain, mode: bodyMode } = await req.json();
     const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
@@ -63,8 +64,15 @@ Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .
       "system-design": `You are Lunor.AI's expert System Design tutor covering load balancing, caching, microservices, message queues, CAP theorem, sharding. Explain with component diagrams, estimate capacity, guide through trade-offs for real-world systems.`,
     };
 
+    const lastUser = [...(Array.isArray(messages) ? messages : [])].reverse().find((m: { role?: string }) => m?.role === "user");
+    const websiteMode = domain === "web-development" && (
+      (bodyMode === "website-generator") || isFullStackWebsiteRequest(String(lastUser?.content || ""))
+    );
+
     const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-    let systemPrompt = `${basePrompt}
+    let systemPrompt = websiteMode
+      ? WEBSITE_GENERATOR_SYSTEM_PROMPT
+      : `${basePrompt}
 
 Rules:
 - Always use markdown formatting with code blocks and syntax highlighting
@@ -73,8 +81,8 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    // For web-development widgets: keep a single HTML file. Website mode replaces this.
+    if (domain === "web-development" && !websiteMode) {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;

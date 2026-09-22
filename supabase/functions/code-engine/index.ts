@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isFullStackWebsiteRequest, WEBSITE_GENERATOR_SYSTEM_PROMPT } from "../_shared/websiteGenerator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -862,10 +863,16 @@ serve(async (req) => {
       const messages = body.messages as Array<{ role: string; content: string }>;
       const model = body.model as string | undefined;
       const selectedModel = normalizeLovableModel(model);
-      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
+      const lastUser = [...(messages || [])].reverse().find((m) => m.role === "user");
+      const websiteMode = domain === "web-development" && (
+        body.mode === "website-generator" || isFullStackWebsiteRequest(String(lastUser?.content || ""))
+      );
+      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}, website=${websiteMode}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const stackDirective = websiteMode
+        ? ""
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
@@ -884,7 +891,19 @@ serve(async (req) => {
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
 - Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
         : "";
-      const systemPrompt = `${basePrompt}
+      const fileContract = `
+Output contract (critical):
+- Return ONLY file blocks (no intro, no outro, no bullet lists, no explanations)
+- Use this exact format for every file:
+  path/to/file.ext
+  \`\`\`language
+  // code
+  \`\`\`
+- Keep file paths stable and unique so they can be auto-applied safely
+${stackDirective}`;
+      const systemPrompt = websiteMode
+        ? `${WEBSITE_GENERATOR_SYSTEM_PROMPT}\n${fileContract}`
+        : `${basePrompt}
 
 Rules:
 - Always use markdown formatting with fenced code blocks and syntax highlighting
@@ -896,16 +915,7 @@ Rules:
 - Add subtle motion/micro-interactions using CSS transitions/animations when relevant
 - Favor visually polished output (spacing, typography hierarchy, color harmony, responsive layout)
 - Ensure imports/paths are consistent and runnable
-
-Output contract (critical):
-- Return ONLY file blocks (no intro, no outro, no bullet lists, no explanations)
-- Use this exact format for every file:
-  path/to/file.ext
-  \`\`\`language
-  // code
-  \`\`\`
-- Keep file paths stable and unique so they can be auto-applied safely
-${stackDirective}`;
+${fileContract}`;
 
       if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
