@@ -21,7 +21,16 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import { WebsiteGeneratorBar } from "@/components/editor/WebsiteGeneratorBar";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  generateWebsite,
+  matchWebsiteRequest,
+  summarizeWebsite,
+  websitePreviewFiles,
+  websiteToProjectTree,
+  type GeneratedWebsite,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -486,7 +495,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **Web Development** AI assistant.\n\nUse **Website generator** to drop a full-stack site into this editor — HTML, CSS, and JavaScript plus a Node API — or ask me to build one, for example “Build a restaurant website called Harbor Table”.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1306,12 +1320,41 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((site: GeneratedWebsite) => {
+    const tree = websiteToProjectTree(site) as FileNode[];
+    const htmlFile = site.files.find((file) => file.path === "client/index.html");
+    const openIds = ["client/index.html", "client/styles.css", "client/script.js", "server/server.js"];
+    const tabs: OpenTab[] = site.files
+      .filter((file) => openIds.includes(file.path))
+      .map((file) => ({
+        id: file.path,
+        name: file.path.split("/").pop() || file.path,
+        language: file.language,
+        content: file.content,
+        isModified: true,
+      }));
+
+    setFileTree(tree);
+    setOpenTabs(tabs);
+    setActiveTabId("client/index.html");
+    setCurrentProjectName(site.name);
+    setShowPreview(true);
+    setShowTerminal(true);
+    if (htmlFile) setPreviewContent(buildPreviewHtml(htmlFile.content, websitePreviewFiles(site)));
+    setOutput([
+      `$ Website generator: ${site.name} (${site.kind})`,
+      ...site.files.map((file) => `  wrote ${file.path}`),
+      "$ Run the API with: node server/server.js",
+    ]);
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+    const prompt = chatInput;
+    const userMsg: Message = { role: "user", content: prompt };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1327,6 +1370,17 @@ ${jsCode}
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
     };
+
+    if (domainId === "web-development") {
+      const brief = matchWebsiteRequest(prompt);
+      if (brief) {
+        const site = generateWebsite(brief);
+        applyGeneratedWebsite(site);
+        upsert(summarizeWebsite(site));
+        setChatLoading(false);
+        return;
+      }
+    }
 
     // Check for cached response when offline
     if (!online) {
@@ -1528,10 +1582,15 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, applyGeneratedWebsite, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 Chat cleared. I'm your **Web Development** assistant. Use **Website generator** for a full-stack site, or ask me to build one.`
+        : `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`,
+    }]);
   };
 
   // -- Project management --
@@ -2560,6 +2619,18 @@ ${jsCode}
                   </div>
                 </div>
               </div>
+            )}
+
+            {domainId === "web-development" && (
+              <WebsiteGeneratorBar
+                disabled={chatLoading}
+                onGenerate={(brief) => {
+                  const site = generateWebsite(brief);
+                  const userMsg: Message = { role: "user", content: `Build a ${brief.kind} website called ${site.name}` };
+                  applyGeneratedWebsite(site);
+                  setMessages((prev) => [...prev, userMsg, { role: "assistant", content: summarizeWebsite(site) }]);
+                }}
+              />
             )}
 
             {/* AI Input */}
