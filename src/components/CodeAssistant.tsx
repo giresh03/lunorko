@@ -3,6 +3,7 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import { isFullStackWebsiteRequest, WEBSITE_TEMPLATES } from "@/lib/websiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -72,6 +73,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         body: JSON.stringify({
           messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
           domain: domainId,
+          ...(domainId === "web-development" && isFullStackWebsiteRequest(userMsg.content)
+            ? { mode: "website-generator" }
+            : {}),
         }),
       });
 
@@ -136,7 +140,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainName, domainId]);
 
   const handleClear = () => {
     setMessages([
@@ -224,6 +228,26 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         )}
         <div ref={endRef} />
       </div>
+
+      {domainId === "web-development" && messages.length <= 1 && !isLoading && (
+        <div className="border-t border-border px-3 py-2">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-muted-foreground">Website Generator</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {WEBSITE_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => setInput(template.prompt)}
+                className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/15 transition-colors"
+              >
+                {template.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Starter Prompts */}
       {messages.length <= 1 && !isLoading && (
