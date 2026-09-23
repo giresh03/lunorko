@@ -10,12 +10,12 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor. For a single visual page, output vanilla HTML, CSS, and JavaScript in one complete HTML file wrapped in an \`\`\`html code block. When the user asks for a full-stack website, MERN app, or the Website Generator, describe the client (index.html, styles.css, app.js) and the Express + MongoDB server files the editor writes. Do not switch that full-stack request into React components.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
+      "Build a full-stack portfolio website",
+      "Create a restaurant site with a reservation API",
+      "Generate a SaaS landing page with a waitlist API",
+      "Build a store with a product catalog and checkout API",
     ],
   },
   "app-development": {
