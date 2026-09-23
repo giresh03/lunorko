@@ -28,7 +28,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+      content: domainId === "web-development"
+        ? `👋 Hi! I'm your **${domainName}** AI assistant. Ask me to **build a full-stack website** and I will write the client plus an Express API. Smaller exercises still come back as one HTML file.`
+        : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -142,7 +144,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     setMessages([
       {
         role: "assistant",
-        content: `👋 Chat cleared! I'm your **${domainName}** AI assistant. How can I help?`,
+        content: domainId === "web-development"
+          ? `👋 Chat cleared. I'm your **${domainName}** assistant. Ask me to build a full-stack website, or for a single HTML exercise.`
+          : `👋 Chat cleared! I'm your **${domainName}** AI assistant. How can I help?`,
       },
     ]);
   };
@@ -154,6 +158,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         <Bot className="h-5 w-5 text-primary" />
         <span className="text-sm font-medium text-foreground">{domainName} Assistant</span>
         <span className="rounded-sm bg-primary/10 px-2 py-0.5 text-xs text-primary">AI Powered</span>
+        {domainId === "web-development" && (
+          <span className="rounded-sm bg-primary/10 px-2 py-0.5 text-xs text-primary">Website generator</span>
+        )}
         <Button variant="ghost" size="sm" className="ml-auto h-7 px-2" onClick={handleClear}>
           <Trash2 className="h-3.5 w-3.5" />
         </Button>

@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  buildFullStackWebsite,
+  extractLabeledCodeFiles,
+  isWebsiteGenerationRequest,
+  upsertProjectFile,
+  WEBSITE_GENERATOR_PROMPTS,
+  type ProjectFile,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -235,9 +243,16 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   return `untitled.${ext}`;
 }
 
+function assistantGreeting(domainName: string) {
+  if (domainName.toLowerCase().includes("web development")) {
+    return `👋 I'm your **Web Development** AI assistant.\n\nUse **Full-stack website** to generate a client and an Express API. The preview updates from \`client/index.html\`, and \`server/\` is ready to run locally.\n\nYou can still ask for a single HTML page, a bug fix, or an explanation.`;
+  }
+  return `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`;
+}
+
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
-  // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  // Match code blocks, and look for filename hints (including paths) on the line before the fence
+  const regex = /(?:(?:[`*]*([\w./-]+\.\w+)[`*]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -486,7 +501,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: assistantGreeting(domainName) },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1060,6 +1075,124 @@ ${jsCode}
     }
   }, [activeTabId, activeTab, updateNode, addChild]);
 
+  const applyProjectFiles = useCallback((files: ProjectFile[]) => {
+    const safe = files.filter((file) => file.path && !file.path.split("/").includes(".."));
+    if (!safe.length) return;
+    setFileTree((prev) => safe.reduce((tree, file) => upsertProjectFile(tree, file), prev));
+    setOpenTabs((prev) => {
+      let tabs = [...prev];
+      for (const file of safe) {
+        const name = file.path.split("/").pop() || file.path;
+        const existing = tabs.find((tab) => tab.id === file.path);
+        if (existing) {
+          tabs = tabs.map((tab) => tab.id === file.path ? { ...tab, content: file.content, language: file.language, name, isModified: true } : tab);
+        } else {
+          tabs = [...tabs, { id: file.path, name, language: file.language, content: file.content, isModified: true }];
+        }
+      }
+      return tabs;
+    });
+    const html = safe.find((file) => file.path === "client/index.html") || safe.find((file) => file.path.endsWith(".html"));
+    if (html) setActiveTabId(html.path);
+  }, []);
+
+  const previewGeneratedSite = useCallback((files: ProjectFile[]) => {
+    const html = files.find((file) => file.path === "client/index.html") || files.find((file) => file.path.endsWith(".html"));
+    if (!html) return;
+    const allFiles: Record<string, string> = {};
+    for (const file of files) {
+      allFiles[file.path] = file.content;
+      const base = file.path.split("/").pop();
+      if (base && !allFiles[base]) allFiles[base] = file.content;
+    }
+    setShowPreview(true);
+    setPreviewContent(buildPreviewHtml(html.content, allFiles));
+  }, [buildPreviewHtml]);
+
+  const runWebsiteGenerator = useCallback(async (rawPrompt: string) => {
+    const brief = rawPrompt.trim();
+    if (!brief || chatLoading) return;
+    const project = buildFullStackWebsite(brief);
+    setChatInput("");
+    setMessages((prev) => [...prev, { role: "user", content: brief }]);
+    setChatLoading(true);
+    applyProjectFiles(project.files);
+    previewGeneratedSite(project.files);
+    setCurrentProjectName(project.siteName);
+    setOutput((prev) => [
+      ...prev,
+      `$ Generated full-stack site "${project.siteName}"`,
+      ...project.files.map((file) => `  wrote ${file.path}`),
+      "$ Preview updated from client/index.html",
+      "$ API: cd server && npm install && npm start",
+    ]);
+
+    const fileList = project.files.map((file) => `- \`${file.path}\``).join("\n");
+    const ready = `**${project.siteName}** is in the editor.\n\n${fileList}\n\nThe preview is the client. \`server/\` serves \`/api/content\` and the same pages when you run \`npm start\` inside it.`;
+
+    const finish = (extra: string) => {
+      setMessages((prev) => [...prev, { role: "assistant", content: `${ready}\n\n${extra}` }]);
+      setChatLoading(false);
+    };
+
+    if (!online) {
+      finish("You are offline, so these starter codes were written as-is.");
+      return;
+    }
+
+    try {
+      const resp = await fetchCodeEngine({
+        action: "generate-website",
+        domain: "web-development",
+        model: selectedModel,
+        messages: [{ role: "user", content: brief }],
+      });
+      if (!resp.ok || !resp.body) {
+        const err = await resp.json().catch(() => ({}));
+        finish(err?.error ? `AI tailor skipped (${err.error}). The starter project is ready to edit.` : "AI tailor skipped. The starter project is ready to edit.");
+        return;
+      }
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantSoFar = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (json === "[DONE]") continue;
+          try {
+            const parsed = JSON.parse(json);
+            const chunk = parsed.choices?.[0]?.delta?.content;
+            if (chunk) assistantSoFar += chunk;
+          } catch {
+            buffer = line + "\n" + buffer;
+            break;
+          }
+        }
+      }
+      const tailored = extractLabeledCodeFiles(assistantSoFar);
+      if (tailored.some((file) => file.path === "client/index.html")) {
+        applyProjectFiles(tailored);
+        previewGeneratedSite(tailored);
+        finish("The model tailored the project files, and the preview was refreshed.");
+      } else {
+        finish("The model reply did not include a complete client, so the starter project stayed in place.");
+      }
+    } catch (error) {
+      finish(isAuthRequiredError(error)
+        ? "Sign in to tailor the copy with AI. The starter project is already in the editor."
+        : "The AI service was unreachable. The starter project is already in the editor.");
+    }
+  }, [applyProjectFiles, chatLoading, online, previewGeneratedSite, selectedModel]);
+
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
     try {
@@ -1309,6 +1442,10 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      await runWebsiteGenerator(chatInput);
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1403,17 +1540,29 @@ ${jsCode}
     if (codeBlocks.length > 0) {
       // Prepare all new files/updates in one pass
       const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
+      const nestedFiles: ProjectFile[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const rawName = (block.filename || `untitled.${ext}`).replace(/\\/g, "/").replace(/^\/+/, "");
+        const lang = normalizedLang || getLang(rawName);
+        if (rawName.includes("/")) {
+          nestedFiles.push({ path: rawName, language: lang, content: block.code });
+          newFiles.push({ id: rawName, name: rawName.split("/").pop() || rawName, lang, code: block.code });
+          return;
+        }
+        const newId = `src/${rawName}`;
+        newFiles.push({ id: newId, name: rawName, lang, code: block.code });
       });
+      if (nestedFiles.length) {
+        setFileTree((prev) => nestedFiles.reduce((tree, file) => upsertProjectFile(tree, file), prev));
+      }
 
       // Batch update file tree in a single setState
       setFileTree(prev => {
         let tree = [...prev];
+        const srcFiles = newFiles.filter((file) => file.id.startsWith("src/"));
+        if (!srcFiles.length) return tree;
         // Ensure src folder exists
         let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
         if (!srcFolder) {
@@ -1421,7 +1570,7 @@ ${jsCode}
           tree = [srcFolder, ...tree];
         }
 
-        newFiles.forEach(({ id, name, lang, code }) => {
+        srcFiles.forEach(({ id, name, lang, code }) => {
           const existingInTree = findFile(tree, id);
           if (existingInTree) {
             tree = updateNode(tree, id, n => ({ ...n, content: code }));
@@ -1528,10 +1677,10 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, runWebsiteGenerator]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{ role: "assistant", content: assistantGreeting(domainName) }]);
   };
 
   // -- Project management --
@@ -2558,6 +2707,34 @@ ${jsCode}
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Wand2 className="h-3.5 w-3.5" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Full-stack website</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {WEBSITE_GENERATOR_PROMPTS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => runWebsiteGenerator(item.prompt)}
+                      className="rounded-md px-2 py-1 text-[10px] font-medium disabled:opacity-50"
+                      style={{
+                        color: currentTheme.uiColors.text,
+                        backgroundColor: currentTheme.uiColors.bg,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                      title={item.prompt}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

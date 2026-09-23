@@ -32,10 +32,22 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+For widgets, forms, and exercises: generate ONLY vanilla HTML, CSS, and JavaScript.
+FORBIDDEN in that mode: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
+REQUIRED in that mode: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+
+When the user asks for a website, landing page, storefront, or full-stack site, switch to the website generator. Output these files, with the path alone on the line before each fence:
+client/index.html
+client/styles.css
+client/script.js
+server/package.json
+server/index.js
+server/routes/api.js
+server/data/content.json
+README.md
+The client is still vanilla HTML/CSS/JS. script.js includes fallback data when fetch("/api/content") fails. server/index.js is an Express ESM app with GET /api/content and POST /api/messages.
 
 Example structure:
 \`\`\`html
@@ -73,11 +85,19 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    const lastUser = [...messages].reverse().find((m: { role?: string }) => m.role === "user");
+    const websiteRequest = typeof lastUser?.content === "string" && /\b(build|create|make|generate|design)\b/i.test(lastUser.content) && /\b(website|web\s*site|landing\s*page|storefront|full[-\s]?stack)\b/i.test(lastUser.content);
+
+    // For web-development: widgets stay one HTML file; website requests use the full-stack layout.
+    if (domain === "web-development" && !websiteRequest) {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+    }
+    if (domain === "web-development" && websiteRequest) {
+      systemPrompt += `
+
+REMINDER: This is a full-stack website request. Do not collapse it into one HTML file. Emit client/index.html, client/styles.css, client/script.js, server/package.json, server/index.js, server/routes/api.js, server/data/content.json, and README.md. Path on the line before each fence. Vanilla client, Express server.`;
     }
 
     if (useGoogleAI) {

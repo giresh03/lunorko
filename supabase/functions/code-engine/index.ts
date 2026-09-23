@@ -503,6 +503,30 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 - You can COMBINE effects: e.g. scales pattern + aurora blobs, or dotted glow + gradient animation for extra premium feel.
 `;
 
+const FULL_STACK_WEBSITE_DIRECTIVE = `
+- This is a full-stack website. Do NOT collapse it into a single HTML file and do NOT use React, JSX, or TypeScript.
+- Return ONLY these files, in this order, with the path alone on the line before each fence:
+  client/index.html
+  client/styles.css
+  client/script.js
+  server/package.json
+  server/index.js
+  server/routes/api.js
+  server/data/content.json
+  README.md
+- client/index.html links styles.css and script.js, sets data-themed on body, and is a complete responsive page for the user's brief.
+- client/script.js fetches /api/content and renders it. Include a FALLBACK object so the page still renders when the API is offline.
+- server/package.json is ESM ("type": "module") and depends on express. server/index.js serves ../client as static files and mounts ./routes/api.js at /api.
+- server/routes/api.js implements GET /content, GET /health, and POST /messages (in-memory). Content lives in server/data/content.json.
+- README.md explains: cd server && npm install && npm start.`;
+
+function wantsFullStackWebsite(messages: Array<{ role?: string; content?: string }> | undefined): boolean {
+  const last = [...(messages || [])].reverse().find((message) => message.role === "user");
+  const text = last?.content || "";
+  return /\b(build|create|make|generate|design|scaffold)\b/i.test(text)
+    && /\b(website|web\s*site|landing\s*page|storefront|full[-\s]?stack)\b/i.test(text);
+}
+
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
@@ -858,14 +882,19 @@ serve(async (req) => {
     }
 
     // ============= ACTION: generate (AI code generation with streaming) =============
-    if (action === "generate") {
+    if (action === "generate" || action === "generate-website") {
       const messages = body.messages as Array<{ role: string; content: string }>;
       const model = body.model as string | undefined;
       const selectedModel = normalizeLovableModel(model);
-      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
+      const websiteRequest = action === "generate-website" || (domain === "web-development" && wantsFullStackWebsite(messages));
+      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}, website=${websiteRequest}`);
 
-      const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const basePrompt = websiteRequest
+        ? `You are Lunor.AI's full-stack website generator for the Web Development assistant. You write a vanilla client and an Express API that match the user's brief.`
+        : (domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`);
+      const stackDirective = websiteRequest
+        ? FULL_STACK_WEBSITE_DIRECTIVE
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
