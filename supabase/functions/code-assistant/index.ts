@@ -73,8 +73,26 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    const lastUserText = String([...(messages || [])].reverse().find((message: { role?: string; content?: string }) => message?.role === "user")?.content || "");
+    const fullWebsite = domain === "web-development"
+      && /\b(build|create|generate|make|scaffold|design|launch)\b/i.test(lastUserText)
+      && /\b(website|web\s*site|landing page|full[-\s]?stack)\b/i.test(lastUserText);
+
+    // For web-development: a full website uses the client/server layout. Smaller UI stays one HTML file.
+    if (fullWebsite) {
+      systemPrompt = `You are Lunor.AI's Web Development tutor building a full-stack website.
+
+Return these files, each as a path line followed by a fenced code block:
+- client/index.html, client/styles.css, client/script.js (vanilla HTML, CSS, and JavaScript only — no React)
+- server/package.json ("type": "module"), server/index.js, server/src/app.js
+- server/src/config/env.js, server/src/config/db.js
+- server/src/modules/site/site.routes.js, site.controller.js, site.service.js
+
+Routes: GET /api/health, GET /api/{listKey}, POST /api/{formKey}.
+client/script.js must paint sample records before fetch so the page is not blank.
+db.js reads MONGODB_URI and uses an in-memory store when it is empty.
+Do not use server/server.js or a generic /api/records route.`;
+    } else if (domain === "web-development") {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
