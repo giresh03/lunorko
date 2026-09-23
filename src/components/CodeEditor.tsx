@@ -22,6 +22,15 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_PRESETS,
+  buildWebsiteFileTree,
+  generateFullStackWebsite,
+  isServerModulePath,
+  shouldGenerateWebsite,
+  toPreviewFileMap,
+  type WebsitePreset,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -485,9 +494,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => [{
+    role: "assistant",
+    content: domainId === "web-development"
+      ? `👋 I'm your **${domainName}** AI assistant.\n\nI can **generate a full-stack website** in this project: a browser client plus an Express API.\n\n- Ask **"Build a restaurant website for Luna Bistro"**\n- Or pick a preset below: Portfolio, Restaurant, Shop, Blog, SaaS, Studio\n\nThe preview uses seed data from \`client/app.js\`. \`npm start\` runs the API (\`GET /api/items\`, \`POST /api/inquiries\`).\n\nDebugging and concept questions use the model. Generated code is applied to your files.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+  }]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -506,7 +518,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const activeTab = openTabs.find((t) => t.id === activeTabId);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages]);
 
   useImperativeHandle(ref, () => ({
@@ -606,8 +618,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         if (n.type === "file" && n.content) {
           // Store by full path id
           files[n.id] = n.content;
-          // Store by name — prefer src/ files (first occurrence wins since src is walked first)
-          if (!files[n.name]) files[n.name] = n.content;
+          // Server modules stay on their path so Express code is not inlined into the preview.
+          if (!isServerModulePath(n.id) && !files[n.name]) files[n.name] = n.content;
         }
         if (n.children) walk(n.children);
       }
@@ -820,6 +832,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 
   // Build a full HTML document for preview by injecting sibling CSS/JS
   const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
+    allFiles = Object.fromEntries(Object.entries(allFiles).filter(([name]) => !isServerModulePath(name)));
     let html = htmlContent;
     
     // Inject a base visible style so content is never invisible against iframe bg
@@ -892,6 +905,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   // Update preview content with debouncing
   // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
   const buildVanillaJsPreview = useCallback((jsCode: string, allFiles: Record<string, string>) => {
+    allFiles = Object.fromEntries(Object.entries(allFiles).filter(([name]) => !isServerModulePath(name)));
     // Collect all CSS from project
     const allCss = Object.entries(allFiles)
       .filter(([name]) => name.endsWith(".css"))
@@ -941,7 +955,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name]) => /\.(js|ts)$/.test(name) && !isServerModulePath(name) && name !== activeTab?.name)
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -987,6 +1001,13 @@ ${jsCode}
   const updatePreview = useCallback(() => {
     if (!activeTab || !showPreview) return;
     const allFiles = collectFiles(fileTree);
+    if (isServerModulePath(activeTab.id)) {
+      const html = allFiles["index.html"] || allFiles["client/index.html"];
+      if (html) {
+        setPreviewContent(buildPreviewHtml(html, allFiles));
+        return;
+      }
+    }
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
     const hasJSXContent = /<\w+[\s/>]/.test(activeTab.content) && /\breturn\s*[\s(]/.test(activeTab.content);
@@ -1230,6 +1251,17 @@ ${jsCode}
     const isHtml = lang === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(lang) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
     const allFiles = collectFiles(fileTree);
+    if (isServerModulePath(activeTab.id)) {
+      const html = allFiles["index.html"] || allFiles["client/index.html"];
+      if (html) {
+        setShowPreview(true);
+        setShowTerminal(true);
+        setPreviewContent(buildPreviewHtml(html, allFiles));
+        setOutput([`$ ${activeTab.name} is server code.`, "Showing the client preview. Run npm start to launch Express."]);
+        setIsRunning(false);
+        return;
+      }
+    }
     const filesList = Object.entries(allFiles).map(([path, content]) => ({ path, content }));
     const isReactProject = hasJSX(filesList);
     const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -1306,9 +1338,54 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const runWebsiteGenerator = useCallback((rawPrompt: string, options?: { preset?: WebsitePreset }) => {
+    if (chatLoading) return;
+    const canned = options?.preset
+      ? WEBSITE_PRESETS.find((entry) => entry.id === options.preset)?.prompt
+      : undefined;
+    const typed = rawPrompt.trim();
+    const prompt = canned || (typed && shouldGenerateWebsite(typed) ? typed : WEBSITE_PRESETS[0].prompt);
+    const site = generateFullStackWebsite({ prompt, preset: options?.preset });
+    const tree = buildWebsiteFileTree(site) as FileNode[];
+    const htmlFile = site.files.find((file) => file.path === "client/index.html");
+
+    setChatInput("");
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: prompt },
+      { role: "assistant", content: site.assistantMessage },
+    ]);
+    setFileTree(tree);
+    setCurrentProjectName(site.name);
+    if (htmlFile) {
+      const tab: OpenTab = {
+        id: "client/index.html",
+        name: "index.html",
+        language: "html",
+        content: htmlFile.content,
+        isModified: true,
+      };
+      setOpenTabs([tab]);
+      setActiveTabId(tab.id);
+      setShowPreview(true);
+      setPreviewContent(buildPreviewHtml(htmlFile.content, toPreviewFileMap(site.files)));
+    }
+    setShowTerminal(true);
+    setOutput((prev) => [
+      ...prev,
+      `$ Generated ${site.name}`,
+      "Preview is using seed data from client/app.js.",
+      "Run npm install && npm start to serve the Express API.",
+    ]);
+  }, [buildPreviewHtml, chatLoading]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && shouldGenerateWebsite(chatInput)) {
+      runWebsiteGenerator(chatInput);
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1605,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, runWebsiteGenerator]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2564,6 +2641,32 @@ ${jsCode}
 
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {domainId === "web-development" && (
+                <div className="mb-2">
+                  <div className="mb-1 flex items-center gap-1">
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                    <span className="text-[9px] font-medium" style={{ color: currentTheme.uiColors.muted }}>Full-stack website</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {WEBSITE_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => runWebsiteGenerator(preset.prompt, { preset: preset.id })}
+                        disabled={chatLoading}
+                        className="rounded px-1.5 py-0.5 text-[9px] font-medium transition-colors disabled:opacity-50"
+                        style={{
+                          color: currentTheme.uiColors.text,
+                          backgroundColor: currentTheme.uiColors.bg,
+                          border: `1px solid ${currentTheme.uiColors.border}`,
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
@@ -2590,11 +2693,25 @@ ${jsCode}
                   }}
                   disabled={chatLoading}
                 />
+                {domainId === "web-development" && (
+                  <button
+                    type="button"
+                    className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
+                    style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.accent, border: `1px solid ${currentTheme.uiColors.border}` }}
+                    onClick={() => runWebsiteGenerator(chatInput)}
+                    disabled={chatLoading}
+                    title="Generate a full-stack website"
+                  >
+                    <Wand2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
                 <button
+                  type="button"
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
                   onClick={handleChatSend}
                   disabled={chatLoading || !chatInput.trim()}
+                  title="Send message"
                 >
                   <Send className="h-3.5 w-3.5" />
                 </button>
