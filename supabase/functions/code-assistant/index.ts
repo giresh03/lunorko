@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseWebsiteRequest, websiteStackPrompt } from "../../../src/lib/websiteGenerator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,8 +74,21 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    const lastUser = Array.isArray(messages)
+      ? [...messages].reverse().find((message: { role?: string }) => message?.role === "user")
+      : undefined;
+    const websiteIntent = domain === "web-development" && lastUser
+      ? parseWebsiteRequest(String(lastUser.content || ""))
+      : null;
+
+    if (websiteIntent) {
+      systemPrompt = `You are Lunor.AI's Web Development assistant. ${websiteStackPrompt(websiteIntent.templateId)}
+
+Rules:
+- Always use markdown formatting with fenced code blocks
+- Keep the client as one HTML page, one CSS file, and one JavaScript file
+- The Express files must stay split across the module paths above`;
+    } else if (domain === "web-development") {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;

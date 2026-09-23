@@ -22,6 +22,8 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { WebsiteGeneratorPanel } from "@/components/editor/WebsiteGeneratorPanel";
+import { applyWebsiteFiles, generateFullStackWebsite, parseWebsiteRequest, type GeneratedWebsite } from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -443,6 +445,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [showWebsiteGenerator, setShowWebsiteGenerator] = useState(domainId === "web-development");
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -486,7 +489,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **Web Development** AI assistant.\n\nOpen **Website** below to generate a full-stack site — a previewable page plus an Express API — and drop the code into this project.\n\nYou can also ask me to **build a website**, debug, or explain code.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1306,9 +1314,61 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((website: GeneratedWebsite) => {
+    setFileTree((prev) => applyWebsiteFiles(prev, website.files));
+    setOpenTabs((prev) => {
+      const next = prev.map((tab) => {
+        const file = website.files.find((entry) => entry.path === tab.id);
+        return file
+          ? { ...tab, name: file.name, language: file.language, content: file.content, isModified: true }
+          : tab;
+      });
+      const preview = website.files.find((entry) => entry.path === website.previewPath);
+      if (preview && !next.some((tab) => tab.id === preview.path)) {
+        next.push({
+          id: preview.path,
+          name: preview.name,
+          language: preview.language,
+          content: preview.content,
+          isModified: true,
+        });
+      }
+      return next;
+    });
+    setActiveTabId(website.previewPath);
+    setShowPreview(true);
+    setCurrentProjectName(website.siteName);
+    const fileMap: Record<string, string> = {};
+    for (const entry of website.files) {
+      fileMap[entry.path] = entry.content;
+      if (!fileMap[entry.name]) fileMap[entry.name] = entry.content;
+    }
+    const html = website.files.find((entry) => entry.path === website.previewPath)?.content ?? "";
+    setPreviewContent(buildPreviewHtml(html, fileMap));
+    setOutput((prev) => [
+      ...prev,
+      `$ Website generator wrote ${website.files.length} files for ${website.siteName}.`,
+      "$ Preview updated. API: cd server && npm install && npm start",
+    ]);
+    setMessages((prev) => [...prev, { role: "assistant", content: website.summary }]);
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    const websiteIntent = domainId === "web-development" ? parseWebsiteRequest(chatInput) : null;
+    if (websiteIntent) {
+      const userMsg: Message = { role: "user", content: chatInput };
+      setMessages((prev) => [...prev, userMsg]);
+      setChatInput("");
+      const website = generateFullStackWebsite({
+        templateId: websiteIntent.templateId,
+        siteName: websiteIntent.siteName,
+        tagline: websiteIntent.tagline,
+      });
+      applyGeneratedWebsite(website);
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1588,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2503,6 +2563,13 @@ ${jsCode}
               <div ref={chatEndRef} />
             </div>
 
+            {domainId === "web-development" && showWebsiteGenerator && (
+              <WebsiteGeneratorPanel
+                theme={currentTheme.uiColors}
+                onGenerate={(input) => applyGeneratedWebsite(generateFullStackWebsite(input))}
+              />
+            )}
+
             {/* Responsive Checklist & Layout Suggestions (app-development only) */}
             {isAppDomain && showChecklist && (
               <div className="border-t overflow-y-auto shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "260px" }}>
@@ -2565,6 +2632,17 @@ ${jsCode}
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {domainId === "web-development" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowWebsiteGenerator(!showWebsiteGenerator)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showWebsiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showWebsiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Website
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}
