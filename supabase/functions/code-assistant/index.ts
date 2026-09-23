@@ -32,10 +32,11 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+Small widgets: generate ONLY vanilla HTML, CSS, and JavaScript in one complete HTML file. FORBIDDEN for those: React, JSX, TSX, TypeScript, Vue, Angular.
+
+Full websites: the editor's Website Generator automation scaffolds client/index.html, client/styles.css, client/site.js and an Express API in server/ (index.js, src/app.js, src/routes.js, src/data.js). When the user asks to build a website, landing page, portfolio, blog, store, dashboard, or full-stack/MERN site, describe that scaffold and, if you include code, keep it as vanilla HTML/CSS/JS plus Express. Tell them to run npm run install:api and npm start.
 
 Example structure:
 \`\`\`html
@@ -77,7 +78,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: Small demos stay one \`\`\`html file. Website builds use the Website Generator files (client/*.html|css|js and server Express). No React, TSX, or .tsx/.ts component files.`;
     }
 
     if (useGoogleAI) {
