@@ -865,7 +865,27 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const lastUserText = Array.isArray(messages)
+        ? [...messages].reverse().find((message) => message?.role === "user")?.content || ""
+        : "";
+      const fullStackWebsite = domain === "web-development" && /(?:generate|build|create|make|scaffold|design)\b[\s\S]{0,80}(?:website|web\s*site|landing\s*page|web\s*app|full[-\s]?stack)/i.test(String(lastUserText));
+      const stackDirective = fullStackWebsite
+        ? `
+- FULL-STACK WEBSITE MODE. Still no React, JSX, TSX, Vue, or TypeScript.
+- Return these files, with the path on its own line before each fence:
+  client/index.html
+  client/styles.css
+  client/app.js
+  server/data/site.js
+  server/server.js
+  package.json
+  README.md
+- client/index.html links styles.css and app.js and stays previewable with no build step.
+- client/app.js fetches GET /api/site and renders embedded fallback data when that request fails. The contact form POSTs JSON to /api/contact.
+- server/server.js is an ESM Node http server with no npm dependencies. It serves client/, GET /api/health, GET /api/site, POST /api/contact, and rejects paths containing "..".
+- package.json has "type": "module" and "start": "node server/server.js".
+- Do not place server code inside the HTML page.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
