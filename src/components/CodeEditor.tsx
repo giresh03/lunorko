@@ -1624,7 +1624,7 @@ ${jsCode}
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [hardRefreshPreview]);
+  }, [hardRefreshPreview, domainId]);
 
   const copyPreviewHtml = useCallback(() => {
     if (!previewContent) return;
