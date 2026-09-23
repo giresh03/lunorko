@@ -865,7 +865,29 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const latestUserText = [...(messages || [])].reverse().find((message) => message.role === "user")?.content || "";
+      const wantsFullStackWebsite = domain === "web-development" && (
+        /\b(full[\s-]?stack|website generator|express\s+(api|backend|server))\b/i.test(latestUserText) ||
+        /\b(generate|build|create|scaffold|make)\s+(?:me\s+)?(?:a|an|the)?\s*(?:full[\s-]?stack\s+)?(?:website|web\s*site)\b/i.test(latestUserText)
+      );
+      const stackDirective = wantsFullStackWebsite
+        ? `
+- FULL-STACK WEBSITE: vanilla HTML, CSS, and JavaScript for the client. No React, JSX, TSX, Vue, or TypeScript.
+- Return these files in order, path on its own line, then a fenced code block:
+  index.html
+  styles.css
+  app.js
+  server/server.js
+  server/routes.js
+  server/store.js
+  package.json
+  README.md
+- index.html links styles.css and app.js and sets window.__SITE_SEED__ so the preview works with no server.
+- app.js renders from that seed, then tries GET /api/content. The contact form POSTs /api/contact and still shows success if the API is offline.
+- server/server.js uses Express, serves the project root, and mounts routes at /api.
+- server/routes.js implements GET /api/health, GET /api/content, GET /api/messages, and POST /api/contact with basic validation.
+- package.json depends on express and sets "start" to "node server/server.js".`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js

@@ -65,10 +65,24 @@ const RunLocallyDialog = ({
   const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   const safeName = projectName.replace(/[^a-z0-9-_]/gi, "-").toLowerCase() || "my-app";
+  const packageFile = files.find((file) => file.path === "package.json" || file.path.endsWith("/package.json"));
+  let hasStartScript = false;
+  if (packageFile) {
+    try {
+      hasStartScript = Boolean(JSON.parse(packageFile.content)?.scripts?.start);
+    } catch {
+      hasStartScript = false;
+    }
+  }
   const runCommands = isReact
     ? `cd ${safeName}
 npm install
 npm run dev`
+    : hasStartScript
+    ? `cd ${safeName}
+npm install
+npm start
+# Opens at http://localhost:3000`
     : `# Extract the zip, then:
 cd ${safeName}
 npx serve .

@@ -73,9 +73,17 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
+    // For web-development: vanilla pages by default, full-stack files when a website is requested
     if (domain === "web-development") {
-      systemPrompt += `
+      const latestUserText = [...(messages || [])].reverse().find((message: { role?: string; content?: string }) => message.role === "user")?.content || "";
+      const wantsFullStackWebsite =
+        /\b(full[\s-]?stack|website generator|express\s+(api|backend|server))\b/i.test(latestUserText) ||
+        /\b(generate|build|create|scaffold|make)\s+(?:me\s+)?(?:a|an|the)?\s*(?:full[\s-]?stack\s+)?(?:website|web\s*site)\b/i.test(latestUserText);
+      systemPrompt += wantsFullStackWebsite
+        ? `
+
+FULL-STACK WEBSITE MODE: Still no React or TypeScript. Return index.html, styles.css, app.js, server/server.js, server/routes.js, server/store.js, package.json, and README.md. Embed window.__SITE_SEED__ so the page works without the API. Express serves GET /api/content and POST /api/contact.`
+        : `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
     }
