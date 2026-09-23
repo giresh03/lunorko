@@ -3,6 +3,12 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import {
+  formatWebsiteAsAssistantMessage,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  WEBSITE_GENERATOR_PRESETS,
+} from "@/lib/websiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,7 +34,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+      content: domainId === "web-development"
+        ? `👋 Hi! I'm your **${domainName}** AI assistant.\n\nThe **full-stack website generator** can build a landing page, portfolio, store, restaurant, blog, or SaaS site — \`index.html\`, \`style.css\`, \`app.js\`, and a Node \`server.js\` API. Pick a preset below or describe the site you want.`
+        : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -39,9 +47,10 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isLoading) return;
-    const userMsg: Message = { role: "user", content: input };
+  const handleSend = useCallback(async (raw?: string) => {
+    const text = (typeof raw === "string" ? raw : input).trim();
+    if (!text || isLoading) return;
+    const userMsg: Message = { role: "user", content: text };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setInput("");
@@ -59,6 +68,12 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
     };
+
+    if (domainId === "web-development" && isWebsiteGenerationRequest(text)) {
+      upsert(formatWebsiteAsAssistantMessage(generateFullStackWebsite(text)));
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -136,7 +151,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainId]);
 
   const handleClear = () => {
     setMessages([
@@ -232,6 +247,20 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-medium text-muted-foreground">Try asking</span>
           </div>
+          {domainId === "web-development" && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {WEBSITE_GENERATOR_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handleSend(preset.prompt)}
+                  className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {preset.label} site
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {promptConfig.starterPrompts.map((prompt, i) => (
               <button
@@ -257,7 +286,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
             className="flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             disabled={isLoading}
           />
-          <Button size="sm" onClick={handleSend} disabled={isLoading || !input.trim()}>
+          <Button size="sm" onClick={() => handleSend()} disabled={isLoading || !input.trim()}>
             <Send className="h-4 w-4" />
           </Button>
         </div>

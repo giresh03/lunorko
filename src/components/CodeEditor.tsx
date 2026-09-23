@@ -22,6 +22,12 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  formatWebsiteAsAssistantMessage,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  WEBSITE_GENERATOR_PRESETS,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -486,7 +492,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** AI assistant.\n\n**Full-stack website generator** is on. Ask me to build a landing page, portfolio, store, restaurant, blog, or SaaS site and I write:\n\n- \`index.html\`, \`style.css\`, \`app.js\` — the site\n- \`server.js\` — Node API (\`/api/health\`, \`/api/content\`, \`/api/contact\`)\n- \`package.json\` and \`README.md\`\n\nFiles land in the editor automatically. Run \`node server.js\` for the API. I can still debug, explain, or restyle any file.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1307,11 +1318,12 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (raw?: string) => {
+    const text = (typeof raw === "string" ? raw : chatInput).trim();
+    if (!text || chatLoading) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: text };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1328,9 +1340,14 @@ ${jsCode}
       });
     };
 
-    // Check for cached response when offline
-    if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+    const websiteRequest = domainId === "web-development" && isWebsiteGenerationRequest(text);
+    const generatedSite = websiteRequest ? generateFullStackWebsite(text) : null;
+
+    // Local full-stack website generator — writes the site without waiting on the model.
+    if (generatedSite) {
+      upsert(formatWebsiteAsAssistantMessage(generatedSite));
+    } else if (!online) {
+      const cached = findCachedAIResponse(text, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
@@ -1387,7 +1404,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(text, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1489,9 +1506,17 @@ ${jsCode}
       }
     }
 
+    if (generatedSite) {
+      const fileList = generatedSite.files.map((file) => `\`${file.filename}\``).join(", ");
+      const summary = `**${generatedSite.title}** is in the editor — a full-stack **${generatedSite.kind}** site.\n\n${generatedSite.tagline}\n\nApplied ${fileList}. The preview uses the page immediately. From the project folder, run \`node server.js\` and open the API at \`/api/health\`, \`/api/content\`, and \`/api/contact\`.`;
+      setMessages((prev) =>
+        prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: summary } : m))
+      );
+    }
+
     // Live debugging hints for app-development domain
-    if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+    if (isAppDomain && assistantSoFar && !generatedSite) {
+      const lowerInput = text.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -2562,6 +2587,34 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Website generator</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {WEBSITE_GENERATOR_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => handleChatSend(preset.prompt)}
+                      className="rounded-full px-2 py-1 text-[10px] font-medium transition-opacity disabled:opacity-50"
+                      style={{
+                        color: currentTheme.uiColors.text,
+                        backgroundColor: currentTheme.uiColors.bg,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                      title={preset.prompt}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
@@ -2593,7 +2646,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => handleChatSend()}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />
