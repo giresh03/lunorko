@@ -864,8 +864,35 @@ serve(async (req) => {
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
-      const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const latestUserText = Array.isArray(messages)
+        ? String([...messages].reverse().find((m) => m?.role === "user")?.content || "")
+        : "";
+      const mentionsSite = /website|web\s*site|web\s*app|landing page/i.test(latestUserText);
+      const mentionsBackend = /express|mongodb|mongo\b|node\.?js|backend|\bapi\b/i.test(latestUserText);
+      const wantsFullStackWebsite = domain === "web-development" && (
+        /full[-\s]?stack|mern\b|website generator/i.test(latestUserText) || (mentionsSite && mentionsBackend)
+      );
+      const fullStackPrompt = `You are Lunor.AI's full-stack website generator inside the Web Development assistant. Write a small complete website a student can run.
+
+Files to return:
+- client/index.html, client/styles.css, client/app.js (vanilla HTML, CSS, and JavaScript — no React)
+- server/server.js (Express, serves ../client, mounts routes at /api, port 4000)
+- server/db.js (mongoose connect; log and continue when MONGODB_URI is missing)
+- server/model.js and server/routes.js (JSON API with an in-memory fallback when mongoose is disconnected)
+- package.json ("type": "module", scripts start and dev, dependencies express cors dotenv mongoose)
+- .env.example (PORT and MONGODB_URI only — no real secrets)
+- README.md with npm install and npm start
+
+client/app.js must fetch the API and fall back to sample data when the request fails, because the in-editor preview cannot reach MongoDB. Use ESM import/export.`;
+      const basePrompt = wantsFullStackWebsite
+        ? fullStackPrompt
+        : (domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`);
+      const stackDirective = wantsFullStackWebsite
+        ? `
+- Return every file listed above, using the path as the line before each fence
+- client/index.html must link styles.css and app.js
+- Include realistic seed data for the page topic`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js

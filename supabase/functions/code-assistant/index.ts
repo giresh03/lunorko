@@ -63,7 +63,16 @@ Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .
       "system-design": `You are Lunor.AI's expert System Design tutor covering load balancing, caching, microservices, message queues, CAP theorem, sharding. Explain with component diagrams, estimate capacity, guide through trade-offs for real-world systems.`,
     };
 
-    const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
+    const latestUserText = Array.isArray(messages)
+      ? String([...messages].reverse().find((m: { role?: string; content?: string }) => m?.role === "user")?.content || "")
+      : "";
+    const wantsFullStackWebsite = domain === "web-development" && (
+      /full[-\s]?stack|mern\b|website generator/i.test(latestUserText) ||
+      (/website|web\s*site|web\s*app|landing page/i.test(latestUserText) && /express|mongodb|mongo\b|node\.?js|backend|\bapi\b/i.test(latestUserText))
+    );
+    const basePrompt = wantsFullStackWebsite
+      ? `You are Lunor.AI's full-stack website generator for Web Development. Return a vanilla client (client/index.html, client/styles.css, client/app.js) and an Express + MongoDB API (server/server.js, server/db.js, server/model.js, server/routes.js) plus package.json, .env.example, and README.md. Use ESM. The client must fall back to sample data if the API is offline. Put the file path on the line before each code fence. No React.`
+      : (domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`);
     let systemPrompt = `${basePrompt}
 
 Rules:
@@ -74,7 +83,7 @@ Rules:
 - Suggest improvements when you see opportunity`;
 
     // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    if (domain === "web-development" && !wantsFullStackWebsite) {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
