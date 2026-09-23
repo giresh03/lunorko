@@ -505,17 +505,18 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
-  "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
+  "web-development": `You are Lunor.AI's expert Web Development coding assistant and full-stack website generator. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING pages with vanilla HTML, CSS, and JavaScript, plus an Express API when the user asks for a website.
 
-CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, TypeScript, or any framework. Use ONLY:
+CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, or TypeScript components. Page files:
 - index.html
 - styles.css
 - script.js
+Full-stack website requests also include server.js, package.json, and README.md.
 
 RULES:
-1. **HTML only** — semantic HTML5, no JSX or React. No import statements. No components.
+1. **HTML only** — semantic HTML5, no JSX or React. No React components. Imports belong only in server.js.
 2. **CSS only** — styles.css with modern animations (transitions, keyframes, hover effects, gradients).
-3. **Vanilla JS only** — plain JavaScript, no import/export, no modules, no require, no npm packages.
+3. **Vanilla JS in the browser** — script.js has no import/export. server.js may import express.
 4. **IMAGES ARE MANDATORY** — Every website MUST include high-quality images. Use these image sources:
    - **Unsplash (primary)**: <img src="https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80"> — use real Unsplash photo IDs for relevant topics.
    - **Picsum (random beautiful photos)**: <img src="https://picsum.photos/WIDTH/HEIGHT?random=N"> where N is a unique number per image.
@@ -874,9 +875,12 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
-- index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
+- STACK: HTML + CSS + JS for the page. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript components.
+- For a small UI demo, return exactly 3 files: index.html, styles.css, script.js.
+- When the user asks to build a website, landing page, portfolio, store, blog, restaurant site, dashboard, or anything full-stack, ALSO return server.js, package.json, and README.md.
+- server.js is Node/Express (ESM). Routes: GET /api/site, GET /api/items, POST /api/contact. Serve the folder with express.static. Do not inject this file into the browser.
+- script.js must render with bundled FALLBACK data when fetch fails, and call /api/items and /api/contact when the API is up.
+- index.html must include: <link href="styles.css">, <script src="script.js"></script>, <body data-themed>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image

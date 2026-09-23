@@ -22,6 +22,12 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  formatWebsiteAssistantMessage,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  WEBSITE_TEMPLATES,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -486,7 +492,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Full-stack websites** under the chat to generate a complete site — page, styles, client script, and an Express API — or ask me to build one.\n\n- **Generate a website** — files land in the editor and the preview opens\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n\nGenerated code is **automatically applied** to your files.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -863,7 +874,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name]) => {
+        const base = name.split("/").pop() || name;
+        return /\.(js|ts)$/.test(base) && base !== "server.js" && !injectedFiles.has(base) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html");
+      })
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1307,11 +1321,12 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (override?: string) => {
+    const promptText = (typeof override === "string" ? override : chatInput).trim();
+    if (!promptText || chatLoading) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: promptText };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1328,13 +1343,15 @@ ${jsCode}
       });
     };
 
-    // Check for cached response when offline
-    if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+    const useWebsiteGenerator = domainId === "web-development" && isWebsiteGenerationRequest(promptText);
+    if (useWebsiteGenerator) {
+      upsert(formatWebsiteAssistantMessage(generateFullStackWebsite(promptText)));
+    } else if (!online) {
+      const cached = findCachedAIResponse(promptText, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
-        upsert("📴 **Offline mode** — no cached response found for this query.\n\nTry browsing the **Snippets** tab in the sidebar for pre-loaded code examples.");
+        upsert("📴 **Offline mode** — no cached response found for this query.\n\nTry browsing the **Snippets** tab in the sidebar, or generate a full-stack website from the buttons under the chat.");
       }
     } else {
       try {
@@ -1387,7 +1404,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(promptText, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1398,7 +1415,7 @@ ${jsCode}
     }
 
     // Auto-apply: extract code blocks, batch all file operations, then trigger preview
-    const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
+    const userPrompt = promptText;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
       // Prepare all new files/updates in one pass
@@ -1491,7 +1508,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = promptText.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -1531,7 +1548,12 @@ ${jsCode}
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 Chat cleared. Ask me to generate a full-stack website, or pick a template under the chat.`
+        : `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`,
+    }]);
   };
 
   // -- Project management --
@@ -2562,6 +2584,28 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Full-stack websites</span>
+                <div className="mt-1.5 grid grid-cols-3 gap-1">
+                  {WEBSITE_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => handleChatSend(template.prompt)}
+                      className="rounded px-1.5 py-1.5 text-left transition-colors disabled:opacity-40"
+                      style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}
+                      title={template.description}
+                    >
+                      <span className="text-[9px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{template.label}</span>
+                      <span className="text-[7px] block" style={{ color: currentTheme.uiColors.muted }}>{template.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
@@ -2593,7 +2637,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => handleChatSend()}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />
