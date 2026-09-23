@@ -14,7 +14,9 @@ export function pg() {
   if (client) return client;
   const url = Deno.env.get('SUPABASE_DB_URL');
   if (!url) throw new Error('SUPABASE_DB_URL is not configured');
-  client = postgres(url, { prepare: false, max: 3, idle_timeout: 20, connect_timeout: 15 });
+  // One connection per isolate with a short idle timeout: many concurrent isolates
+  // otherwise exhaust the instance's connection slots (FATAL 53300).
+  client = postgres(url, { prepare: false, max: 1, idle_timeout: 5, connect_timeout: 10 });
   return client;
 }
 

@@ -760,6 +760,15 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error('project-runtime error', err);
     const message = err instanceof Error ? err.message : 'Internal error';
+    // Database is momentarily out of connection slots: ask the client to retry
+    // instead of surfacing a hard failure on the page.
+    const code = (err as { code?: string } | null)?.code;
+    if (code === '53300' || /connection slots|too many clients/i.test(message)) {
+      return new Response(
+        JSON.stringify({ error: 'Backend is busy, please retry in a moment.', retry: true }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '2' } },
+      );
+    }
     return fail(message, 500);
   }
 });

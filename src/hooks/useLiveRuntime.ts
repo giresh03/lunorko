@@ -152,8 +152,10 @@ export function useLiveRuntime({ scope, scopeKey, name, enabled = true }: Option
 
   /** Load a demo site's sample content into its backend (empty tables only). */
   const seed = useCallback(
-    async (data: SeedData, model?: DataModelTable[]) => {
-      const key = keyRef.current;
+    async (data: SeedData, model?: DataModelTable[], scopeKeyOverride?: string) => {
+      // Callers that have just switched scope pass the new key explicitly, because
+      // keyRef only picks up the change on the next render.
+      const key = scopeKeyOverride ?? keyRef.current;
       if (!key || !allowed || !data || Object.keys(data).length === 0) return;
       try {
         if (inflight.current?.key === key) await inflight.current.p;
