@@ -12,9 +12,9 @@ const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
     systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
+      "Generate a full-stack website for a coffee shop",
+      "Generate a full-stack portfolio website",
+      "Generate a full-stack landing page for a SaaS product",
       "Build a calculator in vanilla HTML",
     ],
   },

@@ -21,7 +21,15 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import { WebsiteGeneratorPanel } from "@/components/editor/WebsiteGeneratorPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  formatWebsiteAssistantMessage,
+  generateFullStackWebsite,
+  isFullStackWebsitePrompt,
+  websiteFilesToTree,
+  type WebsiteKind,
+} from "@/lib/fullStackWebsiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -58,6 +66,7 @@ const PROJECT_TEMPLATES = [
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
+  { id: "fullstack-website", name: "Full-stack website", description: "Client plus Express API", icon: "🏗️" },
 ];
 
 function createProjectFromTemplate(templateId: string, projectName: string, domain: string): FileNode[] {
@@ -81,6 +90,10 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
         ]},
         { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "main": "src/server.js",\n  "scripts": { "start": "node src/server.js" }\n}\n` },
       ];
+    case "fullstack-website": {
+      const site = generateFullStackWebsite({ title: projectName, brief: projectName });
+      return websiteFilesToTree(site.files) as FileNode[];
+    }
     case "react":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -129,6 +142,11 @@ const getLang = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   return LANG_MAP[ext] || "plaintext";
 };
+function isNodeServerSource(name: string, content: string) {
+  if (name === "server" || name.startsWith("server/") || name.includes("/server/")) return true;
+  return /\brequire\s*\(|\bmodule\.exports\b|\bfrom\s+["']express["']|\bexpress\s*\(/.test(content);
+}
+
 const getFileIcon = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   const colors: Record<string, string> = {
@@ -485,8 +503,11 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
+  const [showWebsiteGenerator, setShowWebsiteGenerator] = useState(domainId === "web-development");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: domainId === "web-development"
+      ? `👋 I'm your **${domainName}** AI assistant.\n\n**Website Generator** is pinned in this panel. Pick a blueprint or describe a site and I scaffold a full-stack project: \`index.html\`, \`styles.css\`, \`app.js\`, and an Express API in \`server/\`.\n\nYou can also ask me to debug, explain, or generate smaller snippets. Website files are applied in the editor and previewed immediately.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -606,8 +627,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         if (n.type === "file" && n.content) {
           // Store by full path id
           files[n.id] = n.content;
-          // Store by name — prefer src/ files (first occurrence wins since src is walked first)
-          if (!files[n.name]) files[n.name] = n.content;
+          // Store by name — prefer src/ files (first occurrence wins since src is walked first).
+          // Skip server files so Express sources are not injected into the browser preview.
+          if (!n.id.startsWith("server/") && !files[n.name]) files[n.name] = n.content;
         }
         if (n.children) walk(n.children);
       }
@@ -863,7 +885,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isNodeServerSource(name, content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -941,7 +963,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name, content]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && !isNodeServerSource(name, content))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1306,6 +1328,47 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((site: ReturnType<typeof generateFullStackWebsite>) => {
+    const tree = websiteFilesToTree(site.files) as FileNode[];
+    setFileTree(tree);
+    setCurrentProjectName(site.title);
+    const html = site.files.find((file) => file.path === "index.html");
+    const tabs = site.files
+      .filter((file) => ["index.html", "app.js", "styles.css", "server/server.js", "README.md"].includes(file.path))
+      .map((file) => ({
+        id: file.path,
+        name: file.path.split("/").pop() || file.path,
+        language: file.language,
+        content: file.content,
+        isModified: true,
+      }));
+    setOpenTabs(tabs);
+    setActiveTabId(html?.path || tabs[0]?.id || null);
+    setShowPreview(true);
+    if (html) {
+      const clientFiles: Record<string, string> = {};
+      for (const file of site.files) {
+        if (file.path.startsWith("server/")) continue;
+        clientFiles[file.path] = file.content;
+        const base = file.path.split("/").pop();
+        if (base) clientFiles[base] = file.content;
+      }
+      setPreviewContent(buildPreviewHtml(html.content, clientFiles));
+    }
+    setShowTerminal(true);
+    setOutput((prev) => [...prev, `$ Website Generator applied ${site.title}`, "Preview is using embedded content. Run npm start for the API."]);
+  }, [buildPreviewHtml]);
+
+  const runWebsiteGenerator = useCallback((brief: string, kind?: WebsiteKind) => {
+    const site = generateFullStackWebsite({ brief, kind });
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: brief },
+      { role: "assistant", content: formatWebsiteAssistantMessage(site) },
+    ]);
+    applyGeneratedWebsite(site);
+  }, [applyGeneratedWebsite]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
@@ -1327,6 +1390,14 @@ ${jsCode}
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
     };
+
+    if (domainId === "web-development" && isFullStackWebsitePrompt(chatInput)) {
+      const site = generateFullStackWebsite({ brief: chatInput });
+      applyGeneratedWebsite(site);
+      upsert(formatWebsiteAssistantMessage(site));
+      setChatLoading(false);
+      return;
+    }
 
     // Check for cached response when offline
     if (!online) {
@@ -1528,10 +1599,15 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 Chat cleared. I'm your **${domainName}** assistant. Use **Website Generator** to scaffold a full-stack site, or ask me anything else.`
+        : `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`,
+    }]);
   };
 
   // -- Project management --
@@ -1575,8 +1651,15 @@ ${jsCode}
     setFileTree(newTree);
     setCurrentProjectId(newId);
     setCurrentProjectName(newProjectName.trim());
-    setOpenTabs([]);
-    setActiveTabId(null);
+    const htmlFile = newProjectTemplate === "fullstack-website" ? findFile(newTree, "index.html") : null;
+    if (htmlFile?.content) {
+      setOpenTabs([{ id: htmlFile.id, name: htmlFile.name, language: htmlFile.language || "html", content: htmlFile.content, isModified: false }]);
+      setActiveTabId(htmlFile.id);
+      setShowPreview(true);
+    } else {
+      setOpenTabs([]);
+      setActiveTabId(null);
+    }
     setShowNewProject(false);
     setShowWelcome(false);
     // Save the new project
@@ -1584,7 +1667,7 @@ ${jsCode}
     saveProject(proj);
     setRecentProjects(getSavedProjects());
     setNewProjectName("");
-  }, [newProjectName, newProjectTemplate, domainName, handleSaveProject]);
+  }, [newProjectName, newProjectTemplate, domainName, handleSaveProject, findFile]);
 
   const handleDeleteProject = useCallback((id: string) => {
     deleteProject(id);
@@ -1731,7 +1814,7 @@ ${jsCode}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-2 block">Choose Template</label>
             <div className="grid grid-cols-2 gap-2">
-              {PROJECT_TEMPLATES.map((tmpl) => (
+              {(domainId === "web-development" ? PROJECT_TEMPLATES : PROJECT_TEMPLATES.filter((tmpl) => tmpl.id !== "fullstack-website")).map((tmpl) => (
                 <button
                   key={tmpl.id}
                   onClick={() => setNewProjectTemplate(tmpl.id)}
@@ -2415,6 +2498,21 @@ ${jsCode}
               <Sparkles className="h-4 w-4" style={{ color: currentTheme.uiColors.accent }} />
               <span className="text-xs font-semibold" style={{ color: currentTheme.uiColors.text }}>AI Assistant</span>
               <div className="flex-1" />
+              {domainId === "web-development" && (
+                <button
+                  type="button"
+                  onClick={() => setShowWebsiteGenerator((open) => !open)}
+                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    color: showWebsiteGenerator ? "#111" : currentTheme.uiColors.accent,
+                    backgroundColor: showWebsiteGenerator ? currentTheme.uiColors.accent : "transparent",
+                    border: `1px solid ${currentTheme.uiColors.accent}`,
+                  }}
+                  title="Full-stack website generator"
+                >
+                  Website
+                </button>
+              )}
               <button onClick={handleClearChat} className="p-1 transition-colors" style={{ color: currentTheme.uiColors.muted }} title="Clear chat">
                 <Trash2 className="h-3 w-3" />
               </button>
@@ -2560,6 +2658,14 @@ ${jsCode}
                   </div>
                 </div>
               </div>
+            )}
+
+            {domainId === "web-development" && showWebsiteGenerator && (
+              <WebsiteGeneratorPanel
+                theme={currentTheme.uiColors}
+                disabled={chatLoading}
+                onGenerate={runWebsiteGenerator}
+              />
             )}
 
             {/* AI Input */}
