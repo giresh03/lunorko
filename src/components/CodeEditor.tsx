@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_AUTOMATIONS,
+  describeWebsiteProject,
+  filesToProjectTree,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  websiteAssistantIntro,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -185,6 +193,11 @@ const createDefaultProject = (domainName: string): FileNode[] => {
 };
 
 // -- Extract code blocks from markdown with filename detection --
+/** Server modules must not be inlined into the browser preview. */
+function isBackendModule(content: string): boolean {
+  return /\b(require\(|module\.exports|from\s+["']express["']|express\(\)|createApiRouter|export\s+const\s+items)\b/.test(content);
+}
+
 const LANG_EXT_MAP: Record<string, string> = {
   javascript: "js", typescript: "ts", python: "py", html: "html",
   css: "css", json: "json", jsx: "jsx", tsx: "tsx", xml: "xml",
@@ -486,7 +499,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? websiteAssistantIntro(domainName)
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -851,7 +869,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     let jsMatch;
     while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
+      if (allFiles[jsFileName] && !isBackendModule(allFiles[jsFileName])) {
         html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
         injectedFiles.add(jsFileName);
       }
@@ -863,7 +881,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isBackendModule(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -941,7 +959,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name, content]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && !name.includes("/") && !isBackendModule(content))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1306,9 +1324,60 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((prompt: string) => {
+    const project = generateFullStackWebsite(prompt);
+    const tree = filesToProjectTree(project.files);
+    const htmlFile = project.files.find((file) => file.path === "client/index.html");
+    const tabs = project.files.filter((file) =>
+      ["client/index.html", "client/styles.css", "client/app.js", "server/index.js"].includes(file.path)
+    );
+    setCurrentProjectName(project.brand);
+    setFileTree(tree);
+    setOpenTabs(tabs.map((file) => ({
+      id: file.path,
+      name: file.path.split("/").pop() || file.path,
+      language: file.language,
+      content: file.content,
+      isModified: true,
+    })));
+    setActiveTabId("client/index.html");
+    setShowPreview(true);
+    setShowAIPanel(true);
+    if (htmlFile) {
+      const allFiles: Record<string, string> = {};
+      const walk = (nodes: FileNode[]) => {
+        for (const node of nodes) {
+          if (node.type === "file" && node.content) {
+            allFiles[node.id] = node.content;
+            if (!allFiles[node.name]) allFiles[node.name] = node.content;
+          }
+          if (node.children) walk(node.children);
+        }
+      };
+      walk(tree);
+      setPreviewContent(buildPreviewHtml(htmlFile.content, allFiles));
+    }
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: prompt },
+      { role: "assistant", content: describeWebsiteProject(project) },
+    ]);
+    setChatInput("");
+    setOutput([
+      `$ Generated ${project.brand}`,
+      "Previewing client/index.html",
+      "Run locally: npm install && npm start",
+    ]);
+    setShowTerminal(true);
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      applyGeneratedWebsite(chatInput);
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,10 +1597,15 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{
+      role: "assistant",
+      content: domainId === "web-development"
+        ? websiteAssistantIntro(domainName)
+        : `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`,
+    }]);
   };
 
   // -- Project management --
@@ -2023,6 +2097,22 @@ ${jsCode}
               <button onClick={handleReset} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Reset">
                 <RotateCcw className="h-3.5 w-3.5" />
               </button>
+              {domainId === "web-development" && (
+                <button
+                  onClick={() => {
+                    const typed = chatInput.trim();
+                    const prompt = !typed || isWebsiteGenerationRequest(typed)
+                      ? (typed || WEBSITE_AUTOMATIONS[5].prompt)
+                      : `Build a full-stack website for ${typed}`;
+                    applyGeneratedWebsite(prompt);
+                  }}
+                  disabled={chatLoading}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30"
+                  title="Generate full-stack website"
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                </button>
+              )}
               <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Tests">
                 <TestTube2 className="h-3.5 w-3.5" />
               </button>
@@ -2564,6 +2654,33 @@ ${jsCode}
 
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {domainId === "web-development" && (
+                <div className="mb-2">
+                  <div className="mb-1 flex items-center gap-1">
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                    <span className="text-[10px] font-medium" style={{ color: currentTheme.uiColors.text }}>Website generator</span>
+                  </div>
+                  <div className="flex gap-1 overflow-x-auto">
+                    {WEBSITE_AUTOMATIONS.map((automation) => (
+                      <button
+                        key={automation.id}
+                        type="button"
+                        disabled={chatLoading}
+                        onClick={() => applyGeneratedWebsite(automation.prompt)}
+                        className="shrink-0 rounded-full px-2 py-1 text-[10px] disabled:opacity-40"
+                        style={{
+                          border: `1px solid ${currentTheme.uiColors.border}`,
+                          color: currentTheme.uiColors.text,
+                          backgroundColor: currentTheme.uiColors.bg,
+                        }}
+                        title={automation.prompt}
+                      >
+                        {automation.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
