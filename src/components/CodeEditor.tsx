@@ -22,6 +22,15 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  generateFullStackWebsite,
+  websiteFilesToTree,
+  WEBSITE_BLUEPRINTS,
+  defaultWebsiteTitle,
+  isWebsiteGenerationRequest,
+  parseWebsiteRequest,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -56,6 +65,7 @@ function deleteProject(id: string) {
 const PROJECT_TEMPLATES = [
   { id: "blank", name: "Blank Project", description: "Empty project with a single file", icon: "📄" },
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
+  { id: "fullstack-website", name: "Full-stack website", description: "Client page plus Node API", icon: "🧱" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
 ];
@@ -64,6 +74,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
   switch (templateId) {
     case "blank":
       return [{ id: "main.js", name: "main.js", type: "file", language: "javascript", content: `// ${projectName}\n// ${domain}\n\nconsole.log("Hello, World!");\n` }];
+    case "fullstack-website":
+      return websiteFilesToTree(generateFullStackWebsite({ name: projectName, kind: "landing" }).files) as FileNode[];
     case "web-app":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -486,7 +498,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Website generator** under the chat to drop a full-stack site into this project — landing page, portfolio, store, or blog. Each one includes a previewable client and a Node API.\n\nYou can also ask me to change the page. Code I write is **applied to your files**.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -863,7 +880,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !content.includes("@lunor-runtime server"))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -941,7 +958,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name, content]) => /\.(js|ts)$/.test(name) && !name.includes("/") && name !== activeTab?.name && !content.includes("@lunor-runtime server"))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1309,6 +1326,12 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      const parsed = parseWebsiteRequest(chatInput);
+      applyGeneratedWebsite(parsed.kind, parsed.name, chatInput.trim());
+      setChatInput("");
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1551,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, applyGeneratedWebsite, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -1565,6 +1588,37 @@ ${jsCode}
     saveProject({ ...proj, lastOpened: Date.now() });
     setRecentProjects(getSavedProjects());
   }, [handleSaveProject]);
+
+  const applyGeneratedWebsite = useCallback((kind: WebsiteKind, nameOverride?: string, userText?: string) => {
+    const customName = currentProjectName.replace(/\s+workspace$/i, "").trim();
+    const name = nameOverride?.trim() || (/workspace/i.test(currentProjectName) ? defaultWebsiteTitle(kind) : customName);
+    const site = generateFullStackWebsite({ name, kind });
+    const tree = websiteFilesToTree(site.files) as FileNode[];
+    const html = site.files.find((file) => file.path === "client/index.html");
+    const fileMap: Record<string, string> = {};
+    for (const file of site.files) {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop();
+      if (base && !fileMap[base]) fileMap[base] = file.content;
+    }
+    setFileTree(tree);
+    setCurrentProjectName(site.title);
+    setShowWelcome(false);
+    setShowNewProject(false);
+    if (html) {
+      setOpenTabs([{ id: html.path, name: "index.html", language: "html", content: html.content, isModified: false }]);
+      setActiveTabId(html.path);
+      setPreviewContent(buildPreviewHtml(html.content, fileMap));
+      setShowPreview(true);
+    }
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: userText || `Run the website generator: ${kind}` },
+      { role: "assistant", content: site.summary },
+    ]);
+    setShowTerminal(true);
+    setOutput((prev) => [...prev, `🌐 Website generator wrote ${site.files.length} files for ${site.title}.`, "Run the API with: node server/server.js"]);
+  }, [currentProjectName, buildPreviewHtml]);
 
   const handleCreateNewProject = useCallback(() => {
     if (!newProjectName.trim()) return;
@@ -2558,6 +2612,34 @@ ${jsCode}
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Full-stack websites</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  {WEBSITE_BLUEPRINTS.map((blueprint) => (
+                    <button
+                      key={blueprint.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => applyGeneratedWebsite(blueprint.id)}
+                      className="flex items-center gap-1.5 rounded px-2 py-1.5 text-left disabled:opacity-50"
+                      style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}
+                      title={blueprint.description}
+                    >
+                      <span className="text-sm">{blueprint.icon}</span>
+                      <span>
+                        <span className="block text-[10px] font-medium" style={{ color: currentTheme.uiColors.text }}>{blueprint.name}</span>
+                        <span className="block text-[8px]" style={{ color: currentTheme.uiColors.muted }}>{blueprint.description}</span>
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

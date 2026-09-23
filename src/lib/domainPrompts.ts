@@ -10,12 +10,22 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor. For small widgets, output ONE complete HTML file with <style> and <script> inside, wrapped in a \`\`\`html code block. NO React, TSX, or TypeScript.
+
+When the user asks for a website, landing page, portfolio, store, blog, or full-stack app, use the Website Generator contract instead. Put each path on its own line, then a fenced block:
+client/index.html
+client/styles.css
+client/app.js
+server/server.js
+server/package.json
+README.md
+
+The client is vanilla HTML, CSS, and JS and must render with sample data if fetch fails. server/server.js starts with the comment /* @lunor-runtime server */ and is a Node http server (no React) with /api/health, /api/items, /api/contact, and /api/cart, plus static files from client/.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
+      "Generate a full-stack landing page website",
+      "Generate a portfolio website with a projects API",
+      "Generate a storefront with a cart API",
+      "Generate a blog with posts from the API",
     ],
   },
   "app-development": {
