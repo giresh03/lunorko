@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { generateFullStackWebsite, parseWebsiteRequest, websiteStackPrompt } from "../../../src/lib/websiteGenerator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -828,6 +829,33 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "unknown";
 
+    if (action === "generate-website") {
+      const prompt = typeof body.prompt === "string" ? body.prompt : "";
+      const parsed = parseWebsiteRequest(prompt);
+      const requested = typeof body.template === "string" ? body.template : "";
+      const templateId = (requested || parsed?.templateId || "saas") as "portfolio" | "restaurant" | "saas" | "shop";
+      try {
+        const website = generateFullStackWebsite({
+          templateId,
+          siteName: typeof body.siteName === "string" ? body.siteName : parsed?.siteName,
+          tagline: typeof body.tagline === "string" ? body.tagline : parsed?.tagline,
+        });
+        return new Response(JSON.stringify({
+          templateId: website.templateId,
+          siteName: website.siteName,
+          tagline: website.tagline,
+          previewPath: website.previewPath,
+          summary: website.summary,
+          files: website.files,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Could not generate website" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (!apiKey) {
       return new Response(
         JSON.stringify({
@@ -865,7 +893,15 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const lastUser = Array.isArray(messages)
+        ? [...messages].reverse().find((message) => message?.role === "user")
+        : undefined;
+      const websiteIntent = domain === "web-development" && lastUser
+        ? parseWebsiteRequest(String(lastUser.content || ""))
+        : null;
+      const stackDirective = websiteIntent
+        ? `\n${websiteStackPrompt(websiteIntent.templateId)}`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
