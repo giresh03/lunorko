@@ -3,6 +3,7 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import { formatWebsiteBundle, WEBSITE_KINDS } from "@/lib/websiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,7 +29,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+      content: domainId === "web-development"
+        ? `👋 Hi! I'm your **Web Development** assistant. Ask me to code, debug, or explain — or use **Website Generator** to scaffold a full-stack site (HTML/CSS/JS client + Express API).`
+        : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -44,7 +47,17 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     const userMsg: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
+    const prompt = input;
     setInput("");
+
+    if (domainId === "web-development") {
+      const bundle = formatWebsiteBundle(prompt);
+      if (bundle) {
+        setMessages((prev) => [...prev, { role: "assistant", content: bundle }]);
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     let assistantSoFar = "";
@@ -136,7 +149,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainId]);
 
   const handleClear = () => {
     setMessages([
@@ -224,6 +237,36 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         )}
         <div ref={endRef} />
       </div>
+
+      {domainId === "web-development" && messages.length <= 1 && !isLoading && (
+        <div className="border-t border-border px-3 py-2">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-muted-foreground">Website Generator</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {WEBSITE_KINDS.map((kind) => (
+              <button
+                key={kind.id}
+                onClick={() => {
+                  const prompt = `Generate a full-stack ${kind.label.toLowerCase()} website`;
+                  const bundle = formatWebsiteBundle(prompt);
+                  if (!bundle) return;
+                  setMessages((prev) => [
+                    ...prev,
+                    { role: "user", content: prompt },
+                    { role: "assistant", content: bundle },
+                  ]);
+                }}
+                className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 transition-colors"
+                title={kind.hint}
+              >
+                {kind.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Starter Prompts */}
       {messages.length <= 1 && !isLoading && (
