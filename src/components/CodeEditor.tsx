@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  filesToFileTree,
+  generateFullStackWebsite,
+  parseWebsiteRequest,
+  type GeneratedWebsite,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
+import WebsiteGeneratorPanel from "@/components/editor/WebsiteGeneratorPanel";
 
 // -- Project types --
 interface SavedProject {
@@ -233,6 +241,10 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   
   // Fallback with readable name
   return `untitled.${ext}`;
+}
+
+function isServerOrModuleScript(content: string): boolean {
+  return /\brequire\s*\(|\bmodule\.exports\b|\bprocess\.env\b|^\s*(import|export)\s/m.test(content);
 }
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
@@ -485,8 +497,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
+  const isWebDev = domainId === "web-development";
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: isWebDev
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Website generator** below to scaffold a full-stack site — live preview, React client, and Express API — or ask me directly:\n\n**Build a portfolio website called Northstar**`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -863,7 +881,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isServerOrModuleScript(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1232,11 +1250,11 @@ ${jsCode}
     const allFiles = collectFiles(fileTree);
     const filesList = Object.entries(allFiles).map(([path, content]) => ({ path, content }));
     const isReactProject = hasJSX(filesList);
-    const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const isAppDomain = domainId === "app-development" || domainId === "web-development";
+    const runDomainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-    // For React/JSX projects: use Sandpack - runs instantly in browser
-    if (isReactProject && isAppDomain) {
+    // Sandpack is the app-development preview. Web development keeps the HTML preview,
+    // including when a generated site also contains a React client.
+    if (isReactProject && runDomainId === "app-development") {
       setShowPreview(true);
       setShowTerminal(true);
       setOutput([`$ Running ${activeTab.name}...`, "✅ Sandpack preview ready — edits auto-update"]);
@@ -1306,9 +1324,59 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const openGeneratedWebsite = useCallback((site: GeneratedWebsite, userText?: string) => {
+    const tree = filesToFileTree(site.files);
+    const preview = site.files.find((file) => file.path === site.previewPath);
+    const previewHtml = preview?.content || "";
+    setFileTree(tree as FileNode[]);
+    setOpenTabs(preview ? [{
+      id: site.previewPath,
+      name: "index.html",
+      language: "html",
+      content: previewHtml,
+      isModified: true,
+    }] : []);
+    setActiveTabId(preview ? site.previewPath : null);
+    setCurrentProjectName(site.name);
+    setShowPreview(true);
+    setPreviewContent(previewHtml);
+    setShowTerminal(true);
+    setOutput([
+      `$ Website generator · ${site.name}`,
+      `✅ ${site.files.length} files written`,
+      "🌐 Live preview is index.html",
+      "📦 client/ is the React app · server/ is the Express API",
+    ]);
+    setMessages((prev) => [
+      ...prev,
+      ...(userText ? [{ role: "user" as const, content: userText }] : []),
+      { role: "assistant" as const, content: site.summary },
+    ]);
+  }, []);
+
+  const runWebsiteAutomation = useCallback((kind: WebsiteKind, name: string) => {
+    const site = generateFullStackWebsite({
+      kind,
+      name: name.trim() || undefined,
+      brief: chatInput.trim() || undefined,
+    });
+    const userText = `Build a ${kind} website${name.trim() ? ` called ${name.trim()}` : ""}`;
+    openGeneratedWebsite(site, userText);
+    setChatInput("");
+  }, [chatInput, openGeneratedWebsite]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (isWebDev) {
+      const websiteRequest = parseWebsiteRequest(chatInput);
+      if (websiteRequest) {
+        const site = generateFullStackWebsite(websiteRequest);
+        openGeneratedWebsite(site, chatInput.trim());
+        setChatInput("");
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1596,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, isWebDev, openGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2560,6 +2628,14 @@ ${jsCode}
                   </div>
                 </div>
               </div>
+            )}
+
+            {isWebDev && (
+              <WebsiteGeneratorPanel
+                themeColors={currentTheme.uiColors}
+                disabled={chatLoading}
+                onGenerate={runWebsiteAutomation}
+              />
             )}
 
             {/* AI Input */}

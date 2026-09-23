@@ -865,7 +865,33 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const lastUserText = String([...(messages || [])].reverse().find((message) => message?.role === "user")?.content || "");
+      const fullWebsite = domain === "web-development"
+        && /\b(build|create|generate|make|scaffold|design|launch)\b/i.test(lastUserText)
+        && /\b(website|web\s*site|landing page|full[-\s]?stack)\b/i.test(lastUserText);
+      const fullStackWebsiteLayout = `
+- FULL-STACK WEBSITE. Return this layout:
+  client/index.html
+  client/styles.css
+  client/script.js
+  server/package.json
+  server/index.js
+  server/src/app.js
+  server/src/config/env.js
+  server/src/config/db.js
+  server/src/modules/site/site.routes.js
+  server/src/modules/site/site.controller.js
+  server/src/modules/site/site.service.js
+- client/ is vanilla HTML, CSS, and JavaScript. No React, JSX, or TypeScript.
+- client/index.html links styles.css and script.js.
+- client/script.js paints sample records immediately, then fetches the API.
+- server is Express ESM ("type": "module").
+- GET /api/health, GET /api/{listKey}, POST /api/{formKey}.
+- db.js reads MONGODB_URI and keeps data in memory when it is empty.
+- Do not use server/server.js or a generic /api/records route.`;
+      const stackDirective = fullWebsite
+        ? fullStackWebsiteLayout
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
