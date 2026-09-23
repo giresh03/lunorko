@@ -124,6 +124,7 @@ serve(async (req) => {
       _plan_id: plan_id,
       _order_id: razorpay_order_id,
       _payment_id: razorpay_payment_id,
+      _domain_id: domain_id,
     });
 
     if (activateError) {

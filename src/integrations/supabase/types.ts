@@ -461,6 +461,33 @@ export type Database = {
           },
         ]
       }
+      community_guidelines: {
+        Row: {
+          created_at: string
+          domain_id: string | null
+          guideline_text: string
+          id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domain_id?: string | null
+          guideline_text: string
+          id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domain_id?: string | null
+          guideline_text?: string
+          id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       community_likes: {
         Row: {
           created_at: string
@@ -537,9 +564,13 @@ export type Database = {
           id: string
           image_url: string | null
           is_pinned: boolean
+          is_removed: boolean
           likes_count: number
           post_type: string
           project_link: string | null
+          removal_reason: string | null
+          removed_at: string | null
+          removed_by: string | null
           title: string
           updated_at: string
           user_id: string
@@ -554,9 +585,13 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_pinned?: boolean
+          is_removed?: boolean
           likes_count?: number
           post_type?: string
           project_link?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -571,9 +606,13 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_pinned?: boolean
+          is_removed?: boolean
           likes_count?: number
           post_type?: string
           project_link?: string | null
+          removal_reason?: string | null
+          removed_at?: string | null
+          removed_by?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -2281,6 +2320,7 @@ export type Database = {
     Functions: {
       activate_subscription: {
         Args: {
+          _domain_id?: string
           _order_id?: string
           _payment_id?: string
           _plan_id: string

@@ -1595,7 +1595,14 @@ ${jsCode}
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "workspace_history", filter: `user_id=eq.${userId}` },
           (payload) => {
-            const row = payload.new as { files?: { path: string; language?: string; content: string }[] };
+            const row = payload.new as {
+              files?: { path: string; language?: string; content: string }[];
+              domain?: string;
+              client_id?: string;
+            };
+            // Only react to the site this workspace actually has open, otherwise an
+            // edit to another site would replace these files and drop unsaved work.
+            if (row?.domain && row.domain !== domainId) return;
             const files = Array.isArray(row?.files) ? row.files : [];
             if (!files.length) return;
             setFileTree(buildTreeFromSnapshot(files));
@@ -1617,7 +1624,7 @@ ${jsCode}
       active = false;
       void supabase.removeChannel(channel);
     };
-  }, [hardRefreshPreview]);
+  }, [hardRefreshPreview, domainId]);
 
   const copyPreviewHtml = useCallback(() => {
     if (!previewContent) return;
@@ -2197,11 +2204,13 @@ ${jsCode}
     const demo = online ? await findDemoBuild(input, domainId) : null;
     if (demo) {
       // Each demo site runs on its own live backend so users, admins and data never mix.
-      setRuntimeScope({ key: `${domainId}::demo:${demo.slug}`, name: demo.title });
+      const demoScopeKey = `${domainId}::demo:${demo.slug}`;
+      setRuntimeScope({ key: demoScopeKey, name: demo.title });
       // Load the site's sample content while the files stream in, so the very first
       // page already lists rooms / products / dishes instead of an empty state.
+      // The scope key is passed explicitly — the hook's ref still holds the old scope.
       const demoSeed = demo.seedData ?? seedForDemo(demo.slug);
-      if (demoSeed) void liveRuntime.seed(demoSeed, extractDataModel(demo.response));
+      if (demoSeed) void liveRuntime.seed(demoSeed, extractDataModel(demo.response), demoScopeKey);
       const CHUNK = 600;
       for (let i = 0; i < demo.response.length; i += CHUNK) {
         upsert(demo.response.slice(i, i + CHUNK));
