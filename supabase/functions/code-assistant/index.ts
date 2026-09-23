@@ -32,10 +32,15 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. The editor's Website Generator automation builds full websites. When the user asks to build or generate a website (landing, portfolio, blog, store, dashboard, restaurant), describe that project as:
+- src/index.html, src/style.css, src/app.js
+- server/server.cjs (Node http module only) and package.json ("start": "node server/server.cjs")
+Do not invent React for those requests.
+
+For small widgets, generate ONLY vanilla HTML, CSS, and JavaScript.
 
 FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+REQUIRED for widgets: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
 
 Example structure:
 \`\`\`html
@@ -77,7 +82,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: No React, TSX, TypeScript, or .tsx/.ts component files. For a full website, point at the Website Generator files (src/index.html, src/style.css, src/app.js, server/server.cjs). For a small widget, output one \`\`\`html code block.`;
     }
 
     if (useGoogleAI) {

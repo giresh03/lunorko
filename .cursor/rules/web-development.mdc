@@ -15,6 +15,15 @@ When the prompt mentions **MERN**, **MongoDB**, **Express**, **Node.js** (backen
 - Official docs: `docs/mern-stack/official-docs.md`
 - Follow official Node, Express, MongoDB, React documentation conventions
 
+## Website Generator (Web Development assistant)
+
+When the prompt is about building a website in the Web Development domain, use the in-editor automation in `src/lib/websiteGenerator.ts`.
+
+- Blueprints: landing, portfolio, blog, store, dashboard, restaurant
+- Frontend files: `src/index.html`, `src/style.css`, `src/app.js` (vanilla, previewable)
+- API: `server/server.cjs` using Node's `http` module only, plus `package.json` with `npm start`
+- The Web Development AI assistant mounts these files and opens the preview. Sample data in `app.js` covers preview; live JSON comes from `/api` after `npm start`.
+
 ## Theme & Style
 
 - **Design system**: Radix UI + shadcn/ui (radix-nova style)
