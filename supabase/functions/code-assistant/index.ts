@@ -32,24 +32,20 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+For small widgets (counter, form, calculator): output ONE complete HTML file with <style> and <script> inside a \`\`\`html block. No React, JSX, TSX, or TypeScript.
 
-Example structure:
-\`\`\`html
-<!DOCTYPE html>
-<html>
-<head><style>/* CSS here */</style></head>
-<body>
-  <!-- HTML here -->
-  <script>/* JavaScript here */</script>
-</body>
-</html>
-\`\`\`
+WEBSITE GENERATOR — when the user asks for a website, landing page, portfolio, store, blog, or full-stack app, output these files. Put the path on its own line immediately before each fence:
+client/index.html
+client/styles.css
+client/app.js
+server/server.js
+server/package.json
+README.md
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Client rules: vanilla HTML/CSS/JS only. The page must render with embedded sample data when fetch() fails so the editor preview works offline.
+Server rules: Node http (CommonJS). The first line of server/server.js is /* @lunor-runtime server */. Serve static files from ../client. Include GET /api/health, GET /api/items, POST /api/contact, GET/POST /api/cart. No React.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -73,11 +69,11 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
+    // For web-development: keep widgets as one HTML file; websites use the multi-file contract
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: Do not output React, TSX, or TypeScript. A single widget is one \`\`\`html file. A website or full-stack request uses client/index.html, client/styles.css, client/app.js, and server/server.js (first line /* @lunor-runtime server */).`;
     }
 
     if (useGoogleAI) {

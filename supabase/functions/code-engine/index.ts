@@ -542,6 +542,7 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITE GENERATOR** — When the user asks for a website, landing page, portfolio, store, blog, or full-stack app, ALSO write these files. Put the path on its own line immediately before each fence: client/index.html, client/styles.css, client/app.js, server/server.js, server/package.json, README.md. The client must still be vanilla HTML/CSS/JS and must render from sample data if fetch fails. server/server.js must start with /* @lunor-runtime server */ and implement GET /api/health, GET /api/items, POST /api/contact, and GET/POST /api/cart, serving static files from the client folder. Do not use React for this contract.
 
 ${WEB_COMPONENT_REFERENCE}
 
