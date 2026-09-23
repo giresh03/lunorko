@@ -32,24 +32,18 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. Client pages use ONLY vanilla HTML, CSS, and JavaScript.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+FORBIDDEN on the client: React, JSX, TSX, TypeScript, Vue, Angular.
+For a small widget, return one \`\`\`html file with <style> and <script> inside.
 
-Example structure:
-\`\`\`html
-<!DOCTYPE html>
-<html>
-<head><style>/* CSS here */</style></head>
-<body>
-  <!-- HTML here -->
-  <script>/* JavaScript here */</script>
-</body>
-</html>
-\`\`\`
-
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+FULL-STACK WEBSITE GENERATOR:
+When the user asks for a website, landing page, portfolio, blog, store, dashboard, or an API-backed page, write a full-stack starter:
+- client/index.html, client/styles.css, client/site.js
+- server/package.json, server/index.mjs, server/src/app.mjs, server/src/routes/api.mjs, server/src/data/seed.mjs, server/src/config/db.mjs
+- README.md
+Client site.js must still render if fetch('/api/...') fails. Server files are Express ESM (.mjs), not React.
+Put the path alone on the line before each code fence, such as client/index.html or server/src/routes/api.mjs.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +71,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: Client code is vanilla HTML, CSS, and JS. No React or .tsx files. A full website includes client/* plus server/*.mjs, with each path on its own line before the code fence.`;
     }
 
     if (useGoogleAI) {

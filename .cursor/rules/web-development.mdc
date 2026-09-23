@@ -6,6 +6,19 @@ alwaysApply: false
 
 # Web Development - Modern Theme & Component Patterns
 
+## Full-stack website generator
+
+The Web Development AI assistant can scaffold a full-stack site in one step. The codes live in `src/lib/websiteGenerator.ts` and the assistant panel is `src/components/editor/WebsiteGeneratorPanel.tsx` (Web Development editor only).
+
+Blueprints: SaaS landing, portfolio, blog, store, dashboard.
+
+Each blueprint writes:
+- `client/index.html`, `client/styles.css`, `client/site.js` — vanilla page the editor can preview. `site.js` calls `/api/...` and still works if that fetch fails.
+- `server/index.mjs`, `server/src/app.mjs`, `server/src/routes/api.mjs`, `server/src/data/seed.mjs`, `server/src/config/db.mjs` — Express ESM API. In-memory seed data unless `MONGODB_URI` is set.
+- `README.md` with `cd server && npm install && npm start`.
+
+When a prompt asks for a website in this domain, reuse that layout. Keep the client free of React. Put the repo path on the line above each code fence (`client/index.html`, `server/src/routes/api.mjs`).
+
 ## MERN Stack (Full-Stack)
 
 When the prompt mentions **MERN**, **MongoDB**, **Express**, **Node.js** (backend), or **full-stack JavaScript**:

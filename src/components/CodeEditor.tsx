@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import WebsiteGeneratorPanel from "@/components/editor/WebsiteGeneratorPanel";
+import {
+  applyProjectFiles,
+  describeGeneratedWebsite,
+  generateWebsiteProject,
+  normalizeSiteName,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -121,7 +129,7 @@ interface Message {
 // -- Language helpers --
 const LANG_MAP: Record<string, string> = {
   js: "javascript", ts: "typescript", py: "python", html: "html",
-  css: "css", json: "json", jsx: "javascript", tsx: "typescript",
+  css: "css", json: "json", jsx: "javascript", tsx: "typescript", mjs: "javascript",
   md: "markdown", txt: "plaintext", xml: "xml", yaml: "yaml", yml: "yaml",
   sh: "shell", bash: "shell", sql: "sql",
 };
@@ -132,7 +140,7 @@ const getLang = (name: string) => {
 const getFileIcon = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   const colors: Record<string, string> = {
-    js: "text-yellow-400", ts: "text-blue-400", py: "text-green-400",
+    js: "text-yellow-400", ts: "text-blue-400", py: "text-green-400", mjs: "text-yellow-400",
     html: "text-orange-400", css: "text-purple-400", json: "text-yellow-300",
     jsx: "text-cyan-400", tsx: "text-blue-300", md: "text-muted-foreground",
   };
@@ -237,7 +245,7 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[`*]*([\w./-]+\.[\w]+)[`*]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -247,7 +255,7 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
   }
   // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
   if (blocks.length > 0 && !blocks.some(b => b.filename)) {
-    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
+    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?([\w./-]+\.[\w]+)[`"']?/gi;
     let fnMatch;
     while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
       const unassigned = blocks.find(b => !b.filename);
@@ -486,10 +494,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n${domainName.toLowerCase().includes("web") ? "\n- **Generate a website** — open **Website** to write a full-stack client and Express API\n" : ""}\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [showWebsiteGenerator, setShowWebsiteGenerator] = useState(() => domainName.toLowerCase().includes("web"));
+  const [websiteName, setWebsiteName] = useState("Lunor Studio");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Ghost text state
@@ -888,6 +898,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   const isAppDomain = domainId === "app-development";
+  const isWebDomain = domainId === "web-development";
 
   // Update preview content with debouncing
   // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
@@ -1046,17 +1057,14 @@ ${jsCode}
     } else {
       // Different language or explicit filename — create new file
       const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[language] || language || "js";
-      const newName = filename || `untitled-${Date.now().toString(36)}.${ext}`;
-      const newId = `src/${newName}`;
-      const newNode: FileNode = { id: newId, name: newName, type: "file", language: normalizedLang || getLang(newName), content: code };
-      const newTab: OpenTab = { id: newId, name: newName, language: normalizedLang || getLang(newName), content: code, isModified: true };
-      setFileTree((prev) => {
-        const srcFolder = prev.find(n => n.id === "src" && n.type === "folder");
-        if (srcFolder) return addChild(prev, "src", newNode);
-        return [...prev, newNode];
-      });
-      setOpenTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newId);
+      const requested = filename || `untitled-${Date.now().toString(36)}.${ext}`;
+      const relative = requested.includes("/") ? requested.replace(/^\/+/, "") : `src/${requested}`;
+      const newName = relative.split("/").pop() || requested;
+      const languageName = normalizedLang || getLang(newName);
+      const newTab: OpenTab = { id: relative, name: newName, language: languageName, content: code, isModified: true };
+      setFileTree((prev) => applyProjectFiles(prev, [{ path: relative, language: languageName, content: code }]));
+      setOpenTabs((prev) => [...prev.filter((tab) => tab.id !== relative), newTab]);
+      setActiveTabId(relative);
     }
   }, [activeTabId, activeTab, updateNode, addChild]);
 
@@ -1401,37 +1409,20 @@ ${jsCode}
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
-      // Prepare all new files/updates in one pass
-      const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
-      codeBlocks.forEach((block) => {
+      const newFiles: { id: string; name: string; lang: string; code: string }[] = codeBlocks.map((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const rawName = block.filename || `untitled.${ext}`;
+        const path = rawName.includes("/") ? rawName.replace(/^\/+/, "") : `src/${rawName}`;
+        const name = path.split("/").pop() || rawName;
+        return { id: path, name, lang: normalizedLang || getLang(name), code: block.code };
       });
 
-      // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
-        });
-        return tree;
-      });
+      setFileTree((prev) => applyProjectFiles(prev, newFiles.map((file) => ({
+        path: file.id,
+        language: file.lang,
+        content: file.code,
+      }))));
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1533,6 +1524,53 @@ ${jsCode}
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
   };
+
+  const handleGenerateWebsite = useCallback((kind: WebsiteKind) => {
+    const files = generateWebsiteProject(kind, websiteName);
+    const siteLabel = normalizeSiteName(websiteName);
+    setFileTree((prev) => applyProjectFiles(prev, files));
+    const html = files.find((file) => file.path === "client/index.html");
+    const fileMap: Record<string, string> = {};
+    files.forEach((file) => {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop();
+      if (base && fileMap[base] === undefined) fileMap[base] = file.content;
+    });
+    const previewPaths = [
+      "client/index.html",
+      "client/styles.css",
+      "client/site.js",
+      "server/index.mjs",
+      "server/src/routes/api.mjs",
+    ];
+    setOpenTabs((prev) => {
+      const generated = files.filter((file) => previewPaths.includes(file.path));
+      const kept = prev.filter((tab) => !generated.some((file) => file.path === tab.id));
+      return [
+        ...kept,
+        ...generated.map((file) => ({
+          id: file.path,
+          name: file.path.split("/").pop() || file.path,
+          language: file.language,
+          content: file.content,
+          isModified: true,
+        })),
+      ];
+    });
+    if (html) {
+      setActiveTabId(html.path);
+      setPreviewContent(buildPreviewHtml(html.content, fileMap));
+      setShowPreview(true);
+    }
+    setCurrentProjectName(siteLabel);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Generate a full-stack ${kind} website named ${siteLabel}` },
+      { role: "assistant", content: describeGeneratedWebsite(kind, websiteName) },
+    ]);
+    setOutput((prev) => [...prev, `Website generator wrote ${files.length} files for ${siteLabel}.`]);
+    setShowTerminal(true);
+  }, [websiteName, buildPreviewHtml]);
 
   // -- Project management --
   const handleSaveProject = useCallback(() => {
@@ -2563,6 +2601,16 @@ ${jsCode}
             )}
 
             {/* AI Input */}
+            {isWebDomain && showWebsiteGenerator && (
+              <WebsiteGeneratorPanel
+                siteName={websiteName}
+                onSiteNameChange={setWebsiteName}
+                onGenerate={handleGenerateWebsite}
+                disabled={chatLoading}
+                themeColors={currentTheme.uiColors}
+              />
+            )}
+
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
@@ -2573,6 +2621,17 @@ ${jsCode}
                   >
                     <Ruler className="h-3 w-3" />
                     Responsive
+                  </button>
+                )}
+                {isWebDomain && (
+                  <button
+                    type="button"
+                    onClick={() => setShowWebsiteGenerator((open) => !open)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showWebsiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showWebsiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Website
                   </button>
                 )}
               </div>

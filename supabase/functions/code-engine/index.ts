@@ -542,6 +542,18 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITE GENERATOR** — When the user asks for a website, landing page, portfolio, blog, store, dashboard, or any page with a backend/API, also generate an Express API. Do NOT switch the client to React.
+    Required paths, each in its own fenced block with the path on the line immediately above the fence:
+    - client/index.html
+    - client/styles.css
+    - client/site.js (vanilla JS; if fetch('/api/...') fails, keep the visible page working with the HTML already on the page)
+    - server/package.json (type module, express + cors, start script node index.mjs)
+    - server/index.mjs
+    - server/src/app.mjs
+    - server/src/routes/api.mjs
+    - server/src/data/seed.mjs
+    - README.md explaining cd server && npm install && npm start
+    Server code is ESM JavaScript in .mjs files. Include GET /api/health and the routes that match the page (leads, projects, posts, orders, or stats).
 
 ${WEB_COMPONENT_REFERENCE}
 
