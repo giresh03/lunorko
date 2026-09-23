@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  briefFromPrompt,
+  filesToFileTree,
+  generateFullStackWebsite,
+  WEBSITE_KINDS,
+  type GeneratedWebsite,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -56,6 +64,7 @@ function deleteProject(id: string) {
 const PROJECT_TEMPLATES = [
   { id: "blank", name: "Blank Project", description: "Empty project with a single file", icon: "📄" },
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
+  { id: "fullstack-website", name: "Full-Stack Website", description: "HTML, CSS, JS and an Express API", icon: "🏗️" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
 ];
@@ -81,6 +90,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
         ]},
         { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "main": "src/server.js",\n  "scripts": { "start": "node src/server.js" }\n}\n` },
       ];
+    case "fullstack-website":
+      return filesToFileTree(generateFullStackWebsite({ kind: "landing", name: projectName }).files) as FileNode[];
     case "react":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -125,6 +136,15 @@ const LANG_MAP: Record<string, string> = {
   md: "markdown", txt: "plaintext", xml: "xml", yaml: "yaml", yml: "yaml",
   sh: "shell", bash: "shell", sql: "sql",
 };
+/** Skip Express/Mongo sources when the preview inlines every loose .js file. */
+function isNodeSource(content: string): boolean {
+  return /^\s*export\s+/m.test(content)
+    || /\brequire\s*\(/.test(content)
+    || /\bmodule\.exports\b/.test(content)
+    || /\bfrom\s+["'](?:express|mongoose|cors|dotenv)["']/.test(content)
+    || /import\s+["']dotenv\/config["']/.test(content);
+}
+
 const getLang = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   return LANG_MAP[ext] || "plaintext";
@@ -485,9 +505,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => [{
+    role: "assistant",
+    content: domainId === "web-development"
+      ? `👋 I'm your **Web Development** assistant.\n\n**Website generator** (under this chat) builds a full-stack site — HTML, CSS, and JavaScript plus an Express API — and applies the files here.\n\nYou can also ask: "Build a restaurant website called Olive & Ember".`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+  }]);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("landing");
+  const [siteName, setSiteName] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -863,7 +888,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isNodeSource(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -888,6 +913,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   const isAppDomain = domainId === "app-development";
+  const isWebDomain = domainId === "web-development";
 
   // Update preview content with debouncing
   // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
@@ -1306,9 +1332,49 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((project: GeneratedWebsite) => {
+    const tree = filesToFileTree(project.files) as FileNode[];
+    setFileTree(tree);
+    setCurrentProjectName(project.name);
+    const html = project.files.find((entry) => entry.path === "src/index.html");
+    if (html) {
+      const tab: OpenTab = { id: html.path, name: html.name, language: "html", content: html.content, isModified: true };
+      setOpenTabs([tab]);
+      setActiveTabId(html.path);
+      setShowPreview(true);
+      const map: Record<string, string> = {};
+      for (const entry of project.files) {
+        map[entry.path] = entry.content;
+        if (!map[entry.name]) map[entry.name] = entry.content;
+      }
+      setPreviewContent(buildPreviewHtml(html.content, map));
+    }
+    setOutput((prev) => [...prev, `$ Generated full-stack website "${project.name}"`, "🌐 Preview ready", "▶ npm install && npm start"]);
+    setShowTerminal(true);
+  }, [buildPreviewHtml]);
+
+  const handleGenerateSite = useCallback(() => {
+    const project = generateFullStackWebsite({ kind: siteKind, name: siteName.trim() || undefined });
+    const prompt = `Generate a full-stack ${siteKind} website${siteName.trim() ? ` called ${siteName.trim()}` : ""}`;
+    setMessages((prev) => [...prev, { role: "user", content: prompt }, { role: "assistant", content: project.assistantMessage }]);
+    applyGeneratedWebsite(project);
+  }, [siteKind, siteName, applyGeneratedWebsite]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+
+    if (domainId === "web-development") {
+      const brief = briefFromPrompt(chatInput);
+      if (brief) {
+        const project = generateFullStackWebsite(brief);
+        const userMsg: Message = { role: "user", content: chatInput };
+        setMessages((prev) => [...prev, userMsg, { role: "assistant", content: project.assistantMessage }]);
+        setChatInput("");
+        applyGeneratedWebsite(project);
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1594,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -1731,7 +1797,7 @@ ${jsCode}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-2 block">Choose Template</label>
             <div className="grid grid-cols-2 gap-2">
-              {PROJECT_TEMPLATES.map((tmpl) => (
+              {(isWebDomain ? PROJECT_TEMPLATES : PROJECT_TEMPLATES.filter((tmpl) => tmpl.id !== "fullstack-website")).map((tmpl) => (
                 <button
                   key={tmpl.id}
                   onClick={() => setNewProjectTemplate(tmpl.id)}
@@ -2558,6 +2624,51 @@ ${jsCode}
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {isWebDomain && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Website generator</span>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {WEBSITE_KINDS.map((kind) => (
+                    <button
+                      key={kind.id}
+                      type="button"
+                      onClick={() => setSiteKind(kind.id)}
+                      className="rounded-full px-2 py-0.5 text-[9px] font-medium"
+                      style={{
+                        backgroundColor: siteKind === kind.id ? currentTheme.uiColors.accent : currentTheme.uiColors.card,
+                        color: siteKind === kind.id ? "#ffffff" : currentTheme.uiColors.text,
+                        border: `1px solid ${siteKind === kind.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                      }}
+                      title={kind.hint}
+                    >
+                      {kind.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleGenerateSite()}
+                    placeholder="Site name (optional)"
+                    className="flex-1 rounded-md px-2 py-1 text-[11px] outline-none"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateSite}
+                    className="rounded-md px-2 text-[10px] font-medium"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
+                  >
+                    Generate
+                  </button>
                 </div>
               </div>
             )}

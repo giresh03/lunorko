@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
+import { briefFromPrompt, generateFullStackWebsite, WEBSITE_KINDS, type WebsiteKind } from "@/lib/websiteGenerator";
 
 interface Message {
   role: "user" | "assistant";
@@ -33,14 +34,33 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("landing");
+  const [siteName, setSiteName] = useState("");
+  const isWebDomain = domainId === "web-development";
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const publishWebsite = useCallback((prompt: string, kind?: WebsiteKind, name?: string) => {
+    const project = generateFullStackWebsite({ kind, name });
+    const userMsg: Message = { role: "user", content: prompt };
+    setMessages((prev) => [...prev, userMsg, { role: "assistant", content: project.assistantMessage }]);
+    const page = project.files.find((file) => file.path === "src/index.html");
+    if (page && onSendToEditor) onSendToEditor(page.content, "html");
+  }, [onSendToEditor]);
+
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
+    if (isWebDomain) {
+      const brief = briefFromPrompt(input);
+      if (brief) {
+        publishWebsite(input, brief.kind, brief.name);
+        setInput("");
+        return;
+      }
+    }
     const userMsg: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -136,7 +156,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainId, isWebDomain, publishWebsite]);
 
   const handleClear = () => {
     setMessages([
@@ -224,6 +244,45 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         )}
         <div ref={endRef} />
       </div>
+
+      {isWebDomain && (
+        <div className="border-t border-border px-3 py-2">
+          <div className="mb-2 flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-muted-foreground">Website generator</span>
+          </div>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {WEBSITE_KINDS.map((kind) => (
+              <button
+                key={kind.id}
+                type="button"
+                onClick={() => setSiteKind(kind.id)}
+                className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${siteKind === kind.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-secondary/50 text-secondary-foreground hover:bg-secondary"}`}
+              >
+                {kind.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") publishWebsite(`Generate a full-stack ${siteKind} website${siteName.trim() ? ` called ${siteName.trim()}` : ""}`, siteKind, siteName.trim() || undefined);
+              }}
+              placeholder="Site name (optional)"
+              className="flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <Button
+              size="sm"
+              type="button"
+              onClick={() => publishWebsite(`Generate a full-stack ${siteKind} website${siteName.trim() ? ` called ${siteName.trim()}` : ""}`, siteKind, siteName.trim() || undefined)}
+            >
+              Generate
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Starter Prompts */}
       {messages.length <= 1 && !isLoading && (
