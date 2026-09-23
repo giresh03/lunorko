@@ -32,10 +32,19 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+SMALL DEMOS: vanilla HTML, CSS, and JavaScript in one complete HTML file. No React, JSX, TSX, or TypeScript.
+
+FULL-STACK WEBSITES: when the user asks to build, create, or generate a website, landing page, or full-stack site, the Web Development assistant applies the website generator in the editor. If you still answer in chat, return separate fenced files:
+- client/index.html
+- client/styles.css
+- client/app.js
+- server/index.js (Express, ESM)
+- server/routes.js
+- server/data.js
+- package.json
+The page must work without a build step. The client may fetch /api/items and fall back to seed data.
 
 Example structure:
 \`\`\`html
@@ -49,7 +58,7 @@ Example structure:
 </html>
 \`\`\`
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Small demos still need one runnable \`\`\`html block. Website requests use the full-stack file list instead. No .tsx, .ts, or .jsx files.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +86,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: Small UI demos stay in one \`\`\`html block. A request to build a website uses the full-stack file list above (client plus Express server). Never suggest React, TSX, or TypeScript component files.`;
     }
 
     if (useGoogleAI) {
