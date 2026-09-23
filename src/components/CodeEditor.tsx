@@ -22,6 +22,12 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_TEMPLATES,
+  buildWebsiteProject,
+  describeGeneratedWebsite,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -185,6 +191,12 @@ const createDefaultProject = (domainName: string): FileNode[] => {
 };
 
 // -- Extract code blocks from markdown with filename detection --
+function isNodeServerFile(name: string, content: string): boolean {
+  const base = name.split("/").pop() || name;
+  if (base === "server.js") return true;
+  return /\brequire\s*\(|\bmodule\.exports\b|createServer\s*\(/.test(content);
+}
+
 const LANG_EXT_MAP: Record<string, string> = {
   javascript: "js", typescript: "ts", python: "py", html: "html",
   css: "css", json: "json", jsx: "jsx", tsx: "tsx", xml: "xml",
@@ -397,7 +409,7 @@ const LAYOUT_SUGGESTIONS = [
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
-  const [fileTree, setFileTree] = useState<FileNode[]>([]);
+  const [fileTree, setFileTree] = useState<FileNode[]>(() => createDefaultProject(domainName));
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
@@ -418,6 +430,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   }, []);
 
   const domainId = useMemo(() => domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), [domainName]);
+  const isWebDevDomain = domainId === "web-development";
   const snippets = useMemo(() => getSnippetsForDomain(domainId), [domainId]);
   const [output, setOutput] = useState<string[]>(["$ Ready."]);
   const [isRunning, setIsRunning] = useState(false);
@@ -486,8 +499,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: isWebDevDomain
+      ? `👋 I'm your **${domainName}** AI assistant. Ask me to generate code, debug, or explain a concept.\n\n**Website Generator** is in this panel. It scaffolds a full-stack site from built-in codes: page, styles, browser script, Node API, and \`data.json\`. The page previews here, and \`node src/server.js\` runs the API.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
+  const [showSiteGenerator, setShowSiteGenerator] = useState(false);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("landing");
+  const [siteName, setSiteName] = useState("Northwind");
+  const [siteFocus, setSiteFocus] = useState("");
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -863,7 +882,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isNodeServerFile(name, content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -888,6 +907,71 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   const isAppDomain = domainId === "app-development";
+
+  const handleGenerateWebsite = useCallback(() => {
+    const site = buildWebsiteProject({ kind: siteKind, name: siteName, focus: siteFocus });
+    const html = site.files.find((file) => file.name === "index.html");
+    let nextTree: FileNode[] = [];
+    setFileTree((prev) => {
+      const srcFiles = site.files.filter((file) => file.path.startsWith("src/"));
+      const srcFolder: FileNode = {
+        id: "src",
+        name: "src",
+        type: "folder",
+        isOpen: true,
+        children: srcFiles.map((file) => ({
+          id: file.path,
+          name: file.name,
+          type: "file" as const,
+          language: file.language,
+          content: file.content,
+        })),
+      };
+      let tree = prev.some((node) => node.id === "src")
+        ? prev.map((node) => (node.id === "src" ? srcFolder : node))
+        : [srcFolder, ...prev];
+      for (const file of site.files) {
+        if (file.path.startsWith("src/")) continue;
+        const existing = findFile(tree, file.path);
+        if (existing) {
+          tree = updateNode(tree, file.path, (node) => ({
+            ...node,
+            name: file.name,
+            language: file.language,
+            content: file.content,
+          }));
+        } else {
+          tree = [...tree, {
+            id: file.path,
+            name: file.name,
+            type: "file" as const,
+            language: file.language,
+            content: file.content,
+          }];
+        }
+      }
+      nextTree = tree;
+      return tree;
+    });
+    if (html) setPreviewContent(buildPreviewHtml(html.content, collectFiles(nextTree)));
+
+    setOpenTabs((prev) => {
+      let tabs = prev.filter((tab) => !tab.id.startsWith("src/"));
+      for (const file of site.files) {
+        const tab = { id: file.path, name: file.name, language: file.language, content: file.content, isModified: true };
+        const index = tabs.findIndex((item) => item.id === file.path);
+        if (index >= 0) tabs[index] = tab;
+        else if (file.name === "index.html" || file.name === "server.js") tabs = [...tabs, tab];
+      }
+      return tabs;
+    });
+    if (html) setActiveTabId(html.path);
+    setShowPreview(true);
+    setShowTerminal(true);
+    setOutput((prev) => [...prev, `$ Generated ${site.name} (${site.kind})`, "Open preview for the page. Run: node src/server.js"]);
+    setMessages((prev) => [...prev, { role: "assistant", content: describeGeneratedWebsite(site) }]);
+    setShowSiteGenerator(false);
+  }, [siteKind, siteName, siteFocus, findFile, updateNode, collectFiles, buildPreviewHtml]);
 
   // Update preview content with debouncing
   // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
@@ -941,7 +1025,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name, content]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && !isNodeServerFile(name, content))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -986,6 +1070,7 @@ ${jsCode}
 
   const updatePreview = useCallback(() => {
     if (!activeTab || !showPreview) return;
+    if (isNodeServerFile(activeTab.name, activeTab.content)) return;
     const allFiles = collectFiles(fileTree);
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
@@ -2562,9 +2647,76 @@ ${jsCode}
               </div>
             )}
 
+            {isWebDevDomain && showSiteGenerator && (
+              <div className="border-t overflow-y-auto shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "280px" }}>
+                <div className="px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} /> Website Generator
+                  </span>
+                  <p className="text-[8px] mt-1" style={{ color: currentTheme.uiColors.muted }}>
+                    Full-stack codes: page, styles, browser script, Node API, and data.json.
+                  </p>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-1">
+                  {WEBSITE_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => setSiteKind(template.id)}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded text-left"
+                      style={{
+                        backgroundColor: siteKind === template.id ? currentTheme.uiColors.accent + "18" : currentTheme.uiColors.card,
+                        border: `1px solid ${siteKind === template.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                      }}
+                    >
+                      <span className="text-sm">{template.icon}</span>
+                      <span>
+                        <span className="text-[9px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{template.label}</span>
+                        <span className="text-[7px]" style={{ color: currentTheme.uiColors.muted }}>{template.description}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="px-2 pb-2 space-y-1">
+                  <input
+                    value={siteName}
+                    onChange={(event) => setSiteName(event.target.value)}
+                    placeholder="Site name"
+                    className="w-full rounded-md px-2 py-1 text-[10px] outline-none"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <input
+                    value={siteFocus}
+                    onChange={(event) => setSiteFocus(event.target.value)}
+                    placeholder="Focus, for example: a bakery in Lisbon"
+                    className="w-full rounded-md px-2 py-1 text-[10px] outline-none"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateWebsite}
+                    className="w-full rounded-md px-2 py-1.5 text-[10px] font-semibold"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
+                  >
+                    Generate website
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {isWebDevDomain && (
+                  <button
+                    onClick={() => setShowSiteGenerator(!showSiteGenerator)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showSiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showSiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Websites
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}
