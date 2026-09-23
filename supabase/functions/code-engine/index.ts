@@ -865,6 +865,10 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
+      const transcript = Array.isArray(messages)
+        ? messages.map((m) => (typeof m?.content === "string" ? m.content : "")).join("\n")
+        : "";
+      const fullStackWebsite = domain === "web-development" && /full-stack website|website generator/i.test(transcript);
       const stackDirective = domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
@@ -872,6 +876,21 @@ serve(async (req) => {
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+        : domain === "web-development" && fullStackWebsite
+        ? `
+- STACK: Full-stack website. Frontend is vanilla HTML, CSS, and JS. Backend is Node.js + Express. Do NOT use React, JSX, TSX, Vue, or TypeScript.
+- Return these files and put the path on the line immediately before each fence:
+  src/index.html
+  src/styles.css
+  src/script.js
+  server/data.js
+  server/index.js
+  package.json
+  README.md
+- src/index.html links styles.css and script.js and sets window.__SITE_SEED__
+- src/script.js fetches the JSON routes and falls back to window.__SITE_SEED__ when the preview has no server
+- server/index.js serves ../src as static files and exposes the same routes as the seed
+- server/data.js uses module.exports with siteName, collections, actions, and submissions`
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.

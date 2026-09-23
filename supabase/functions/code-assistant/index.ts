@@ -35,7 +35,9 @@ serve(async (req) => {
       "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
 
 FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+For small exercises, return one complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+
+FULL-STACK WEBSITE GENERATOR: If the user asks to generate a full-stack website, return separate files with the path on the line before each fence: src/index.html, src/styles.css, src/script.js, server/data.js, server/index.js, package.json, README.md. The Express server serves the page and JSON. script.js must use window.__SITE_SEED__ when fetch fails.
 
 Example structure:
 \`\`\`html
@@ -77,7 +79,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: For ordinary UI exercises, output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files. If the user asked for a full-stack website, follow the website generator file list instead.`;
     }
 
     if (useGoogleAI) {
