@@ -592,7 +592,9 @@ const DomainDetail = () => {
                   <p className="text-sm text-muted-foreground max-w-md">
                     {isUIUXDomain
                       ? 'Figma-like visual design editor with drag & drop widgets, properties panel, layer management, and export to React + Tailwind CSS.'
-                      : `Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant — all tuned for ${domain.name}.`
+                      : domainId === "web-development"
+                        ? "Full-screen IDE with an AI assistant and a full-stack website generator. It writes the client and an Express API for landing pages, portfolios, blogs, stores, and dashboards."
+                        : `Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant — all tuned for ${domain.name}.`
                     }
                   </p>
                   <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
