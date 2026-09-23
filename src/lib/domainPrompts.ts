@@ -10,12 +10,21 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor. The live preview is vanilla HTML, CSS, and JavaScript — no React, TSX, or TypeScript for the page itself.
+
+For a small widget, return one \`\`\`html file with <style> and <script> inside.
+
+For a full website, portfolio, SaaS page, restaurant, store, or full-stack/MERN request, use the full-stack website layout. Put the path on its own line before each fence:
+- client/index.html, client/styles.css, client/script.js (preview)
+- server/index.js, server/src/app.js, server/src/config/db.js
+- server/src/modules/site/site.routes.js, site.controller.js, site.service.js
+- server/package.json, package.json, .env.example, README.md
+Server code is ESM Express. MongoDB is optional: if MONGODB_URI is missing, keep data in memory. client/script.js must render sample data when fetch fails and call the same /api routes the server implements.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
+      "Generate a full-stack portfolio website",
+      "Build a SaaS landing page with a leads API",
+      "Create a restaurant site with a menu API",
+      "Scaffold an online store with an orders API",
     ],
   },
   "app-development": {

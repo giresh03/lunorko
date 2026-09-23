@@ -32,10 +32,11 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. The live preview uses vanilla HTML, CSS, and JavaScript.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+FORBIDDEN for the page: React, JSX, TSX, TypeScript, Vue, Angular, component files.
+For a small demo, return one complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+For a full website or API, also return client/ and server/ files as described in the reminder below.
 
 Example structure:
 \`\`\`html
@@ -77,7 +78,9 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: The live preview is vanilla HTML/CSS/JS. No React, TSX, or TypeScript components.
+
+When the user asks for a full website, portfolio, SaaS, restaurant, store, or full-stack/MERN app, also emit Express server files. Put the path on the line before each fence: client/index.html, client/styles.css, client/script.js, server/index.js, server/src/app.js, server/src/config/db.js, server/src/modules/site/site.routes.js, server/src/modules/site/site.controller.js, server/src/modules/site/site.service.js, server/package.json, package.json, .env.example, README.md. Use ESM. If MONGODB_URI is missing, keep data in memory. The browser script must still render with sample data when the API is offline.`;
     }
 
     if (useGoogleAI) {

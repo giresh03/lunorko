@@ -507,10 +507,11 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
 
-CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, TypeScript, or any framework. Use ONLY:
-- index.html
-- styles.css
-- script.js
+CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, or TypeScript for the page. The preview files are:
+- index.html (or client/index.html)
+- styles.css (or client/styles.css)
+- script.js (or client/script.js)
+For a full website or API, also include the Express server files from rule 11. Do not replace the preview with React.
 
 RULES:
 1. **HTML only** — semantic HTML5, no JSX or React. No import statements. No components.
@@ -542,6 +543,7 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITES** — When the user asks for a website, portfolio, SaaS, restaurant, store, landing page, MERN, or API, keep the visual page as vanilla HTML/CSS/JS and ALSO emit an Express API. Paths go on their own line before each code fence: client/index.html, client/styles.css, client/script.js, server/index.js, server/src/app.js, server/src/config/db.js, server/src/modules/site/site.routes.js, server/src/modules/site/site.controller.js, server/src/modules/site/site.service.js, server/package.json, package.json, .env.example, README.md. Use ESM. If MONGODB_URI is missing, store data in memory. client/script.js must still render sample data when fetch fails.
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -874,9 +876,25 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
-- index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
+- STACK: HTML + CSS + JS for the live preview. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript for the page.
+- Small UI requests: return exactly 3 files named index.html, styles.css, script.js
+- FULL WEBSITE requests (website, portfolio, SaaS, restaurant, store, landing page, full-stack, MERN, API): also emit the Express API. Put each path on its own line immediately before the fence:
+  client/index.html
+  client/styles.css
+  client/script.js
+  server/package.json
+  server/index.js
+  server/src/app.js
+  server/src/config/db.js
+  server/src/modules/site/site.routes.js
+  server/src/modules/site/site.controller.js
+  server/src/modules/site/site.service.js
+  package.json
+  .env.example
+  README.md
+- Server files use ESM (import/export) and Express. If MONGODB_URI is missing, store data in memory.
+- client/script.js must render sample data when fetch fails, and call the same /api routes the server exposes.
+- client/index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image

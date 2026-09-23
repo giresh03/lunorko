@@ -62,10 +62,19 @@ const RunLocallyDialog = ({
 
   const files = collectFiles(fileTree);
   const isReact = hasJSX(files);
+  const isFullStack = files.some((f) => f.path === "server/package.json" || f.path.endsWith("/server/package.json"));
   const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   const safeName = projectName.replace(/[^a-z0-9-_]/gi, "-").toLowerCase() || "my-app";
-  const runCommands = isReact
+  const runCommands = isFullStack
+    ? `cd ${safeName}/server
+npm install
+npm start
+
+# second terminal — static site
+cd ${safeName}
+npx serve client`
+    : isReact
     ? `cd ${safeName}
 npm install
 npm run dev`
@@ -252,7 +261,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Download your project and run it on your machine.{" "}
-            {isReact
+            {isFullStack
+              ? "Includes the Express API in server/ and the site in client/."
+              : isReact
               ? "Includes Vite + React setup — runs on http://localhost:5173"
               : "Static HTML/CSS/JS — open index.html or use a local server."}
           </p>
