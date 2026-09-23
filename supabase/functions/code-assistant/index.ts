@@ -49,7 +49,9 @@ Example structure:
 </html>
 \`\`\`
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.
+
+FULL-STACK WEBSITE GENERATOR: If the user asks to generate a full-stack website (landing, portfolio, restaurant, store, blog, or dashboard), the editor writes client/index.html, client/styles.css, client/app.js, server/server.js, server/package.json, and README.md. Run it with node server/server.js. Routes: GET /api/health, GET /api/items, GET /api/plans, POST /api/contact, GET /api/cart, POST /api/cart. client/app.js uses SEED when fetch fails. Keep your answer aligned with that layout instead of replacing it with one HTML file.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +79,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files. If the user asks for a full-stack website, describe the local generator files (client/index.html, client/styles.css, client/app.js, server/server.js) instead of collapsing them into one HTML file.`;
     }
 
     if (useGoogleAI) {

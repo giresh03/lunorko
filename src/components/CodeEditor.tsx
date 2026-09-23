@@ -22,6 +22,15 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_BLUEPRINTS,
+  defaultWebsiteTitle,
+  generateFullStackWebsite,
+  isServerRuntimeSource,
+  parseWebsiteRequest,
+  websiteFilesToTree,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -58,6 +67,7 @@ const PROJECT_TEMPLATES = [
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
+  { id: "full-stack-site", name: "Full-Stack Site", description: "Client, Node API, and preview", icon: "🧱" },
 ];
 
 function createProjectFromTemplate(templateId: string, projectName: string, domain: string): FileNode[] {
@@ -90,6 +100,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
         ]},
         { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "dependencies": { "react": "^18.2.0", "react-dom": "^18.2.0" }\n}\n` },
       ];
+    case "full-stack-site":
+      return websiteFilesToTree(generateFullStackWebsite({ kind: "landing", name: projectName }).files) as FileNode[];
     default:
       return createDefaultProject(domain);
   }
@@ -395,6 +407,46 @@ const LAYOUT_SUGGESTIONS = [
   { id: "form", icon: "📝", label: "Adaptive Form", desc: "Keyboard-aware", prompt: "Generate a keyboard-aware form with TextInput fields, validation, and proper spacing that adapts to screen size" },
 ];
 
+function WebsiteGeneratorPanel({
+  accent,
+  border,
+  text,
+  muted,
+  card,
+  onGenerate,
+}: {
+  accent: string;
+  border: string;
+  text: string;
+  muted: string;
+  card: string;
+  onGenerate: (kind: WebsiteKind) => void;
+}) {
+  return (
+    <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: border, backgroundColor: card }}>
+      <p className="text-[10px] font-semibold mb-1.5" style={{ color: text }}>Full-stack websites</p>
+      <div className="grid grid-cols-3 gap-1">
+        {WEBSITE_BLUEPRINTS.map((blueprint) => (
+          <button
+            key={blueprint.kind}
+            type="button"
+            onClick={() => onGenerate(blueprint.kind)}
+            className="rounded px-1.5 py-1 text-left transition-colors"
+            style={{ backgroundColor: card, border: `1px solid ${border}`, color: text }}
+            title={blueprint.description}
+          >
+            <span className="block text-[10px] font-medium">{blueprint.label}</span>
+            <span className="block text-[8px]" style={{ color: muted }}>{blueprint.description}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-1.5 text-[8px]" style={{ color: muted }}>
+        Or ask: <span style={{ color: accent }}>Generate a full-stack restaurant website for Hearth & Rye</span>
+      </p>
+    </div>
+  );
+}
+
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
@@ -485,9 +537,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => [{
+    role: "assistant",
+    content: domainId === "web-development"
+      ? `👋 I'm your **Web Development** AI assistant.\n\n- **Full-stack websites** — landing, portfolio, restaurant, store, blog, or dashboard. I write the client and Node API into the project and open the preview.\n- **Generate other code** — it is applied to your files\n- **Debug and explain** — with examples\n\nTry: "Generate a full-stack restaurant website for Hearth & Rye".`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+  }]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -840,7 +895,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     let cssMatch;
     while ((cssMatch = cssLinkRegex.exec(htmlContent)) !== null) {
       const cssFileName = cssMatch[1].split("/").pop() || "";
-      if (allFiles[cssFileName]) {
+      if (allFiles[cssFileName] && !isServerRuntimeSource(allFiles[cssFileName])) {
         html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${allFiles[cssFileName]}</style>`);
         injectedFiles.add(cssFileName);
       }
@@ -851,7 +906,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     let jsMatch;
     while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
+      if (allFiles[jsFileName] && !isServerRuntimeSource(allFiles[jsFileName])) {
         html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
         injectedFiles.add(jsFileName);
       }
@@ -859,11 +914,11 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 
     // Also inject any remaining CSS/JS files that weren't explicitly referenced
     const remainingCss = Object.entries(allFiles)
-      .filter(([name]) => name.endsWith(".css") && !injectedFiles.has(name) && !name.includes("/"))
+      .filter(([name, content]) => name.endsWith(".css") && !injectedFiles.has(name) && !name.includes("/") && !isServerRuntimeSource(content))
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isServerRuntimeSource(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -894,7 +949,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   const buildVanillaJsPreview = useCallback((jsCode: string, allFiles: Record<string, string>) => {
     // Collect all CSS from project
     const allCss = Object.entries(allFiles)
-      .filter(([name]) => name.endsWith(".css"))
+      .filter(([name, content]) => name.endsWith(".css") && !isServerRuntimeSource(content))
       .map(([, content]) => content)
       .join("\n");
 
@@ -941,7 +996,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name, content]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && !isServerRuntimeSource(content))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1306,6 +1361,44 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((kind: WebsiteKind, name: string) => {
+    const site = generateFullStackWebsite({ kind, name });
+    const tree = websiteFilesToTree(site.files) as FileNode[];
+    setFileTree(tree);
+    setCurrentProjectName(site.title);
+    setShowWelcome(false);
+    setShowNewProject(false);
+    const htmlFile = site.files.find((file) => file.path === "client/index.html");
+    if (htmlFile) {
+      setOpenTabs([{
+        id: "client/index.html",
+        name: "index.html",
+        language: "html",
+        content: htmlFile.content,
+        isModified: true,
+      }]);
+      setActiveTabId("client/index.html");
+      const allFiles: Record<string, string> = {};
+      for (const file of site.files) {
+        allFiles[file.path] = file.content;
+        const base = file.path.split("/").pop() || file.path;
+        if (!allFiles[base]) allFiles[base] = file.content;
+      }
+      setPreviewContent(buildPreviewHtml(htmlFile.content, allFiles));
+      setShowPreview(true);
+    }
+    const fileList = site.files.map((file) => `- \`${file.path}\``).join("\n");
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `Built a full-stack **${kind}** website called **${site.title}** and opened the preview.\n\n${fileList}\n\nRun \`node server/server.js\`, then use:\n- \`GET /api/health\`\n- \`GET /api/items\`\n- \`GET /api/plans\`\n- \`POST /api/contact\`\n- \`GET /api/cart\`\n- \`POST /api/cart\`\n\nThe preview uses \`SEED\` in \`client/app.js\` until that server is running.`,
+      },
+    ]);
+    setOutput((prev) => [...prev, `🌐 Generated full-stack ${kind} website "${site.title}".`]);
+    setShowTerminal(true);
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
@@ -1314,7 +1407,17 @@ ${jsCode}
     const userMsg: Message = { role: "user", content: chatInput };
     const updated = [...messages, userMsg];
     setMessages(updated);
+    const prompt = chatInput;
     setChatInput("");
+
+    if (domainId === "web-development") {
+      const request = parseWebsiteRequest(prompt);
+      if (request) {
+        applyGeneratedWebsite(request.kind, request.name);
+        return;
+      }
+    }
+
     setChatLoading(true);
     let assistantSoFar = "";
 
@@ -1528,7 +1631,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -1731,7 +1834,7 @@ ${jsCode}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-2 block">Choose Template</label>
             <div className="grid grid-cols-2 gap-2">
-              {PROJECT_TEMPLATES.map((tmpl) => (
+              {(domainId === "web-development" ? PROJECT_TEMPLATES : PROJECT_TEMPLATES.filter((tmpl) => tmpl.id !== "full-stack-site")).map((tmpl) => (
                 <button
                   key={tmpl.id}
                   onClick={() => setNewProjectTemplate(tmpl.id)}
@@ -2560,6 +2663,25 @@ ${jsCode}
                   </div>
                 </div>
               </div>
+            )}
+
+            {domainId === "web-development" && (
+              <WebsiteGeneratorPanel
+                accent={currentTheme.uiColors.accent}
+                border={currentTheme.uiColors.border}
+                text={currentTheme.uiColors.text}
+                muted={currentTheme.uiColors.muted}
+                card={currentTheme.uiColors.card}
+                onGenerate={(kind) => {
+                  const blueprint = WEBSITE_BLUEPRINTS.find((item) => item.kind === kind);
+                  const title = defaultWebsiteTitle(kind);
+                  setMessages((prev) => [
+                    ...prev,
+                    { role: "user", content: `Generate a full-stack ${blueprint?.label.toLowerCase() ?? kind} website for ${title}` },
+                  ]);
+                  applyGeneratedWebsite(kind, title);
+                }}
+              />
             )}
 
             {/* AI Input */}
