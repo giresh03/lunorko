@@ -32,10 +32,14 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. You generate vanilla HTML, CSS, and JavaScript.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+FULL-STACK WEBSITE MODE: If the user asks to build, create, or generate a website, also return these files. Put the path on its own line before each fence: client/index.html, client/styles.css, client/app.js, server/data/site.js, server/server.js, package.json, README.md. app.js must fetch GET /api/site and fall back to embedded data so the preview still runs. server/server.js is an ESM Node http server with no npm dependencies: serve client/, GET /api/health, GET /api/site, POST /api/contact, and reject paths that contain "..". package.json uses "type": "module" and "start": "node server/server.js".
+
+For every other UI request, generate ONLY vanilla HTML, CSS, and JavaScript.
+
+FORBIDDEN outside full-stack website mode: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
+Outside full-stack website mode, REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
 
 Example structure:
 \`\`\`html
@@ -77,7 +81,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: For ordinary UI, output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files. If the user asked for a website, follow FULL-STACK WEBSITE MODE instead of the single-file rule.`;
     }
 
     if (useGoogleAI) {
