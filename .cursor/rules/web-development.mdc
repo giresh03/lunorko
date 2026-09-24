@@ -15,6 +15,16 @@ When the prompt mentions **MERN**, **MongoDB**, **Express**, **Node.js** (backen
 - Official docs: `docs/mern-stack/official-docs.md`
 - Follow official Node, Express, MongoDB, React documentation conventions
 
+## Full-stack website automation
+
+The Web Development AI assistant generates a runnable site from `src/lib/websiteGenerator.ts` when a learner asks to build a website. It writes:
+
+- `src/index.html`, `src/style.css`, `src/app.js` — browser client, previewed in the editor
+- `src/server.js` — Express API (`GET /api/health`, `GET /api/items`, `POST /api/items`, `POST /api/contact`)
+- `package.json`, `README.md`
+
+`app.js` must stay browser-only and fall back when `/api/items` is unavailable. Do not inject `server.js` into the preview. Small UI requests still use one vanilla HTML file.
+
 ## Theme & Style
 
 - **Design system**: Radix UI + shadcn/ui (radix-nova style)

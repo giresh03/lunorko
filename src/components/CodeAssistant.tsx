@@ -3,6 +3,7 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import { formatWebsiteForChat, generateFullStackWebsite, isWebsiteGenerationRequest } from "@/lib/websiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -46,6 +47,13 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     setMessages(updatedMessages);
     setInput("");
     setIsLoading(true);
+
+    if (domainId === "web-development" && isWebsiteGenerationRequest(input)) {
+      const project = generateFullStackWebsite(input);
+      setMessages((prev) => [...prev, { role: "assistant", content: formatWebsiteForChat(project) }]);
+      setIsLoading(false);
+      return;
+    }
 
     let assistantSoFar = "";
 
@@ -136,13 +144,15 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainName, domainId]);
 
   const handleClear = () => {
     setMessages([
       {
         role: "assistant",
-        content: `👋 Chat cleared! I'm your **${domainName}** AI assistant. How can I help?`,
+        content: domainId === "web-development"
+          ? `👋 Chat cleared. Ask me to build a website and I'll write the HTML client and Express API.`
+          : `👋 Chat cleared! I'm your **${domainName}** AI assistant. How can I help?`,
       },
     ]);
   };

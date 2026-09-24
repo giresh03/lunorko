@@ -865,7 +865,20 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const lastUserText = Array.isArray(messages)
+        ? [...messages].reverse().find((m) => m?.role === "user")?.content || ""
+        : "";
+      const websiteRequest = domain === "web-development"
+        && /\b(build|create|make|generate|design|scaffold)\b/i.test(lastUserText)
+        && /\b(website|web\s*site|landing\s*page|full[-\s]?stack)\b/i.test(lastUserText);
+      const stackDirective = websiteRequest
+        ? `
+- FULL-STACK WEBSITE: return exactly these files, each with the filename alone on the line before the fence: index.html, style.css, app.js, server.js, package.json, README.md
+- index.html links style.css and app.js. No React, JSX, or TypeScript.
+- app.js is browser-only. It fetches GET /api/items and falls back to embedded seed data if the request fails.
+- server.js uses require("express") and require("cors"). Routes: GET /api/health, GET /api/items, POST /api/items, POST /api/contact. Serve static files from __dirname.
+- package.json start script is "node src/server.js" and depends on express and cors.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
