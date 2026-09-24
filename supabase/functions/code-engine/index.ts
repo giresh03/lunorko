@@ -542,6 +542,7 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITE GENERATOR** — When the user asks to build a website, landing page, portfolio, blog, restaurant, store, dashboard, or full-stack app, ALSO return server/server.js, package.json, and README.md. server/server.js uses only Node built-ins (node:http, node:fs/promises, node:path, node:url), enables CORS, serves the client folder, and exposes JSON under /api/. script.js must fetch http://localhost:3000 and fall back to embedded sample data. No Express, no React, no npm dependencies.
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -865,6 +866,10 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
+      const lastUserText = (messages || []).filter((m) => m.role === "user").map((m) => m.content || "").join("\n");
+      const fullStackWebsite = domain === "web-development"
+        && /\b(build|create|generate|make|scaffold)\b/i.test(lastUserText)
+        && /(website|web site|landing page|full[-\s]?stack|portfolio|restaurant|saas|blog|dashboard|online store)/i.test(lastUserText);
       const stackDirective = domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
@@ -872,6 +877,14 @@ serve(async (req) => {
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+        : fullStackWebsite
+        ? `
+- FULL-STACK WEBSITE. Do NOT generate React, JSX, TSX, Vue, or TypeScript.
+- Return these files: client/index.html, client/styles.css, client/script.js, server/server.js, package.json, README.md
+- client/index.html links styles.css and script.js and includes a real hero image
+- client/script.js fetches http://localhost:3000/api/... and falls back to embedded sample data
+- server/server.js uses only Node built-ins, enables CORS, serves ../client, and implements the JSON routes the page calls
+- package.json: { "type": "module", "scripts": { "start": "node server/server.js" } }`
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.

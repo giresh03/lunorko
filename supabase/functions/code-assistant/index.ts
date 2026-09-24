@@ -32,24 +32,25 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+Small UI demos: vanilla HTML, CSS, and JavaScript only. No React, JSX, TSX, TypeScript, Vue, or Angular. Prefer one complete HTML file, or index.html + styles.css + script.js.
 
-Example structure:
-\`\`\`html
-<!DOCTYPE html>
-<html>
-<head><style>/* CSS here */</style></head>
-<body>
-  <!-- HTML here -->
-  <script>/* JavaScript here */</script>
-</body>
-</html>
-\`\`\`
+FULL-STACK WEBSITE GENERATOR — when the user asks to build a website, landing page, portfolio, blog, restaurant, store, dashboard, or full-stack app, return these files and nothing framework-based:
+- client/index.html
+- client/styles.css
+- client/script.js
+- server/server.js
+- package.json
+- README.md
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Rules for that mode:
+- index.html links styles.css and script.js by filename.
+- script.js calls fetch("http://localhost:3000/api/...") and falls back to embedded sample data so the in-editor preview works with the API offline.
+- server/server.js uses only Node built-ins (node:http, node:fs/promises, node:path, node:url). No Express and no npm dependencies.
+- The server enables CORS, serves ../client as static files, and exposes JSON routes under /api/.
+- package.json is { "type": "module", "scripts": { "start": "node server/server.js" } }.
+- Format every file as a path line, then a fenced code block.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -73,11 +74,18 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
+    // For web-development: keep snippets in HTML, and switch to the full-stack file contract for websites.
     if (domain === "web-development") {
-      systemPrompt += `
+      const lastUser = (messages || []).filter((m: { role?: string }) => m.role === "user").map((m: { content?: string }) => m.content || "").join("\n");
+      const fullStackWebsite = /\b(build|create|generate|make|scaffold)\b/i.test(lastUser)
+        && /(website|web site|landing page|full[-\s]?stack|portfolio|restaurant|saas|blog|dashboard|online store)/i.test(lastUser);
+      systemPrompt += fullStackWebsite
+        ? `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: This is a full-stack website request. Return client/index.html, client/styles.css, client/script.js, server/server.js, package.json, and README.md. Node built-ins only. No React.`
+        : `
+
+REMINDER: For this small UI request, output vanilla HTML/CSS/JS. No React, TSX, TypeScript, or component files.`;
     }
 
     if (useGoogleAI) {

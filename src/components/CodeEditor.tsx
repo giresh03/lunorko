@@ -22,6 +22,12 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  buildWebsiteProject,
+  detectWebsiteRequest,
+  extractSiteName,
+  WEBSITE_BLUEPRINTS,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -485,9 +491,17 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
+  const isWebDevDomain = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === "web-development";
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: isWebDevDomain
+        ? `👋 I'm your **${domainName}** AI assistant.\n\n**Website generator** scaffolds a full-stack site in the editor: a previewable client plus a Node API (\`server/server.js\`). Pick a blueprint below, or ask me to build a portfolio, SaaS page, blog, restaurant, store, or dashboard.\n\nThe page works before the server is running. Start the API with \`node server/server.js\`.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
+  const [siteName, setSiteName] = useState("Lunor Studio");
+  const [showSiteGen, setShowSiteGen] = useState(true);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -863,7 +877,13 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => {
+        if (!/\.(js|ts)$/.test(name) || injectedFiles.has(name) || name.includes("/") || name.endsWith(".html")) return false;
+        // Keep Node API files out of the browser preview.
+        if (/server\.(m|c)?js$/i.test(name)) return false;
+        if (/\b(createServer|from\s+["']node:|require\()\b/.test(content)) return false;
+        return true;
+      })
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1306,13 +1326,57 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyWebsiteBlueprint = useCallback((kind: string, name: string, options?: { announce?: boolean }) => {
+    const project = buildWebsiteProject(kind, name);
+    setFileTree(project.tree);
+    setCurrentProjectName(project.siteName);
+    setShowWelcome(false);
+    const htmlFile = project.files.find((file) => file.path === "client/index.html");
+    const fileMap: Record<string, string> = {};
+    for (const file of project.files) {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop();
+      if (base && !fileMap[base]) fileMap[base] = file.content;
+    }
+    if (htmlFile) {
+      setOpenTabs([{
+        id: "client/index.html",
+        name: "index.html",
+        language: "html",
+        content: htmlFile.content,
+        isModified: true,
+      }]);
+      setActiveTabId("client/index.html");
+      setShowPreview(true);
+      setPreviewDevice("desktop");
+      setPreviewContent(buildPreviewHtml(htmlFile.content, fileMap));
+    }
+    setShowTerminal(true);
+    setOutput((prev) => [
+      ...prev,
+      `✦ Full-stack ${project.label} “${project.siteName}” written to the editor.`,
+      "$ node server/server.js",
+    ]);
+    if (options?.announce !== false) {
+      setMessages((prev) => [...prev, { role: "assistant", content: project.summary }]);
+    }
+    return project.summary;
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    const websiteKind = isWebDevDomain ? detectWebsiteRequest(chatInput) : null;
+    const requestedName = extractSiteName(chatInput) || siteName;
+    const websiteSummary = websiteKind ? applyWebsiteBlueprint(websiteKind, requestedName, { announce: false }) : "";
+    const websiteNote = websiteKind
+      ? `\n\n[Website generator already wrote a full-stack ${websiteKind} scaffold named "${requestedName}". Files: client/index.html, client/styles.css, client/script.js, server/server.js, package.json, README.md. Refine those paths. Keep the Node built-in server and the offline fallback data in script.js.]`
+      : "";
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
-    const updated = [...messages, userMsg];
+    const scaffoldMsg: Message | null = websiteSummary ? { role: "assistant", content: websiteSummary } : null;
+    const updated = scaffoldMsg ? [...messages, userMsg, scaffoldMsg] : [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
     setChatLoading(true);
@@ -1341,7 +1405,7 @@ ${jsCode}
         // Append file context to the last user message for AI awareness
         const messagesWithContext = updated.map((m, i) => {
           if (i === updated.length - 1 && m.role === "user") {
-            return { role: m.role, content: m.content + fileContext };
+            return { role: m.role, content: m.content + websiteNote + fileContext };
           }
           return { role: m.role, content: m.content };
         });
@@ -1528,7 +1592,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, isWebDevDomain, siteName, applyWebsiteBlueprint]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2562,9 +2626,58 @@ ${jsCode}
               </div>
             )}
 
+            {isWebDevDomain && showSiteGen && (
+              <div className="border-t shrink-0 overflow-y-auto" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "220px" }}>
+                <div className="px-3 py-2 flex items-center justify-between border-b" style={{ borderColor: currentTheme.uiColors.border }}>
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                    Website generator
+                  </span>
+                  <span className="text-[9px]" style={{ color: currentTheme.uiColors.muted }}>Client + Node API</span>
+                </div>
+                <div className="px-3 py-2">
+                  <input
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    placeholder="Site name"
+                    className="w-full rounded-md px-2 py-1 text-[11px] outline-none mb-2"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <div className="grid grid-cols-2 gap-1">
+                    {WEBSITE_BLUEPRINTS.map((blueprint) => (
+                      <button
+                        key={blueprint.id}
+                        type="button"
+                        onClick={() => applyWebsiteBlueprint(blueprint.id, siteName)}
+                        className="flex items-start gap-1.5 px-2 py-1.5 rounded text-left"
+                        style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}
+                      >
+                        <span className="text-xs" style={{ color: currentTheme.uiColors.accent }}>{blueprint.icon}</span>
+                        <span>
+                          <span className="text-[10px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{blueprint.label}</span>
+                          <span className="text-[8px] block" style={{ color: currentTheme.uiColors.muted }}>{blueprint.description}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {isWebDevDomain && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSiteGen(!showSiteGen)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
+                    style={{ color: showSiteGen ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showSiteGen ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Websites
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}
