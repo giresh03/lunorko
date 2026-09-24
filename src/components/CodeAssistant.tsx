@@ -5,6 +5,14 @@ import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  detectWebsiteRequest,
+  formatWebsiteAssistantMessage,
+  generateFullStackWebsite,
+  WEBSITE_BLUEPRINTS,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
+import WebsiteGeneratorBar from "@/components/editor/WebsiteGeneratorBar";
 
 interface Message {
   role: "user" | "assistant";
@@ -28,7 +36,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+      content: domainId === "web-development"
+        ? `👋 Hi! I'm your **${domainName}** AI assistant. Use **Website generator** below to scaffold a full-stack site (React + Express) — landing, portfolio, blog, store, or dashboard. You can also ask me to build a full-stack website by name.`
+        : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -36,11 +46,36 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages]);
+
+  const runWebsiteGenerator = useCallback((kind: WebsiteKind, title?: string, userText?: string) => {
+    const site = generateFullStackWebsite(kind, title);
+    const blueprint = WEBSITE_BLUEPRINTS.find((item) => item.id === kind);
+    const prompt = userText
+      || (title
+        ? `Build a full-stack ${site.kindLabel.toLowerCase()} website called ${site.title}`
+        : (blueprint?.prompt ?? "Build a full-stack website"));
+    const assistant = formatWebsiteAssistantMessage(site);
+    setMessages((prev) => {
+      const last = prev[prev.length - 1];
+      const withUser = last?.role === "user" && last.content === prompt ? prev : [...prev, { role: "user" as const, content: prompt }];
+      return [...withUser, { role: "assistant" as const, content: assistant }];
+    });
+    const preview = site.files.find((entry) => entry.path === "preview.html");
+    if (preview && onSendToEditor) onSendToEditor(preview.content, "html");
+  }, [onSendToEditor]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
+    if (domainId === "web-development") {
+      const detected = detectWebsiteRequest(input);
+      if (detected) {
+        setInput("");
+        runWebsiteGenerator(detected.kind, detected.title, input);
+        return;
+      }
+    }
     const userMsg: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -136,7 +171,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainId, runWebsiteGenerator]);
 
   const handleClear = () => {
     setMessages([
@@ -224,6 +259,10 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         )}
         <div ref={endRef} />
       </div>
+
+      {domainId === "web-development" && (
+        <WebsiteGeneratorBar disabled={isLoading} onGenerate={(kind) => runWebsiteGenerator(kind)} />
+      )}
 
       {/* Starter Prompts */}
       {messages.length <= 1 && !isLoading && (
