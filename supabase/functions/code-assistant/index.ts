@@ -35,7 +35,9 @@ serve(async (req) => {
       "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
 
 FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+REQUIRED for small UI: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+
+FULL-STACK WEBSITE AUTOMATION: if the user asks to build, create, or generate a website, landing page, or full-stack site, output these files instead of one HTML file. Put the filename alone on the line before each fence: index.html, style.css, app.js, server.js, package.json, README.md. app.js is browser-only, calls GET /api/items, and includes fallback data. server.js uses require("express") and implements GET /api/health, GET /api/items, POST /api/items, and POST /api/contact.
 
 Example structure:
 \`\`\`html
@@ -75,7 +77,16 @@ Rules:
 
     // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
     if (domain === "web-development") {
-      systemPrompt += `
+      const lastUser = Array.isArray(messages)
+        ? [...messages].reverse().find((m: { role?: string }) => m?.role === "user")?.content || ""
+        : "";
+      const websiteRequest = /\b(build|create|make|generate|design|scaffold)\b/i.test(lastUser)
+        && /\b(website|web\s*site|landing\s*page|full[-\s]?stack)\b/i.test(lastUser);
+      systemPrompt += websiteRequest
+        ? `
+
+WEBSITE MODE: Return index.html, style.css, app.js, server.js, package.json, and README.md. Filename on its own line, then a fence. No React.`
+        : `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
     }

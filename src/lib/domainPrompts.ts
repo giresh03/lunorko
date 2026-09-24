@@ -3,6 +3,8 @@
  * Used by both the edge function (system prompt) and CodeAssistant (starter chips).
  */
 
+import { WEBSITE_STARTER_PROMPTS } from "@/lib/websiteGenerator";
+
 export interface DomainPromptConfig {
   systemPrompt: string;
   starterPrompts: string[];
@@ -10,12 +12,13 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor. For small UI snippets, output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.
+
+FULL-STACK WEBSITE AUTOMATION: when the user asks to build, create, or generate a website, landing page, or full-stack site, do not use the single-file rule. The editor runs src/lib/websiteGenerator.ts and writes index.html, style.css, app.js, server.js, package.json, and README.md. app.js is browser-only and falls back if GET /api/items fails. server.js is Express with GET /api/health, GET /api/items, POST /api/items, and POST /api/contact.`,
     starterPrompts: [
+      ...WEBSITE_STARTER_PROMPTS,
       "Build a counter with HTML, CSS, and JS (one file)",
       "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
     ],
   },
   "app-development": {
