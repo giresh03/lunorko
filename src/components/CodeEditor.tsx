@@ -22,6 +22,15 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  detectWebsiteRequest,
+  filesToTree,
+  formatWebsiteAssistantMessage,
+  generateFullStackWebsite,
+  WEBSITE_BLUEPRINTS,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
+import WebsiteGeneratorBar from "@/components/editor/WebsiteGeneratorBar";
 
 // -- Project types --
 interface SavedProject {
@@ -192,6 +201,15 @@ const LANG_EXT_MAP: Record<string, string> = {
 };
 
 // Generate a descriptive filename from the user's prompt and code content
+/** Skip Node and ES modules when the preview inlines loose script files. */
+function isBrowserClassicScript(content: string): boolean {
+  if (/\brequire\s*\(/.test(content) || /\bmodule\.exports\b/.test(content) || /\bprocess\.env\b/.test(content) || /\bimport\.meta\b/.test(content)) {
+    return false;
+  }
+  if (/^\s*import\s/m.test(content) || /^\s*export\s/m.test(content)) return false;
+  return true;
+}
+
 function generateFileName(language: string, code: string, userPrompt?: string): string {
   const ext = LANG_EXT_MAP[language] || LANG_EXT_MAP[LANG_MAP[language] || ""] || language || "js";
   
@@ -486,7 +504,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Website generator** under this chat to scaffold a full-stack site — React client, Express API, and a live \`preview.html\`. Choose a landing page, portfolio, blog, store, or dashboard.\n\nYou can also ask me to **generate**, **debug**, or **explain** code. Smaller UI practice stays vanilla HTML so it previews instantly.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -851,7 +874,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     let jsMatch;
     while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
+      if (allFiles[jsFileName] && isBrowserClassicScript(allFiles[jsFileName])) {
         html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
         injectedFiles.add(jsFileName);
       }
@@ -863,7 +886,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && isBrowserClassicScript(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -886,6 +909,49 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     
     return html;
   }, []);
+
+  const applyGeneratedWebsite = useCallback((kind: WebsiteKind, title?: string, fromChat = false) => {
+    const site = generateFullStackWebsite(kind, title);
+    const tree = filesToTree(site.files) as FileNode[];
+    setFileTree(tree);
+    setCurrentProjectName(site.title);
+
+    const openIds = ["preview.html", "client/src/App.jsx", "server/index.js", "README.md"];
+    const found: OpenTab[] = [];
+    const walk = (nodes: FileNode[]) => {
+      for (const node of nodes) {
+        if (node.type === "file" && openIds.includes(node.id)) {
+          found.push({
+            id: node.id,
+            name: node.name,
+            language: node.language || getLang(node.name),
+            content: node.content || "",
+            isModified: false,
+          });
+        }
+        if (node.children) walk(node.children);
+      }
+    };
+    walk(tree);
+    const ordered = openIds.flatMap((id) => found.filter((tab) => tab.id === id));
+    setOpenTabs(ordered);
+    setActiveTabId("preview.html");
+    setShowPreview(true);
+    const preview = site.files.find((entry) => entry.path === "preview.html");
+    if (preview) setPreviewContent(buildPreviewHtml(preview.content, {}));
+
+    const blueprint = WEBSITE_BLUEPRINTS.find((item) => item.id === kind);
+    const prompt = title
+      ? `Build a full-stack ${site.kindLabel.toLowerCase()} website called ${site.title}`
+      : (blueprint?.prompt ?? "Build a full-stack website");
+    const assistant = formatWebsiteAssistantMessage(site);
+    setMessages((prev) => {
+      const next = fromChat ? prev : [...prev, { role: "user" as const, content: prompt }];
+      return [...next, { role: "assistant" as const, content: assistant }];
+    });
+    setOutput((prev) => [...prev, `Website generator wrote ${site.files.length} files for "${site.title}". Open preview.html.`]);
+    setShowTerminal(true);
+  }, [buildPreviewHtml]);
 
   const isAppDomain = domainId === "app-development";
 
@@ -1309,6 +1375,16 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development") {
+      const detected = detectWebsiteRequest(chatInput);
+      if (detected) {
+        const userMsg: Message = { role: "user", content: chatInput };
+        setMessages((prev) => [...prev, userMsg]);
+        setChatInput("");
+        applyGeneratedWebsite(detected.kind, detected.title, true);
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1604,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2560,6 +2636,10 @@ ${jsCode}
                   </div>
                 </div>
               </div>
+            )}
+
+            {domainId === "web-development" && (
+              <WebsiteGeneratorBar disabled={chatLoading} onGenerate={(kind) => applyGeneratedWebsite(kind)} />
             )}
 
             {/* AI Input */}
