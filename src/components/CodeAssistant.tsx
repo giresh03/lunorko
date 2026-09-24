@@ -3,6 +3,12 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import {
+  formatWebsiteAssistantMessage,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  WEBSITE_KINDS,
+} from "@/lib/websiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,7 +34,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+      content: domainId === "web-development"
+        ? `👋 Hi! I'm your **${domainName}** AI assistant.\n\nThe **website generator** builds a full-stack site — \`index.html\`, \`styles.css\`, \`app.js\`, and an Express \`server.js\`. Pick a type below or describe the site.`
+        : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -39,9 +47,10 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isLoading) return;
-    const userMsg: Message = { role: "user", content: input };
+  const handleSend = useCallback(async (raw?: string) => {
+    const text = (typeof raw === "string" ? raw : input).trim();
+    if (!text || isLoading) return;
+    const userMsg: Message = { role: "user", content: text };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setInput("");
@@ -59,6 +68,15 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
     };
+
+    if (domainId === "web-development" && isWebsiteGenerationRequest(text)) {
+      const site = generateFullStackWebsite(text);
+      const page = site.files.find((file) => file.path === "index.html");
+      if (page && onSendToEditor) onSendToEditor(page.content, "html");
+      upsert(formatWebsiteAssistantMessage(site));
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -136,7 +154,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainId, onSendToEditor]);
 
   const handleClear = () => {
     setMessages([
@@ -232,6 +250,20 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             <span className="text-xs font-medium text-muted-foreground">Try asking</span>
           </div>
+          {domainId === "web-development" && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {WEBSITE_KINDS.map((kind) => (
+                <button
+                  key={kind.id}
+                  type="button"
+                  onClick={() => handleSend(kind.example)}
+                  className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary hover:bg-primary/20 transition-colors"
+                >
+                  {kind.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {promptConfig.starterPrompts.map((prompt, i) => (
               <button
@@ -257,7 +289,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
             className="flex-1 rounded-md border border-border bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             disabled={isLoading}
           />
-          <Button size="sm" onClick={handleSend} disabled={isLoading || !input.trim()}>
+          <Button size="sm" onClick={() => handleSend()} disabled={isLoading || !input.trim()}>
             <Send className="h-4 w-4" />
           </Button>
         </div>
