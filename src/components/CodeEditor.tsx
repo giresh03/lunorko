@@ -21,7 +21,9 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import { WebsiteGeneratorPanel } from "@/components/editor/WebsiteGeneratorPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { generateWebsite, matchWebsiteRequest, type WebsiteRequest } from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -129,6 +131,12 @@ const getLang = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   return LANG_MAP[ext] || "plaintext";
 };
+
+function isBackendPreviewFile(name: string): boolean {
+  const base = name.split("/").pop() || name;
+  if (name.startsWith("server/") || name.includes("/server/")) return true;
+  return base === "server.js" || base === "server.mjs" || base === "server.cjs";
+}
 const getFileIcon = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   const colors: Record<string, string> = {
@@ -485,9 +493,12 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => [{
+    role: "assistant",
+    content: domainId === "web-development"
+      ? `👋 I'm your **Web Development** assistant.\n\nUse **Website Generator** under the chat to scaffold a full-stack site — client, Express API, and seed data — directly in the editor.\n\nYou can also ask me to **build a landing page, portfolio, blog, shop, or dashboard**. I'll write those files for you.\n\nOther requests still generate code and apply it to your files.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+  }]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -859,11 +870,11 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 
     // Also inject any remaining CSS/JS files that weren't explicitly referenced
     const remainingCss = Object.entries(allFiles)
-      .filter(([name]) => name.endsWith(".css") && !injectedFiles.has(name) && !name.includes("/"))
+      .filter(([name]) => name.endsWith(".css") && !injectedFiles.has(name) && !name.includes("/") && !isBackendPreviewFile(name))
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isBackendPreviewFile(name))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -888,6 +899,52 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   const isAppDomain = domainId === "app-development";
+  const isWebDev = domainId === "web-development";
+
+  const applyGeneratedWebsite = useCallback((request: WebsiteRequest) => {
+    const site = generateWebsite(request);
+    const folders = new Map<string, FileNode>();
+    const tree: FileNode[] = [];
+    const rootFiles: FileNode[] = [];
+
+    for (const generated of site.files) {
+      const node: FileNode = {
+        id: generated.path,
+        name: generated.name,
+        type: "file",
+        language: generated.language,
+        content: generated.content,
+      };
+      if (generated.folder === "root") {
+        rootFiles.push(node);
+        continue;
+      }
+      let folder = folders.get(generated.folder);
+      if (!folder) {
+        folder = { id: generated.folder, name: generated.folder, type: "folder", isOpen: true, children: [] };
+        folders.set(generated.folder, folder);
+        tree.push(folder);
+      }
+      folder.children!.push(node);
+    }
+
+    setFileTree([...tree, ...rootFiles]);
+    const html = site.files.find((generated) => generated.path === "client/index.html");
+    if (html) {
+      setOpenTabs([{ id: html.path, name: html.name, language: "html", content: html.content, isModified: true }]);
+      setActiveTabId(html.path);
+      const fileMap: Record<string, string> = {};
+      for (const generated of site.files) {
+        fileMap[generated.path] = generated.content;
+        if (!fileMap[generated.name]) fileMap[generated.name] = generated.content;
+      }
+      setShowPreview(true);
+      setPreviewContent(buildPreviewHtml(html.content, fileMap));
+    }
+    setCurrentProjectName(site.title);
+    const listing = site.files.map((generated) => `- \`${generated.path}\``).join("\n");
+    return `**${site.title}** is in the editor.\n\n${site.summary}\n\n### Files\n${listing}\n\n### Run the API\n\`\`\`bash\nnpm install\nnpm start\n\`\`\``;
+  }, [buildPreviewHtml]);
 
   // Update preview content with debouncing
   // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
@@ -941,7 +998,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && !isBackendPreviewFile(name))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1309,6 +1366,15 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (isWebDev) {
+      const intent = matchWebsiteRequest(chatInput);
+      if (intent) {
+        const reply = applyGeneratedWebsite(intent);
+        setMessages((prev) => [...prev, { role: "user", content: chatInput }, { role: "assistant", content: reply }]);
+        setChatInput("");
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1594,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, isWebDev, applyGeneratedWebsite, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2560,6 +2626,16 @@ ${jsCode}
                   </div>
                 </div>
               </div>
+            )}
+
+            {isWebDev && (
+              <WebsiteGeneratorPanel
+                busy={chatLoading}
+                onGenerate={(request) => {
+                  const reply = applyGeneratedWebsite(request);
+                  setMessages((prev) => [...prev, { role: "user", content: request.brief }, { role: "assistant", content: reply }]);
+                }}
+              />
             )}
 
             {/* AI Input */}
