@@ -874,15 +874,17 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
-- index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
-- Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
-- MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
-- Use a hero section with a full-width background image
-- Use responsive design with flexbox/grid and media queries
-- Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- STACK: vanilla HTML, CSS, and JavaScript in the browser. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript. NEVER.
+- Small widget (counter, form, calculator, one component): return exactly 3 files: index.html, styles.css, script.js.
+- Full website (landing page, portfolio, blog, shop, store, dashboard, coffee shop, restaurant, or any complete site): use this layout and do not collapse it into one HTML file:
+  - client/index.html, client/styles.css, client/site.js
+  - server/package.json, server/index.mjs, server/src/app.mjs, server/src/routes/api.mjs, server/src/data/seed.mjs, server/src/config/db.mjs
+  - README.md
+- The client must render sample data immediately and fall back to it when /api is unreachable.
+- The server is Express ESM. Serve ../client as static files. Include GET /api/health plus the blueprint routes. MongoDB is optional via MONGODB_URI; fall back to seed data.
+- index.html links styles.css and site.js, and loads Google Fonts.
+- Add modern CSS (transitions, hover, gradients) and responsive flexbox/grid.
+- Include images with Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80).`
         : "";
       const systemPrompt = `${basePrompt}
 
