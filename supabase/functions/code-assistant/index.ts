@@ -49,7 +49,9 @@ Example structure:
 </html>
 \`\`\`
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.
+
+FULL-STACK WEBSITE: If the user asks to build or generate a website, keep the page vanilla HTML/CSS/JS and describe the Web Development assistant's website generator files: client/index.html, client/styles.css, client/app.js, client/api-shim.js, server/server.js, server/data.js, package.json, README.md. The client uses fetch("/api/..."). The preview shim handles those routes when window.__LUNOR_PREVIEW__ is true. npm start runs the Express server on port 3000.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +79,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: For UI that is not a full-stack website, output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
     }
 
     if (useGoogleAI) {

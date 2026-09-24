@@ -22,6 +22,13 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  generateWebsite,
+  isWebsiteGenerationRequest,
+  matchWebsiteBlueprint,
+  websiteToFileTree,
+  WEBSITE_BLUEPRINTS,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -485,8 +492,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+  const [messages, setMessages] = useState<Message[]>(() => [
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? "👋 I'm your **Web Development** AI assistant.\n\n**Full-stack website** below writes a client, an Express API, and seed data into this project. The preview answers `/api` in the browser. You can also ask in chat, for example: **Build a restaurant website called Olive & Rye**.\n\nOther HTML, CSS, and JavaScript I write is still applied to your files automatically."
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -821,6 +833,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   // Build a full HTML document for preview by injecting sibling CSS/JS
   const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
     let html = htmlContent;
+    const isBackendFile = (name: string) => {
+      const base = name.split("/").pop() || name;
+      return name.startsWith("server/") || base === "server.js" || base === "data.js";
+    };
     
     // Inject a base visible style so content is never invisible against iframe bg
     const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
@@ -830,6 +846,12 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       html = html.replace("<body", `${baseStyle}<body`);
     } else {
       html = baseStyle + html;
+    }
+
+    if (!html.includes("__LUNOR_PREVIEW__")) {
+      const boot = `<script>window.__LUNOR_PREVIEW__=true;</script>`;
+      if (/<body[^>]*>/i.test(html)) html = html.replace(/<body([^>]*)>/i, `<body$1>${boot}`);
+      else html = boot + html;
     }
     
     // Track which CSS/JS files were already referenced and injected
@@ -851,7 +873,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     let jsMatch;
     while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
+      if (allFiles[jsFileName] && !isBackendFile(jsFileName)) {
         html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
         injectedFiles.add(jsFileName);
       }
@@ -863,7 +885,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isBackendFile(name))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1306,9 +1328,66 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const handleGenerateWebsite = useCallback((blueprintId: string | undefined, brief: string) => {
+    const site = generateWebsite({ brief, blueprintId });
+    const tree = websiteToFileTree(site.files) as FileNode[];
+    setChatInput("");
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: brief },
+      { role: "assistant", content: site.summary },
+    ]);
+    setFileTree(tree);
+    setCurrentProjectId(`site-${Date.now()}`);
+    setCurrentProjectName(site.title);
+    setShowWelcome(false);
+
+    const wanted = ["client/index.html", "client/app.js", "server/server.js"];
+    const tabs: OpenTab[] = [];
+    const walk = (nodes: FileNode[]) => {
+      for (const node of nodes) {
+        if (node.type === "file" && wanted.includes(node.id)) {
+          tabs.push({
+            id: node.id,
+            name: node.name,
+            language: node.language || getLang(node.name),
+            content: node.content || "",
+            isModified: false,
+          });
+        }
+        if (node.children) walk(node.children);
+      }
+    };
+    walk(tree);
+    tabs.sort((a, b) => wanted.indexOf(a.id) - wanted.indexOf(b.id));
+    setOpenTabs(tabs);
+    setActiveTabId(tabs[0]?.id ?? null);
+    setShowPreview(true);
+    setShowTerminal(true);
+
+    const fileMap: Record<string, string> = {};
+    for (const file of site.files) {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop() || file.path;
+      if (!fileMap[base]) fileMap[base] = file.content;
+    }
+    const html = site.files.find((file) => file.path === "client/index.html")?.content || "";
+    setPreviewContent(buildPreviewHtml(html, fileMap));
+    setOutput((prev) => [
+      ...prev,
+      `$ Website generator — ${site.title}`,
+      ...site.files.map((file) => `  wrote ${file.path}`),
+      "Preview API is in-browser. Run npm install && npm start for Express.",
+    ]);
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      handleGenerateWebsite(matchWebsiteBlueprint(chatInput), chatInput.trim());
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1607,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, handleGenerateWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2558,6 +2637,34 @@ ${jsCode}
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Full-stack website</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {WEBSITE_BLUEPRINTS.map((blueprint) => (
+                    <button
+                      key={blueprint.id}
+                      type="button"
+                      disabled={chatLoading}
+                      title={blueprint.description}
+                      onClick={() => handleGenerateWebsite(blueprint.id, blueprint.prompt)}
+                      className="rounded-md px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
+                      style={{
+                        color: currentTheme.uiColors.text,
+                        backgroundColor: currentTheme.uiColors.card,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                    >
+                      {blueprint.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
