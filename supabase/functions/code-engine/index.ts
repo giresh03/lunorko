@@ -864,8 +864,32 @@ serve(async (req) => {
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
-      const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const lastUserText = Array.isArray(messages)
+        ? [...messages].reverse().find((m) => m?.role === "user")?.content || ""
+        : "";
+      const fullStackWebsite = domain === "web-development" && (
+        body.automation === "fullstack-website" ||
+        /full[\s-]?stack|website generator|mern\b|express\s+api|with (an? )?(api|backend)/i.test(String(lastUserText))
+      );
+      const basePrompt = fullStackWebsite
+        ? `You are Lunor.AI's full-stack website generator inside the Web Development assistant. Produce a vanilla HTML/CSS/JS client and a CommonJS Express API that a student can run locally.`
+        : (domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`);
+      const stackDirective = fullStackWebsite
+        ? `
+- FULL-STACK WEBSITE GENERATOR. No React, JSX, TSX, Vue, or TypeScript.
+- Return exactly these paths, each on its own line immediately before its fence:
+  client/index.html
+  client/styles.css
+  client/app.js
+  server/index.js
+  server/package.json
+  README.md
+- client/index.html links href="styles.css" and src="app.js", uses a hero image, and embeds catalog JSON in <script id="site-seed" type="application/json">.
+- client/app.js is browser JavaScript only. It fetch()es GET http://localhost:3001/api/items and POST http://localhost:3001/api/leads, and renders the seed data when the API is offline. Never use require, import, or module.exports in client files.
+- server/index.js uses require("express") and require("cors"), listens on process.env.PORT || 3001, and implements GET /api/health, GET /api/items, GET /api/leads, POST /api/leads.
+- server/package.json has express and cors dependencies and "start": "node index.js".
+- Use real Unsplash image URLs. Make the page responsive, with a clear type hierarchy and a working form.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
