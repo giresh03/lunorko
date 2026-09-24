@@ -22,6 +22,16 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  assistantIntro,
+  detectWebsiteRequest,
+  filesToTree,
+  generateFullStackWebsite,
+  mergeGeneratedFiles,
+  projectPathForBlock,
+  WEBSITE_GENERATOR_ACTIONS,
+  type GeneratedWebsite,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -237,7 +247,7 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[`*]*([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*\.[A-Za-z0-9]+)[`*]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -485,9 +495,10 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => [{
+    role: "assistant",
+    content: assistantIntro(domainName) ?? `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+  }]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -863,7 +874,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !/^(server|data|routes)\.js$/.test(name))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -941,7 +952,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && !name.startsWith("server/") && !name.includes("/server/") && !/^(server|data|routes)\.js$/.test(name))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1306,9 +1317,56 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((site: GeneratedWebsite) => {
+    setFileTree(filesToTree(site.files) as FileNode[]);
+    setCurrentProjectName(site.brief.name);
+    const preferred = new Set(["client/index.html", "client/app.js", "server/server.js"]);
+    setOpenTabs(site.files.filter((file) => preferred.has(file.path)).map((file) => ({
+      id: file.path,
+      name: file.path.split("/").pop() || file.path,
+      language: file.language,
+      content: file.content,
+      isModified: false,
+    })));
+    setActiveTabId("client/index.html");
+    const fileMap: Record<string, string> = {};
+    for (const file of site.files) {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop();
+      if (base && !/^(server|data|routes)\.js$/.test(base)) fileMap[base] = file.content;
+    }
+    const html = site.files.find((file) => file.path === "client/index.html")?.content || "";
+    setPreviewContent(buildPreviewHtml(html, fileMap));
+    setShowPreview(true);
+    setShowTerminal(true);
+    setOutput([
+      `$ Website generator · ${site.brief.name}`,
+      `✅ Wrote ${site.files.length} files`,
+      "$ node server/server.js",
+      "→ http://localhost:3000",
+      `→ GET /api/${site.apiResource}`,
+    ]);
+  }, [buildPreviewHtml]);
+
+  const runWebsiteFromPrompt = useCallback((prompt: string) => {
+    if (domainId !== "web-development") return false;
+    const brief = detectWebsiteRequest(prompt);
+    if (!brief) return false;
+    const site = generateFullStackWebsite(brief);
+    applyGeneratedWebsite(site);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: prompt },
+      { role: "assistant", content: site.summary },
+    ]);
+    setChatInput("");
+    return true;
+  }, [applyGeneratedWebsite, domainId]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (runWebsiteFromPrompt(chatInput)) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1407,31 +1465,16 @@ ${jsCode}
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const filePath = projectPathForBlock(fname);
+        const baseName = filePath.split("/").pop() || fname;
+        newFiles.push({ id: filePath, name: baseName, lang: normalizedLang || getLang(baseName), code: block.code });
       });
 
-      // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
-        });
-        return tree;
-      });
+      setFileTree(prev => mergeGeneratedFiles(prev, newFiles.map((file) => ({
+        path: file.id,
+        language: file.lang,
+        content: file.code,
+      }))) as FileNode[]);
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1528,10 +1571,13 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, runWebsiteFromPrompt]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{
+      role: "assistant",
+      content: assistantIntro(domainName, true) ?? `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`,
+    }]);
   };
 
   // -- Project management --
@@ -2564,6 +2610,34 @@ ${jsCode}
 
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {domainId === "web-development" && (
+                <div className="mb-2">
+                  <div className="mb-1 flex items-center gap-1">
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
+                      Website generator
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {WEBSITE_GENERATOR_ACTIONS.map((action) => (
+                      <button
+                        key={action.id}
+                        type="button"
+                        disabled={chatLoading}
+                        onClick={() => runWebsiteFromPrompt(action.prompt)}
+                        className="rounded px-1.5 py-1 text-[9px] font-medium transition-colors disabled:opacity-50"
+                        style={{
+                          color: currentTheme.uiColors.text,
+                          backgroundColor: currentTheme.uiColors.bg,
+                          border: `1px solid ${currentTheme.uiColors.border}`,
+                        }}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
