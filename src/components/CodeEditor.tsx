@@ -22,6 +22,7 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { generateWebsite, isWebsiteGenerationRequest, WEBSITE_GENERATOR_PRESETS } from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -485,8 +486,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+  const [messages, setMessages] = useState<Message[]>(() => [
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** AI assistant.\n\n- **Generate a website** — full-stack HTML, CSS, JavaScript, and an Express API, applied to your files\n- **Generate other code** — it auto-updates in the editor\n- **Debug** and **explain** concepts\n\nUse the website chips below, or ask me to build a site.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1307,11 +1313,12 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (promptOverride?: string) => {
+    const promptText = (typeof promptOverride === "string" ? promptOverride : chatInput).trim();
+    if (!promptText || chatLoading) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: promptText };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1328,9 +1335,15 @@ ${jsCode}
       });
     };
 
-    // Check for cached response when offline
-    if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+    const websiteRequest = domainId === "web-development" && isWebsiteGenerationRequest(promptText);
+
+    // Local full-stack website generator for the web-development assistant.
+    if (websiteRequest) {
+      const site = generateWebsite(promptText);
+      upsert(site.markdown);
+      setCurrentProjectName(`${site.brand} Website`);
+    } else if (!online) {
+      const cached = findCachedAIResponse(promptText, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
@@ -1387,7 +1400,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(promptText, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -2562,6 +2575,33 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="mb-1.5 flex items-center gap-1">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Website generator</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {WEBSITE_GENERATOR_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => handleChatSend(preset.prompt)}
+                      className="rounded px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
+                      style={{
+                        color: currentTheme.uiColors.text,
+                        backgroundColor: currentTheme.uiColors.card,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
@@ -2581,7 +2621,7 @@ ${jsCode}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
-                  placeholder={`Ask about ${domainName.toLowerCase()}...`}
+                  placeholder={domainId === "web-development" ? "Describe a website to generate..." : `Ask about ${domainName.toLowerCase()}...`}
                   className="flex-1 rounded-md px-2.5 py-1.5 text-xs outline-none"
                   style={{
                     backgroundColor: currentTheme.uiColors.bg,

@@ -6,6 +6,10 @@ alwaysApply: false
 
 # Web Development - Modern Theme & Component Patterns
 
+## Website generator
+
+When a web-development prompt asks to build a website, landing page, portfolio, blog, restaurant site, SaaS page, or online store, use `src/lib/websiteGenerator.ts` (`generateWebsite`). The editor assistant already applies that output: `index.html`, `style.css`, `app.js`, `server.js`, `package.json`, and `README.md`.
+
 ## MERN Stack (Full-Stack)
 
 When the prompt mentions **MERN**, **MongoDB**, **Express**, **Node.js** (backend), or **full-stack JavaScript**:
