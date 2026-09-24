@@ -73,8 +73,14 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    const lastUser = [...(Array.isArray(messages) ? messages : [])].reverse().find((message: { role?: string }) => message?.role === "user");
+    const askedForWebsite = typeof lastUser?.content === "string" && /\b(build|create|generate|scaffold)\b/i.test(lastUser.content) && /\b(website|web site|landing page|portfolio|blog|store|dashboard)\b/i.test(lastUser.content);
+
+    if (domain === "web-development" && askedForWebsite) {
+      systemPrompt += `
+
+FULL-STACK WEBSITE: Return these files in fenced code blocks with the path on the line above each block: client/index.html, client/styles.css, client/site.js, server/index.mjs, server/src/app.mjs, server/src/routes/api.mjs, server/src/data/seed.mjs, server/src/config/db.mjs, server/package.json, README.md. Use vanilla HTML, CSS, and JS for the client. site.js must render sample data and fall back to it when /api/content fails. The server is Express ESM, serves the client, and exposes GET /api/health. Connect to MongoDB only when MONGODB_URI is set.`;
+    } else if (domain === "web-development") {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
