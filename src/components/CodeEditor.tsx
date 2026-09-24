@@ -22,6 +22,15 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_BLUEPRINTS,
+  editorPathFor,
+  generateWebsite,
+  inferWebsiteRequest,
+  insertGeneratedFile,
+  previewFileMap,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -236,8 +245,8 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
 }
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
-  // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  // Match code blocks, and look for a path such as server/index.js on the line before the fence
+  const regex = /(?:(?:[`*]*([\w./-]+\.[\w]+)[`*]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -395,6 +404,18 @@ const LAYOUT_SUGGESTIONS = [
   { id: "form", icon: "📝", label: "Adaptive Form", desc: "Keyboard-aware", prompt: "Generate a keyboard-aware form with TextInput fields, validation, and proper spacing that adapts to screen size" },
 ];
 
+function assistantGreeting(domainName: string, cleared = false): string {
+  const id = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  if (id === "web-development") {
+    return cleared
+      ? `👋 Chat cleared. I'm your **Web Development** assistant.\n\nOpen **Website** under the message box to generate a full-stack site, or ask me to change the one that's open.`
+      : `👋 I'm your **Web Development** AI assistant.\n\n- **Website generator** — use **Website** under the message box to build a full-stack site (previewable HTML plus an Express API)\n- **Generate or edit code** — it is applied to your files\n- **Debug and explain** — paste code or ask a question`;
+  }
+  return cleared
+    ? `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`
+    : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`;
+}
+
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
@@ -443,6 +464,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [showSiteGenerator, setShowSiteGenerator] = useState(false);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("landing");
+  const [siteBrand, setSiteBrand] = useState("");
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -486,7 +510,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: assistantGreeting(domainName) },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1306,9 +1330,62 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((site: ReturnType<typeof generateWebsite>, userText?: string) => {
+    setFileTree((prev) => site.files.reduce(
+      (tree, file) => insertGeneratedFile(tree, file),
+      prev,
+    ));
+    const html = site.files.find((file) => file.path === "index.html");
+    const htmlLocation = editorPathFor("index.html");
+    if (html && htmlLocation) {
+      setOpenTabs((prev) => {
+        if (prev.some((tab) => tab.id === htmlLocation.id)) {
+          return prev.map((tab) => tab.id === htmlLocation.id
+            ? { ...tab, content: html.content, language: "html", isModified: true }
+            : tab);
+        }
+        return [...prev, {
+          id: htmlLocation.id,
+          name: htmlLocation.name,
+          language: "html",
+          content: html.content,
+          isModified: true,
+        }];
+      });
+      setActiveTabId(htmlLocation.id);
+      setPreviewContent(buildPreviewHtml(html.content, previewFileMap(site.files)));
+      setShowPreview(true);
+    }
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: userText || site.prompt },
+      { role: "assistant", content: site.summary },
+    ]);
+    setOutput((prev) => [
+      ...prev,
+      `$ Generated ${site.brand} (${site.kind})`,
+      "🌐 Preview updated",
+      "📦 API files are in server/",
+    ]);
+  }, [buildPreviewHtml]);
+
+  const handleGenerateWebsite = useCallback(() => {
+    applyGeneratedWebsite(generateWebsite(siteKind, siteBrand));
+    setShowSiteGenerator(false);
+  }, [siteKind, siteBrand, applyGeneratedWebsite]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development") {
+      const request = inferWebsiteRequest(chatInput);
+      if (request) {
+        const typed = chatInput;
+        setChatInput("");
+        applyGeneratedWebsite(generateWebsite(request.kind, request.brand), typed);
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1402,36 +1479,27 @@ ${jsCode}
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
       // Prepare all new files/updates in one pass
-      const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
+      const newFiles: { id: string; name: string; path: string; lang: string; code: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
-      });
-
-      // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
+        const hinted = block.filename && editorPathFor(block.filename) ? block.filename : "";
+        const rawName = hinted || generateFileName(block.language, block.code, userPrompt);
+        const located = editorPathFor(rawName) ?? { id: `src/untitled.${ext}`, name: `untitled.${ext}` };
+        newFiles.push({
+          id: located.id,
+          name: located.name,
+          path: editorPathFor(rawName) ? rawName : `untitled.${ext}`,
+          lang: normalizedLang || getLang(located.name),
+          code: block.code,
         });
-        return tree;
       });
+
+      // Batch update file tree in a single setState, including nested paths such as server/index.js
+      setFileTree(prev => newFiles.reduce(
+        (tree, file) => insertGeneratedFile(tree, { path: file.path, language: file.lang, content: file.code }),
+        prev,
+      ));
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1528,10 +1596,10 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, applyGeneratedWebsite, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{ role: "assistant", content: assistantGreeting(domainName, true) }]);
   };
 
   // -- Project management --
@@ -2562,6 +2630,56 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && showSiteGenerator && (
+              <div className="border-t overflow-y-auto shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "280px" }}>
+                <div className="px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} /> Full-stack website generator
+                  </span>
+                  <p className="text-[8px] mt-1" style={{ color: currentTheme.uiColors.muted }}>
+                    Writes a previewable site plus an Express API in server/.
+                  </p>
+                </div>
+                <div className="p-2">
+                  <input
+                    value={siteBrand}
+                    onChange={(e) => setSiteBrand(e.target.value)}
+                    placeholder="Brand or project name"
+                    className="w-full rounded-md px-2 py-1.5 text-[10px] outline-none mb-2"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <div className="grid grid-cols-2 gap-1">
+                    {WEBSITE_BLUEPRINTS.map((blueprint) => (
+                      <button
+                        key={blueprint.id}
+                        type="button"
+                        onClick={() => setSiteKind(blueprint.id)}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-left"
+                        style={{
+                          backgroundColor: siteKind === blueprint.id ? currentTheme.uiColors.accent + "18" : currentTheme.uiColors.card,
+                          border: `1px solid ${siteKind === blueprint.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                        }}
+                      >
+                        <span className="text-sm">{blueprint.icon}</span>
+                        <span>
+                          <span className="text-[9px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{blueprint.label}</span>
+                          <span className="text-[7px]" style={{ color: currentTheme.uiColors.muted }}>{blueprint.description}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGenerateWebsite}
+                    className="mt-2 w-full rounded-md px-2 py-1.5 text-[10px] font-semibold"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#fff" }}
+                  >
+                    Generate website
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
@@ -2573,6 +2691,16 @@ ${jsCode}
                   >
                     <Ruler className="h-3 w-3" />
                     Responsive
+                  </button>
+                )}
+                {domainId === "web-development" && (
+                  <button
+                    onClick={() => setShowSiteGenerator(!showSiteGenerator)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showSiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showSiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Website
                   </button>
                 )}
               </div>
@@ -2595,6 +2723,7 @@ ${jsCode}
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
                   onClick={handleChatSend}
                   disabled={chatLoading || !chatInput.trim()}
+                  aria-label="Send"
                 >
                   <Send className="h-3.5 w-3.5" />
                 </button>

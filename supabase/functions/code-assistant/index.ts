@@ -32,24 +32,20 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. You generate vanilla HTML, CSS, and JavaScript. The Web Development assistant includes a Full-Stack Website Generator automation.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+FORBIDDEN on the frontend: React, JSX, TSX, TypeScript, Vue, Angular, component imports.
+For small widgets (counter, todo, calculator): one complete HTML file with <style> and <script>, wrapped in \`\`\`html.
 
-Example structure:
-\`\`\`html
-<!DOCTYPE html>
-<html>
-<head><style>/* CSS here */</style></head>
-<body>
-  <!-- HTML here -->
-  <script>/* JavaScript here */</script>
-</body>
-</html>
-\`\`\`
+For a website, landing page, portfolio, blog, store, restaurant, SaaS page, or full-stack request, return these files. Put the path on the line above each fence:
+index.html
+styles.css
+script.js
+server/index.js
+server/package.json
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+server/index.js is an Express app (type: module) on port 3000 with CORS, GET /api/items, and POST /api/messages.
+script.js fetches http://localhost:3000/api/items and falls back to embedded data so the in-editor preview still renders.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +73,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: No React, TSX, or TypeScript. Small widgets stay in one HTML file. Websites use index.html, styles.css, script.js, server/index.js, and server/package.json.`;
     }
 
     if (useGoogleAI) {
