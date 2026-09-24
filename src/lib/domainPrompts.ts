@@ -10,12 +10,20 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor. Use vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frontend frameworks.
+
+For a small example (counter, form, calculator), return one complete HTML file with <style> and <script>, or index.html, styles.css, and script.js.
+
+For a full website (landing page, portfolio, blog, shop, dashboard, coffee shop, restaurant), write a full-stack project:
+- client/index.html, client/styles.css, client/site.js — render sample data immediately if the API is down
+- server/ Express ESM API (index.mjs, src/app.mjs, src/routes/api.mjs, src/data/seed.mjs, src/config/db.mjs, package.json) with GET /api/health
+- README.md
+MongoDB is optional via MONGODB_URI. Never replace a full website with a single HTML file.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
+      "Build a coffee shop website",
+      "Create a restaurant website",
+      "Build a SaaS landing page",
+      "Create a portfolio website",
     ],
   },
   "app-development": {

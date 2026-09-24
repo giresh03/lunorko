@@ -7,7 +7,7 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,16 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import WebsiteGeneratorPanel from "@/components/editor/WebsiteGeneratorPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  clientPreviewMap,
+  describeWebsite,
+  generateWebsite,
+  matchWebsiteRequest,
+  toFileTree,
+  type WebsiteBrief,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -443,6 +452,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [showWebsitePanel, setShowWebsitePanel] = useState(false);
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -486,7 +496,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: domainId === "web-development"
+      ? `👋 I'm your **${domainName}** AI assistant.\n\n- **Website** — full-stack sites (client + Express API) for a landing page, portfolio, blog, shop, or dashboard\n- Ask me to **build a coffee shop website** or a restaurant site and I'll write the project here\n- **Generate code** for smaller pages — it still lands in the editor\n\nThe preview shows sample data immediately. Run \`cd server && npm install && npm start\` when you want the API.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -603,6 +615,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     const files: Record<string, string> = {};
     const walk = (ns: FileNode[]) => {
       for (const n of ns) {
+        if (n.id === "server" || n.id.startsWith("server/")) continue;
         if (n.type === "file" && n.content) {
           // Store by full path id
           files[n.id] = n.content;
@@ -886,6 +899,34 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     
     return html;
   }, []);
+
+  const openGeneratedWebsite = useCallback((brief: WebsiteBrief) => {
+    const project = generateWebsite(brief);
+    const tree = toFileTree(project.files) as FileNode[];
+    setFileTree(tree);
+    setCurrentProjectName(project.title);
+    setShowWelcome(false);
+    const htmlFile = project.files.find((file) => file.path === "client/index.html");
+    if (htmlFile) {
+      setOpenTabs([{
+        id: htmlFile.path,
+        name: "index.html",
+        language: "html",
+        content: htmlFile.content,
+        isModified: true,
+      }]);
+      setActiveTabId(htmlFile.path);
+      setPreviewContent(buildPreviewHtml(htmlFile.content, clientPreviewMap(project.files)));
+      setShowPreview(true);
+    }
+    setShowTerminal(true);
+    setOutput((prev) => [
+      ...prev,
+      `$ Generated ${project.title}`,
+      "Preview uses sample data. API: cd server && npm install && npm start",
+    ]);
+    return project;
+  }, [buildPreviewHtml]);
 
   const isAppDomain = domainId === "app-development";
 
@@ -1328,6 +1369,16 @@ ${jsCode}
       });
     };
 
+    if (domainId === "web-development") {
+      const brief = matchWebsiteRequest(chatInput);
+      if (brief) {
+        const project = openGeneratedWebsite(brief);
+        upsert(describeWebsite(project));
+        setChatLoading(false);
+        return;
+      }
+    }
+
     // Check for cached response when offline
     if (!online) {
       const cached = findCachedAIResponse(chatInput, domainId);
@@ -1528,7 +1579,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, openGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2563,6 +2614,21 @@ ${jsCode}
             )}
 
             {/* AI Input */}
+            {domainId === "web-development" && showWebsitePanel && (
+              <WebsiteGeneratorPanel
+                onSelect={(id) => {
+                  const project = openGeneratedWebsite({ blueprint: id });
+                  setMessages((prev) => [...prev, { role: "assistant", content: describeWebsite(project) }]);
+                  setShowWebsitePanel(false);
+                }}
+                text={currentTheme.uiColors.text}
+                muted={currentTheme.uiColors.muted}
+                accent={currentTheme.uiColors.accent}
+                border={currentTheme.uiColors.border}
+                card={currentTheme.uiColors.card}
+              />
+            )}
+
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
@@ -2573,6 +2639,17 @@ ${jsCode}
                   >
                     <Ruler className="h-3 w-3" />
                     Responsive
+                  </button>
+                )}
+                {domainId === "web-development" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowWebsitePanel(!showWebsitePanel)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showWebsitePanel ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showWebsitePanel ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Globe className="h-3 w-3" />
+                    Website
                   </button>
                 )}
               </div>

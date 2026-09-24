@@ -32,24 +32,17 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. You generate vanilla HTML, CSS, and JavaScript.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular.
 
-Example structure:
-\`\`\`html
-<!DOCTYPE html>
-<html>
-<head><style>/* CSS here */</style></head>
-<body>
-  <!-- HTML here -->
-  <script>/* JavaScript here */</script>
-</body>
-</html>
-\`\`\`
+Small examples (counter, form, calculator): one complete HTML file with <style> and <script>, in a \`\`\`html block.
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Full websites (landing page, portfolio, blog, shop, dashboard, coffee shop, restaurant): a full-stack project, not one HTML file.
+- client/index.html, client/styles.css, client/site.js — render sample data immediately if /api is down
+- server/package.json, server/index.mjs, server/src/app.mjs, server/src/routes/api.mjs, server/src/data/seed.mjs, server/src/config/db.mjs
+- README.md
+Express ESM. GET /api/health plus the page's data routes. Serve ../client. MongoDB is optional via MONGODB_URI and falls back to seed data.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +70,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: No React, TSX, or TypeScript. Small demos stay one HTML file. A full website uses client/ plus the Express server/ layout, and the client still renders if the API is down.`;
     }
 
     if (useGoogleAI) {
