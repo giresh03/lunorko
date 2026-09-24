@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_TEMPLATES,
+  filesToProjectTree,
+  generateWebsite,
+  inferWebsiteRequest,
+  upsertProjectFiles,
+  type GeneratedWebsite,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -237,7 +245,7 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[\*`]*([\w./-]+\.[\w]+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -485,9 +493,18 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const isWeb = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === "web-development";
+    return [{
+      role: "assistant",
+      content: isWeb
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nOpen **Websites** below to generate a full-stack site — client page plus an Express API — or ask me to build a landing page, portfolio, restaurant, store, blog, or dashboard.\n\nThe preview runs on sample data. \`npm start\` serves the same site at http://localhost:3000.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    }];
+  });
+  const [showWebsites, setShowWebsites] = useState(true);
+  const [siteKind, setSiteKind] = useState("landing");
+  const [siteName, setSiteName] = useState("Lumen");
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -886,6 +903,34 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     
     return html;
   }, []);
+
+  const applyGeneratedWebsite = useCallback((site: GeneratedWebsite) => {
+    setFileTree(filesToProjectTree(site.files));
+    setCurrentProjectName(site.name);
+    const html = site.files.find((file) => file.path === "client/index.html");
+    const openPaths = ["client/index.html", "client/styles.css", "client/app.js", "server/server.mjs"];
+    const tabs: OpenTab[] = site.files.filter((file) => openPaths.includes(file.path)).map((file) => ({
+      id: file.path,
+      name: file.path.split("/").pop() || file.path,
+      language: file.path.endsWith(".css") ? "css" : file.path.endsWith(".html") ? "html" : "javascript",
+      content: file.content,
+      isModified: true,
+    }));
+    setOpenTabs(tabs);
+    setActiveTabId(html?.path ?? tabs[0]?.id ?? null);
+    setShowWelcome(false);
+    if (html) {
+      const allFiles: Record<string, string> = {};
+      for (const file of site.files) {
+        allFiles[file.path] = file.content;
+        const base = file.path.split("/").pop() || file.path;
+        if (!allFiles[base]) allFiles[base] = file.content;
+      }
+      setShowPreview(true);
+      setPreviewContent(buildPreviewHtml(html.content, allFiles));
+    }
+    setOutput((prev) => [...prev, `Website "${site.name}" generated. Preview uses seed data until npm start.`]);
+  }, [buildPreviewHtml]);
 
   const isAppDomain = domainId === "app-development";
 
@@ -1307,14 +1352,31 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (rawText?: string) => {
+    const text = (typeof rawText === "string" ? rawText : chatInput).trim();
+    if (!text || chatLoading) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: text };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
+
+    if (domainId === "web-development") {
+      const request = inferWebsiteRequest(text);
+      if (request) {
+        const site = generateWebsite({
+          kind: request.kind,
+          name: request.name || siteName,
+        });
+        applyGeneratedWebsite(site);
+        setSiteKind(site.kind);
+        setSiteName(site.name);
+        setMessages([...updated, { role: "assistant", content: site.summary }]);
+        return;
+      }
+    }
+
     setChatLoading(true);
     let assistantSoFar = "";
 
@@ -1330,7 +1392,7 @@ ${jsCode}
 
     // Check for cached response when offline
     if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+      const cached = findCachedAIResponse(text, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
@@ -1387,7 +1449,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(text, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1406,32 +1468,15 @@ ${jsCode}
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const hinted = (block.filename || "").replace(/^\.?\//, "");
+        const safeHint = hinted.includes("..") ? "" : hinted;
+        const fname = safeHint || `untitled.${ext}`;
+        const newId = fname.includes("/") ? fname : `src/${fname}`;
+        const baseName = fname.split("/").pop() || fname;
+        newFiles.push({ id: newId, name: baseName, lang: normalizedLang || getLang(baseName), code: block.code });
       });
 
-      // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
-        });
-        return tree;
-      });
+      setFileTree(prev => upsertProjectFiles(prev, newFiles.map((file) => ({ path: file.id, content: file.code }))));
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1491,7 +1536,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = text.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -1528,7 +1573,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite, siteName]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2564,6 +2609,69 @@ ${jsCode}
 
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {domainId === "web-development" && (
+                <div className="mb-2">
+                  <button
+                    onClick={() => setShowWebsites((open) => !open)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
+                    style={{ color: showWebsites ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showWebsites ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Websites
+                  </button>
+                  {showWebsites && (
+                    <div className="mt-2 space-y-2">
+                      <div className="grid grid-cols-3 gap-1">
+                        {WEBSITE_TEMPLATES.map((template) => (
+                          <button
+                            key={template.id}
+                            onClick={() => {
+                              setSiteKind(template.id);
+                              setSiteName(template.defaultName);
+                            }}
+                            className="rounded px-1.5 py-1 text-left"
+                            style={{
+                              backgroundColor: siteKind === template.id ? currentTheme.uiColors.accent + "22" : currentTheme.uiColors.bg,
+                              border: `1px solid ${siteKind === template.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                              color: currentTheme.uiColors.text,
+                            }}
+                            title={template.description}
+                          >
+                            <span className="block text-[9px] font-medium">{template.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <input
+                          value={siteName}
+                          onChange={(e) => setSiteName(e.target.value)}
+                          placeholder="Site name"
+                          className="flex-1 rounded-md px-2 py-1 text-[11px] outline-none"
+                          style={{ backgroundColor: currentTheme.uiColors.bg, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                        />
+                        <button
+                          className="rounded-md px-2 text-[10px] font-medium"
+                          style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
+                          onClick={() => {
+                            const site = generateWebsite({ kind: siteKind, name: siteName });
+                            applyGeneratedWebsite(site);
+                            setMessages((prev) => [
+                              ...prev,
+                              { role: "user", content: `Generate a ${site.kind} website called ${site.name}` },
+                              { role: "assistant", content: site.summary },
+                            ]);
+                          }}
+                        >
+                          Generate
+                        </button>
+                      </div>
+                      <p className="text-[8px] leading-snug" style={{ color: currentTheme.uiColors.muted }}>
+                        {WEBSITE_TEMPLATES.find((template) => template.id === siteKind)?.description}. Writes the client, Express server, and README into this project.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
@@ -2593,7 +2701,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => { void handleChatSend(); }}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />
