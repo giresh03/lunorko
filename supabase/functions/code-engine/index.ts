@@ -542,6 +542,7 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITES** — When the user asks for a website, landing page, portfolio, blog, store, restaurant, or full-stack site, also return server/index.js (Express, port 3000, CORS, GET /api/items, POST /api/messages) and server/package.json. script.js must fetch http://localhost:3000/api/items and fall back to embedded data so the preview works before the API is running. Keep the frontend as vanilla HTML, CSS, and JS.
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -874,8 +875,16 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- STACK: HTML + CSS + JS for the page. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript. NEVER.
+- Always return: index.html, styles.css, script.js
+- When the user asks for a website, landing page, portfolio, blog, store, restaurant, SaaS page, or full-stack app, ALSO return server/index.js and server/package.json
+- server/index.js: Express (ESM), CORS, JSON, GET /api/items, POST /api/messages, listen on port 3000
+- script.js must fetch http://localhost:3000/api/items and fall back to embedded data if that request fails
+- Put the file path on its own line immediately above each fence, for example:
+  server/index.js
+  \`\`\`javascript
+  // code
+  \`\`\`
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
