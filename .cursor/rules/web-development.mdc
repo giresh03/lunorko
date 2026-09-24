@@ -124,6 +124,16 @@ const [activeTab, setActiveTab] = useState("forum");
 - **lucide-react**: Use `import { IconName } from 'lucide-react'` — in-editor preview shims common icons. For full icon set, run locally with Vite.
 - **Run locally with Vite** (for full npm packages): `npm create vite@latest my-app -- --template react && cd my-app && npm install lucide-react && npm run dev`
 
+## Full-stack website generator
+
+When the prompt asks for a website, landing page, portfolio, store, blog, restaurant, dashboard, or full-stack app in Web Development:
+
+- Use the assistant's **Websites** generator (`src/lib/websiteGenerator.ts`)
+- Client files: `client/index.html`, `client/styles.css`, `client/app.js` (vanilla, previewable)
+- API: `server/server.mjs` (Express, ESM) plus root `package.json` and `README.md`
+- `client/app.js` calls `http://localhost:3000` and keeps seed data when the API is offline
+- Small widgets (counter, todo, calculator) stay a single HTML/CSS/JS demo
+
 ## Rule
 
 When implementing web UI from a prompt:

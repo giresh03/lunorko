@@ -5,9 +5,9 @@ import {
   File, FolderOpen, FolderClosed, Plus, Trash2, FilePlus, FolderPlus,
   Terminal as TerminalIcon, Bot, Send, Minimize2, Settings,
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
-  FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
+  FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput,   FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  filesToProjectTree,
+  generateWebsite,
+  inferWebsiteRequest,
+  upsertProjectFiles,
+  WEBSITE_TEMPLATES,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -120,7 +128,7 @@ interface Message {
 
 // -- Language helpers --
 const LANG_MAP: Record<string, string> = {
-  js: "javascript", ts: "typescript", py: "python", html: "html",
+  js: "javascript", mjs: "javascript", cjs: "javascript", ts: "typescript", py: "python", html: "html",
   css: "css", json: "json", jsx: "javascript", tsx: "typescript",
   md: "markdown", txt: "plaintext", xml: "xml", yaml: "yaml", yml: "yaml",
   sh: "shell", bash: "shell", sql: "sql",
@@ -235,23 +243,32 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   return `untitled.${ext}`;
 }
 
+function pathFromLine(line: string): string | undefined {
+  const cleaned = line.replace(/^[#>*\-\d.\s]+/, "").replace(/:$/, "").trim();
+  const token = (cleaned.split(/\s+/).pop() || "").replace(/^[`"'(]+|[`"'):,]+$/g, "");
+  const match = token.match(/^([A-Za-z0-9_./-]*[A-Za-z][A-Za-z0-9_./-]*\.[A-Za-z0-9]+)$/);
+  if (!match) return undefined;
+  return match[1].replace(/^\.\//, "");
+}
+
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
-  // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  // Match code blocks, and look for a file path on the line before the fence.
+  const regex = /```([^\n`]*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
-    const filename = match[1] || undefined;
-    const lang = match[2] || "javascript";
-    blocks.push({ language: lang, code: match[3].trim(), filename });
+    const before = markdown.slice(Math.max(0, match.index - 200), match.index);
+    const prevLine = before.split("\n").map((line) => line.trim()).filter(Boolean).pop() || "";
+    const lang = (match[1] || "javascript").trim() || "javascript";
+    blocks.push({ language: lang, code: match[2].trim(), filename: pathFromLine(prevLine) });
   }
-  // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
+  // If no filenames found via regex, try to detect from common patterns like "filename: client/index.html"
   if (blocks.length > 0 && !blocks.some(b => b.filename)) {
-    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
+    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?([A-Za-z0-9_./-]*[A-Za-z][A-Za-z0-9_./-]*\.[A-Za-z0-9]+)[`"']?/gi;
     let fnMatch;
     while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
       const unassigned = blocks.find(b => !b.filename);
-      if (unassigned) unassigned.filename = fnMatch[1];
+      if (unassigned) unassigned.filename = fnMatch[1].replace(/^\.\//, "");
     }
   }
   // Generate proper filenames for blocks that still don't have one
@@ -486,9 +503,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: domainId === "web-development"
+      ? `👋 I'm your **${domainName}** AI assistant.\n\n- **Websites** — generate a full-stack site (HTML, CSS, JS, and an Express API)\n- **Generate code** — it lands in the editor and preview\n- **Debug** and **explain** with examples\n\nOpen **Websites** below, or ask me to build a restaurant, portfolio, store, blog, or landing page.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
+  const [showSiteGenerator, setShowSiteGenerator] = useState(false);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("landing");
+  const [siteBrief, setSiteBrief] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -886,6 +908,34 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     
     return html;
   }, []);
+
+  const isWebDomain = domainId === "web-development";
+
+  const applyGeneratedWebsite = useCallback((site: ReturnType<typeof generateWebsite>) => {
+    const tree = filesToProjectTree(site.files);
+    setFileTree(tree);
+    setCurrentProjectName(site.name);
+    setShowWelcome(false);
+    const html = site.files.find((file) => file.path === "client/index.html");
+    if (!html) return;
+    const tab = { id: "client/index.html", name: "index.html", language: "html", content: html.content, isModified: true };
+    setOpenTabs([tab]);
+    setActiveTabId(tab.id);
+    const fileMap: Record<string, string> = {};
+    for (const file of site.files) {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop();
+      if (base && fileMap[base] === undefined) fileMap[base] = file.content;
+    }
+    setPreviewContent(buildPreviewHtml(html.content, fileMap));
+    setShowPreview(true);
+    setShowTerminal(true);
+    setOutput((prev) => [
+      ...prev,
+      `$ Generated full-stack site "${site.name}"`,
+      "Preview is using seed data until you run: npm install && npm start",
+    ]);
+  }, [buildPreviewHtml]);
 
   const isAppDomain = domainId === "app-development";
 
@@ -1309,6 +1359,22 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+
+    if (domainId === "web-development") {
+      const siteRequest = inferWebsiteRequest(chatInput);
+      if (siteRequest) {
+        const site = generateWebsite(siteRequest);
+        applyGeneratedWebsite(site);
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: chatInput },
+          { role: "assistant", content: site.summary },
+        ]);
+        setChatInput("");
+        return;
+      }
+    }
+
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1402,36 +1468,21 @@ ${jsCode}
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
       // Prepare all new files/updates in one pass
-      const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
+      const newFiles: { id: string; name: string; lang: string; code: string; path: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const rawName = (block.filename || `untitled.${ext}`).replace(/\\/g, "/").replace(/^\.\//, "");
+        const path = rawName.includes("/") ? rawName : `src/${rawName}`;
+        const name = path.split("/").pop() || rawName;
+        newFiles.push({ id: path, path, name, lang: normalizedLang || getLang(name), code: block.code });
       });
 
-      // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
-        });
-        return tree;
-      });
+      setFileTree(prev => upsertProjectFiles(prev, newFiles.map((file) => ({
+        path: file.path,
+        language: file.lang,
+        content: file.code,
+      }))));
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1528,7 +1579,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2562,9 +2613,73 @@ ${jsCode}
               </div>
             )}
 
+            {isWebDomain && showSiteGenerator && (
+              <div className="border-t shrink-0 overflow-y-auto" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "240px" }}>
+                <div className="px-3 py-2 flex items-center gap-1.5 border-b" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                  <Globe className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Full-stack website generator</span>
+                </div>
+                <div className="p-2 grid grid-cols-3 gap-1">
+                  {WEBSITE_TEMPLATES.map((template) => (
+                    <button
+                      key={template.id}
+                      onClick={() => setSiteKind(template.id)}
+                      className="rounded px-2 py-1.5 text-left"
+                      style={{
+                        backgroundColor: siteKind === template.id ? currentTheme.uiColors.accent + "18" : currentTheme.uiColors.card,
+                        border: `1px solid ${siteKind === template.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                      }}
+                    >
+                      <span className="text-[9px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{template.label}</span>
+                      <span className="text-[7px] block" style={{ color: currentTheme.uiColors.muted }}>{template.description}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="px-2 pb-2 flex gap-1.5">
+                  <input
+                    value={siteBrief}
+                    onChange={(e) => setSiteBrief(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const site = generateWebsite({ kind: siteKind, brief: siteBrief });
+                        applyGeneratedWebsite(site);
+                        setMessages((prev) => [...prev, { role: "user", content: siteBrief.trim() ? `Generate a ${siteKind} website: ${siteBrief.trim()}` : `Generate a ${siteKind} website` }, { role: "assistant", content: site.summary }]);
+                        setShowSiteGenerator(false);
+                      }
+                    }}
+                    placeholder="Site name, e.g. Olive & Oak"
+                    className="flex-1 rounded-md px-2 py-1 text-[10px] outline-none"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <button
+                    className="rounded-md px-2 text-[10px] font-medium"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
+                    onClick={() => {
+                      const site = generateWebsite({ kind: siteKind, brief: siteBrief });
+                      applyGeneratedWebsite(site);
+                      setMessages((prev) => [...prev, { role: "user", content: siteBrief.trim() ? `Generate a ${siteKind} website: ${siteBrief.trim()}` : `Generate a ${siteKind} website` }, { role: "assistant", content: site.summary }]);
+                      setShowSiteGenerator(false);
+                    }}
+                  >
+                    Generate
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {isWebDomain && (
+                  <button
+                    onClick={() => setShowSiteGenerator(!showSiteGenerator)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showSiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showSiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Globe className="h-3 w-3" />
+                    Websites
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}
