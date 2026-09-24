@@ -882,7 +882,8 @@ serve(async (req) => {
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
+- FULL-STACK WEBSITE GENERATOR: if the user asks to generate, build, or create a website, landing page, portfolio, blog, shop, or SaaS site, ignore the 3-file limit and return these paths instead: client/index.html, client/styles.css, client/app.js, server/server.js, server/data.js, package.json, README.md. client/app.js must render with embedded seed data for preview and fetch /api/<resource>. server/server.js must be a dependency-free Node http server that serves ../client and the JSON from server/data.js. Put each path on its own line immediately before its code fence.`
         : "";
       const systemPrompt = `${basePrompt}
 

@@ -77,7 +77,9 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: For widgets, output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files.
+
+FULL-STACK WEBSITE GENERATOR: if the user asks to generate, build, or create a website, landing page, portfolio, blog, shop, or SaaS site, ignore the single-file rule and return client/index.html, client/styles.css, client/app.js, server/server.js, server/data.js, package.json, and README.md. client/app.js must render from embedded seed data and fetch the API. server/server.js must be a dependency-free Node http server. Put each path on its own line immediately before its code fence.`;
     }
 
     if (useGoogleAI) {
