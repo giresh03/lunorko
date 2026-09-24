@@ -507,15 +507,27 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
 
-CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, TypeScript, or any framework. Use ONLY:
+CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, or TypeScript.
+
+For a component, widget, or single-page demo, use ONLY:
 - index.html
 - styles.css
 - script.js
 
+For a website, landing page, portfolio, store, blog, restaurant, dashboard, or full-stack app, ALSO generate the Express API. Use these paths, one file per block:
+- client/index.html
+- client/styles.css
+- client/app.js
+- server/server.mjs
+- package.json
+- README.md
+
+The client stays vanilla HTML/CSS/JS so the live preview runs with no build. client/app.js calls http://localhost:3000 and includes seed data used when that API is offline. server/server.mjs is an ES module Express app (import express, cors, express.json) with the REST routes the page actually calls. Do not put Node code in the client.
+
 RULES:
-1. **HTML only** — semantic HTML5, no JSX or React. No import statements. No components.
-2. **CSS only** — styles.css with modern animations (transitions, keyframes, hover effects, gradients).
-3. **Vanilla JS only** — plain JavaScript, no import/export, no modules, no require, no npm packages.
+1. **HTML only** — semantic HTML5, no JSX or React. No import statements in the client. No components.
+2. **CSS only** — styles.css or client/styles.css with modern animations (transitions, keyframes, hover effects, gradients).
+3. **Vanilla JS in the browser** — client code has no import/export, no modules, no require, no npm packages. The Node server file is the only module.
 4. **IMAGES ARE MANDATORY** — Every website MUST include high-quality images. Use these image sources:
    - **Unsplash (primary)**: <img src="https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80"> — use real Unsplash photo IDs for relevant topics.
    - **Picsum (random beautiful photos)**: <img src="https://picsum.photos/WIDTH/HEIGHT?random=N"> where N is a unique number per image.
@@ -542,6 +554,7 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITES** — When the user asks to build a website or full-stack app, return the client files and server/server.mjs together. The page must still look complete from seed data if the API is down.
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -874,9 +887,19 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
-- index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
+- STACK: HTML + CSS + JS for the client. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript. NEVER.
+- For a widget or small demo, return exactly 3 files: index.html, styles.css, script.js
+- For a website or full-stack app, return exactly these files, with the path alone on the line before each fence:
+  client/index.html
+  client/styles.css
+  client/app.js
+  server/server.mjs
+  package.json
+  README.md
+- client/index.html must include <link rel="stylesheet" href="styles.css">, <script src="app.js"></script>, and Google Fonts
+- client/app.js fetches http://localhost:3000 and falls back to inline seed data
+- server/server.mjs uses ESM (import express from "express"), cors, express.json, and routes that match the page
+- package.json has "type": "module" and "start": "node server/server.mjs"
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
