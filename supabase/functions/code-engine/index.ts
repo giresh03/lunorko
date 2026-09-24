@@ -784,6 +784,20 @@ ${code}
   }
 }
 
+function wantsFullStackWebsite(messages: Array<{ role?: string; content?: string }> | undefined): boolean {
+  const lastUser = [...(messages || [])].reverse().find((message) => message?.role === "user");
+  const text = String(lastUser?.content || "").trim().toLowerCase();
+  if (!text) return false;
+  const isEdit = /\b(fix|debug|change|update|edit|tweak|sticky|bug|header|footer|color|colour)\b/.test(text);
+  const isFreshBuild = /\b(build|create|generate|scaffold)\b/.test(text);
+  if (isEdit && !isFreshBuild) return false;
+  const asksToMake = /\b(build|create|generate|scaffold|make)\b/.test(text);
+  if (!asksToMake) return false;
+  if (/\b(website|web site|landing page|storefront|homepage)\b/.test(text)) return true;
+  if (isFreshBuild && /\b(portfolio|blog|online store|online shop|dashboard|saas)\b/.test(text)) return true;
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -872,6 +886,23 @@ serve(async (req) => {
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+        : domain === "web-development" && wantsFullStackWebsite(messages)
+        ? `
+- FULL-STACK WEBSITE: Ignore the three-file-only rule for this request.
+- Return exactly these files:
+  client/index.html
+  client/styles.css
+  client/site.js
+  server/index.mjs
+  server/src/app.mjs
+  server/src/routes/api.mjs
+  server/src/data/seed.mjs
+  server/src/config/db.mjs
+  server/package.json
+  README.md
+- client/ is vanilla HTML, CSS, and JS. index.html links styles.css and site.js. site.js shows sample data immediately and fetches /api/content, keeping that sample data if the API is offline.
+- server/ is Express with "type": "module". index.mjs listens on PORT or 3000. app.mjs serves ../../client from server/src and mounts /api. api.mjs includes GET /health and GET /content. db.mjs connects to MongoDB only when MONGODB_URI is set.
+- Do not put server code in the client files.`
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
