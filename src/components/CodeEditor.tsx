@@ -22,6 +22,15 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_KINDS,
+  formatWebsiteAssistantMessage,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  shouldInlineInBrowserPreview,
+  type GeneratedFile,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -486,10 +495,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").includes("web-development")
+      ? `👋 I'm your **${domainName}** AI assistant.\n\n**Website Generator** below builds a full-stack site — HTML, CSS, and JS plus an Express API — and applies the files here. You can also ask me to build a website in chat.\n\nI can still debug, explain, and edit the code. Generated code is **automatically applied**.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("landing");
+  const [siteBrief, setSiteBrief] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Ghost text state
@@ -863,7 +876,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => !injectedFiles.has(name) && !name.includes("/") && shouldInlineInBrowserPreview(name, content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1059,6 +1072,70 @@ ${jsCode}
       setActiveTabId(newId);
     }
   }, [activeTabId, activeTab, updateNode, addChild]);
+
+  const applyGeneratedFiles = useCallback((files: GeneratedFile[]) => {
+    const placed = files.map((file) => ({
+      id: file.location === "root" ? file.path : `src/${file.path}`,
+      name: file.path,
+      lang: file.language,
+      code: file.content,
+      location: file.location,
+    }));
+
+    setFileTree((prev) => {
+      let tree = [...prev];
+      if (!tree.some((node) => node.id === "src" && node.type === "folder")) {
+        tree = [{ id: "src", name: "src", type: "folder", isOpen: true, children: [] }, ...tree];
+      }
+      placed.forEach((file) => {
+        if (findFile(tree, file.id)) {
+          tree = updateNode(tree, file.id, (node) => ({ ...node, content: file.code, language: file.lang }));
+        } else if (file.location === "root") {
+          tree = [...tree, { id: file.id, name: file.name, type: "file", language: file.lang, content: file.code }];
+        } else {
+          tree = addChild(tree, "src", { id: file.id, name: file.name, type: "file", language: file.lang, content: file.code });
+        }
+      });
+      return tree;
+    });
+
+    setOpenTabs((prev) => {
+      let tabs = [...prev];
+      placed.forEach((file) => {
+        const existing = tabs.find((tab) => tab.id === file.id);
+        if (existing) {
+          tabs = tabs.map((tab) => tab.id === file.id ? { ...tab, content: file.code, language: file.lang, isModified: true } : tab);
+        } else {
+          tabs = [...tabs, { id: file.id, name: file.name, language: file.lang, content: file.code, isModified: true }];
+        }
+      });
+      return tabs;
+    });
+
+    const htmlFile = placed.find((file) => file.name.endsWith(".html") && file.location === "src");
+    if (htmlFile) setActiveTabId(htmlFile.id);
+    setShowPreview(true);
+    window.setTimeout(() => {
+      setFileTree((currentTree) => {
+        if (htmlFile) setPreviewContent(buildPreviewHtml(htmlFile.code, collectFiles(currentTree)));
+        return currentTree;
+      });
+    }, 200);
+  }, [addChild, buildPreviewHtml, collectFiles, findFile, updateNode]);
+
+  const runWebsiteGenerator = useCallback((brief: string, kind?: WebsiteKind) => {
+    const prompt = brief.trim() || WEBSITE_KINDS.find((option) => option.id === (kind || siteKind))?.example || "Build a full-stack website";
+    const site = generateFullStackWebsite(prompt, kind || siteKind);
+    applyGeneratedFiles(site.files);
+    setCurrentProjectName(site.name);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: prompt },
+      { role: "assistant", content: formatWebsiteAssistantMessage(site) },
+    ]);
+    setOutput((prev) => [...prev, `🌐 Generated ${site.name}. Preview is using sample data. Run npm start for the API.`]);
+    setShowTerminal(true);
+  }, [applyGeneratedFiles, siteKind]);
 
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
@@ -1309,6 +1386,12 @@ ${jsCode}
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      const brief = chatInput;
+      setChatInput("");
+      runWebsiteGenerator(brief);
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1611,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, runWebsiteGenerator]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2558,6 +2641,64 @@ ${jsCode}
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {domainId === "web-development" && (
+              <div className="border-t p-2 shrink-0 space-y-2" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="flex items-center gap-1.5">
+                  <Wand2 className="h-3.5 w-3.5" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Website Generator</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {WEBSITE_KINDS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setSiteKind(option.id)}
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        backgroundColor: siteKind === option.id ? currentTheme.uiColors.accent : "transparent",
+                        color: siteKind === option.id ? "#081018" : currentTheme.uiColors.text,
+                        border: `1px solid ${siteKind === option.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                      }}
+                      title={option.description}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    value={siteBrief}
+                    onChange={(e) => setSiteBrief(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        runWebsiteGenerator(siteBrief, siteKind);
+                        setSiteBrief("");
+                      }
+                    }}
+                    placeholder={WEBSITE_KINDS.find((option) => option.id === siteKind)?.example}
+                    className="flex-1 rounded-md px-2 py-1.5 text-[11px] outline-none"
+                    style={{
+                      backgroundColor: currentTheme.uiColors.card,
+                      color: currentTheme.uiColors.text,
+                      border: `1px solid ${currentTheme.uiColors.border}`,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="h-7 px-2 rounded-md text-[10px] font-semibold"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#081018" }}
+                    onClick={() => {
+                      runWebsiteGenerator(siteBrief, siteKind);
+                      setSiteBrief("");
+                    }}
+                  >
+                    Generate
+                  </button>
                 </div>
               </div>
             )}

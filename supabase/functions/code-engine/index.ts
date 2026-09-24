@@ -874,15 +874,15 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
-- index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
-- Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
-- MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
-- Use a hero section with a full-width background image
-- Use responsive design with flexbox/grid and media queries
-- Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- STACK: HTML + CSS + JS for the client. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript.
+- For a single component or small edit, return index.html, styles.css, and script.js.
+- When the user asks to build, create, or generate a website or full-stack site, return this project instead:
+  src/index.html, src/styles.css, src/app.js, src/server.js, package.json, README.md
+- index.html links styles.css and app.js. app.js fetches JSON and renders SEED data when fetch fails so the editor preview still works.
+- server.js is Express with cors, express.json(), express.static(__dirname), and the routes app.js calls. No secrets.
+- package.json start script is "node src/server.js" with dependencies express and cors.
+- Add modern CSS (transitions, hover, gradients) and a responsive layout.
+- Include images with picsum or unsplash URLs.`
         : "";
       const systemPrompt = `${basePrompt}
 
