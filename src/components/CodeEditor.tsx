@@ -22,6 +22,13 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_BLUEPRINTS,
+  buildFullStackWebsite,
+  filesToProjectTree,
+  insertGeneratedFile,
+  isFullStackWebsiteRequest,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -237,7 +244,7 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[\*`]*([\w./-]+\.[\w]+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -247,7 +254,7 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
   }
   // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
   if (blocks.length > 0 && !blocks.some(b => b.filename)) {
-    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
+    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?([\w./-]+\.[\w]+)[`"']?/gi;
     let fnMatch;
     while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
       const unassigned = blocks.find(b => !b.filename);
@@ -486,8 +493,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: domainId === "web-development"
+      ? `👋 I'm your **${domainName}** AI assistant.\n\n- **Website generator** — use **Websites** below to scaffold a full-stack site (vanilla client + Express API)\n- **Generate code** — it lands in the editor and preview\n- **Debug and explain** — paste code or ask how it works\n\nFull-stack sites preview immediately. Start \`server/\` with npm when you want the API live.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
+  const [showWebsiteGenerator, setShowWebsiteGenerator] = useState(domainId === "web-development");
+  const [websiteBlueprintId, setWebsiteBlueprintId] = useState(WEBSITE_BLUEPRINTS[0].id);
+  const [websiteBrief, setWebsiteBrief] = useState("");
+  const websiteAutomationRef = useRef<string | undefined>(undefined);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -846,12 +859,15 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
     }
     
+    const isNodeSource = (source: string) =>
+      /\brequire\s*\(|\bmodule\.exports\b|\bprocess\.env\b|from\s+['"]express['"]/.test(source);
+
     // Find referenced JS files and inject inline if they exist in the project
     const jsScriptRegex = /<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/gi;
     let jsMatch;
     while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
+      if (allFiles[jsFileName] && !isNodeSource(allFiles[jsFileName])) {
         html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
         injectedFiles.add(jsFileName);
       }
@@ -863,7 +879,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isNodeSource(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1307,11 +1323,12 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (overrideText?: string) => {
+    const promptText = typeof overrideText === "string" ? overrideText : chatInput;
+    if (!promptText.trim() || chatLoading) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: promptText };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1345,7 +1362,10 @@ ${jsCode}
           }
           return { role: m.role, content: m.content };
         });
-        const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel });
+        const automation = websiteAutomationRef.current
+          || (domainId === "web-development" && isFullStackWebsiteRequest(promptText) ? "fullstack-website" : undefined);
+        websiteAutomationRef.current = undefined;
+        const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel, automation });
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
           let msg = err?.error || "Request failed.";
@@ -1387,7 +1407,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(promptText, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1406,29 +1426,21 @@ ${jsCode}
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const rawName = block.filename || `untitled.${ext}`;
+        const filePath = rawName.includes("/") ? rawName.replace(/^\/+/, "") : `src/${rawName}`;
+        const fname = filePath.split("/").pop() || rawName;
+        newFiles.push({ id: filePath, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
       });
 
-      // Batch update file tree in a single setState
+      // Batch update file tree in a single setState, including nested client/server paths
       setFileTree(prev => {
         let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
+        const needsSrc = newFiles.some((file) => file.id.startsWith("src/"));
+        if (needsSrc && !tree.some((node) => node.id === "src" && node.type === "folder")) {
+          tree = [{ id: "src", name: "src", type: "folder", isOpen: true, children: [] }, ...tree];
         }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
+        newFiles.forEach(({ id, lang, code }) => {
+          tree = insertGeneratedFile(tree, id, code, lang);
         });
         return tree;
       });
@@ -1491,7 +1503,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = promptText.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -1529,6 +1541,46 @@ ${jsCode}
 
     setChatLoading(false);
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+
+  const applyGeneratedWebsite = useCallback((blueprintId: string) => {
+    const site = buildFullStackWebsite(blueprintId, { brief: websiteBrief });
+    const tree = filesToProjectTree(site.files);
+    setFileTree(tree);
+    setOpenTabs(site.files.map((file) => ({
+      id: file.path,
+      name: file.path.split("/").pop() || file.path,
+      language: file.language,
+      content: file.content,
+      isModified: true,
+    })));
+    setActiveTabId("client/index.html");
+    setCurrentProjectName(site.blueprint.brand);
+    setShowPreview(true);
+    const previewFiles: Record<string, string> = {};
+    for (const file of site.files) {
+      if (file.path.startsWith("server/")) continue;
+      previewFiles[file.path] = file.content;
+      const baseName = file.path.split("/").pop();
+      if (baseName) previewFiles[baseName] = file.content;
+    }
+    const html = site.files.find((file) => file.path === "client/index.html")?.content || "";
+    setPreviewContent(buildPreviewHtml(html, previewFiles));
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Generate a full-stack ${site.blueprint.name.toLowerCase()} website${websiteBrief.trim() ? `: ${websiteBrief.trim()}` : ""}` },
+      { role: "assistant", content: site.summary },
+    ]);
+    return site;
+  }, [websiteBrief, buildPreviewHtml]);
+
+  const refineGeneratedWebsite = useCallback(() => {
+    const blueprint = WEBSITE_BLUEPRINTS.find((item) => item.id === websiteBlueprintId) ?? WEBSITE_BLUEPRINTS[0];
+    const brief = websiteBrief.trim() || blueprint.subhead;
+    websiteAutomationRef.current = "fullstack-website";
+    void handleChatSend(
+      `Full-stack website generator: build a ${blueprint.name.toLowerCase()} site for ${blueprint.brand}. ${brief}\n\nKeep client/index.html, client/styles.css, client/app.js, server/index.js, server/package.json, and README.md. The browser client must fall back to seed data when the API is offline.`
+    );
+  }, [websiteBlueprintId, websiteBrief, handleChatSend]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2562,9 +2614,84 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && showWebsiteGenerator && (
+              <div className="border-t overflow-y-auto shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "280px" }}>
+                <div className="px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} /> Full-stack website generator
+                  </span>
+                  <p className="text-[9px] mt-1" style={{ color: currentTheme.uiColors.muted }}>
+                    Builds a previewable client and an Express API. Files land in the editor.
+                  </p>
+                </div>
+                <div className="p-2 grid grid-cols-2 gap-1">
+                  {WEBSITE_BLUEPRINTS.map((blueprint) => {
+                    const selected = websiteBlueprintId === blueprint.id;
+                    return (
+                      <button
+                        key={blueprint.id}
+                        onClick={() => setWebsiteBlueprintId(blueprint.id)}
+                        className="flex items-start gap-1.5 px-2 py-1.5 rounded text-left"
+                        style={{
+                          backgroundColor: selected ? currentTheme.uiColors.accent + "18" : currentTheme.uiColors.card,
+                          border: `1px solid ${selected ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                        }}
+                      >
+                        <span className="text-sm leading-none">{blueprint.icon}</span>
+                        <span>
+                          <span className="text-[9px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{blueprint.name}</span>
+                          <span className="text-[7px]" style={{ color: currentTheme.uiColors.muted }}>{blueprint.description}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="px-2 pb-2 space-y-1.5">
+                  <input
+                    value={websiteBrief}
+                    onChange={(event) => setWebsiteBrief(event.target.value)}
+                    placeholder="Optional brief, for example a bakery in Lisbon"
+                    className="w-full rounded-md px-2 py-1.5 text-[10px] outline-none"
+                    style={{
+                      backgroundColor: currentTheme.uiColors.card,
+                      color: currentTheme.uiColors.text,
+                      border: `1px solid ${currentTheme.uiColors.border}`,
+                    }}
+                  />
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => applyGeneratedWebsite(websiteBlueprintId)}
+                      className="flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium"
+                      style={{ backgroundColor: currentTheme.uiColors.accent, color: "#fff" }}
+                    >
+                      Build website
+                    </button>
+                    <button
+                      onClick={refineGeneratedWebsite}
+                      disabled={chatLoading}
+                      className="flex-1 rounded-md px-2 py-1.5 text-[10px] font-medium disabled:opacity-50"
+                      style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                    >
+                      Refine with AI
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {domainId === "web-development" && (
+                  <button
+                    onClick={() => setShowWebsiteGenerator((open) => !open)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showWebsiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showWebsiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Websites
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}
@@ -2593,7 +2720,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => handleChatSend()}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />

@@ -63,7 +63,31 @@ Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .
       "system-design": `You are Lunor.AI's expert System Design tutor covering load balancing, caching, microservices, message queues, CAP theorem, sharding. Explain with component diagrams, estimate capacity, guide through trade-offs for real-world systems.`,
     };
 
-    const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
+    const lastUserText = Array.isArray(messages)
+      ? [...messages].reverse().find((m: { role?: string; content?: string }) => m?.role === "user")?.content || ""
+      : "";
+    const fullStackWebsite = domain === "web-development" &&
+      /full[\s-]?stack|website generator|mern\b|express\s+api|with (an? )?(api|backend)/i.test(String(lastUserText));
+
+    const basePrompt = fullStackWebsite
+      ? `You are Lunor.AI's full-stack website generator for Web Development. Build a vanilla client plus a CommonJS Express API.
+
+Return exactly these files, each introduced by its path on its own line:
+client/index.html
+client/styles.css
+client/app.js
+server/index.js
+server/package.json
+README.md
+
+Rules:
+- No React, JSX, TSX, Vue, or TypeScript.
+- client/index.html links styles.css and app.js and embeds seed JSON in <script id="site-seed" type="application/json">.
+- client/app.js uses fetch for GET /api/items and POST /api/leads, and falls back to the seed when the API is offline. No require() or imports.
+- server/index.js uses require("express") and require("cors"), listens on port 3001, and implements GET /api/health, GET /api/items, GET /api/leads, and POST /api/leads.
+- server/package.json depends on express and cors, with a start script of "node index.js".
+- Include real Unsplash image URLs. Keep the page responsive and visually finished.`
+      : (domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`);
     let systemPrompt = `${basePrompt}
 
 Rules:
@@ -73,8 +97,9 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
-    // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    // For ordinary web pages: keep a single previewable HTML file.
+    // Full-stack website requests use the multi-file generator prompt above.
+    if (domain === "web-development" && !fullStackWebsite) {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;

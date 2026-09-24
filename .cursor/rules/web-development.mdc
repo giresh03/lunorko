@@ -6,6 +6,16 @@ alwaysApply: false
 
 # Web Development - Modern Theme & Component Patterns
 
+## Full-stack website generator
+
+The Web Development AI assistant includes a website generator (`src/lib/websiteGenerator.ts`). It scaffolds:
+
+- `client/index.html`, `client/styles.css`, `client/app.js` — vanilla preview that falls back to seed data
+- `server/index.js`, `server/package.json` — CommonJS Express API (`GET /api/items`, `POST /api/leads`)
+- `README.md`
+
+Use that layout when a prompt asks for a full-stack website, website generator, or an Express API behind a page. Ordinary single-page prompts stay one HTML/CSS/JS preview.
+
 ## MERN Stack (Full-Stack)
 
 When the prompt mentions **MERN**, **MongoDB**, **Express**, **Node.js** (backend), or **full-stack JavaScript**:
