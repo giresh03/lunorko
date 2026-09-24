@@ -21,7 +21,15 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import WebsiteGeneratorPanel from "@/components/editor/WebsiteGeneratorPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { extractCodeBlocks, editorPathForGeneratedFile, getLang, LANG_EXT_MAP, LANG_MAP } from "@/lib/codeBlocks";
+import { insertProjectFile } from "@/lib/projectTree";
+import {
+  FULLSTACK_WEBSITE_AUTOMATION,
+  buildWebsiteGeneratorPrompt,
+  getWebsiteBlueprint,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -118,17 +126,6 @@ interface Message {
   content: string;
 }
 
-// -- Language helpers --
-const LANG_MAP: Record<string, string> = {
-  js: "javascript", ts: "typescript", py: "python", html: "html",
-  css: "css", json: "json", jsx: "javascript", tsx: "typescript",
-  md: "markdown", txt: "plaintext", xml: "xml", yaml: "yaml", yml: "yaml",
-  sh: "shell", bash: "shell", sql: "sql",
-};
-const getLang = (name: string) => {
-  const ext = name.split(".").pop()?.toLowerCase() || "";
-  return LANG_MAP[ext] || "plaintext";
-};
 const getFileIcon = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   const colors: Record<string, string> = {
@@ -183,85 +180,6 @@ const createDefaultProject = (domainName: string): FileNode[] => {
       content: `# ${domainName}\n\nWelcome to your ${domainName} workspace on **Lunor.AI**.\n\n## Environment\n- **Primary Language:** ${env.primaryLanguage}\n- **Supported:** ${env.supportedLanguages.join(", ")}\n- **Runtime:** ${env.runtime === "native" ? "⚡ Native execution" : "🤖 AI-simulated execution"}\n\n## Getting Started\n\n1. Edit files in the explorer\n2. Run code with the play button (supports ${env.supportedLanguages.join(", ")})\n3. Ask the AI assistant for help\n` },
   ];
 };
-
-// -- Extract code blocks from markdown with filename detection --
-const LANG_EXT_MAP: Record<string, string> = {
-  javascript: "js", typescript: "ts", python: "py", html: "html",
-  css: "css", json: "json", jsx: "jsx", tsx: "tsx", xml: "xml",
-  yaml: "yaml", shell: "sh", bash: "sh", sql: "sql", markdown: "md",
-};
-
-// Generate a descriptive filename from the user's prompt and code content
-function generateFileName(language: string, code: string, userPrompt?: string): string {
-  const ext = LANG_EXT_MAP[language] || LANG_EXT_MAP[LANG_MAP[language] || ""] || language || "js";
-  
-  // Try to extract a meaningful name from the prompt
-  if (userPrompt) {
-    const prompt = userPrompt.toLowerCase();
-    // Common patterns: "build a login page", "create a todo app", "make a calculator"
-    const patterns = [
-      /(?:build|create|make|generate|write|code)\s+(?:a|an|the)?\s*(.+?)(?:\s+(?:page|app|component|form|function|class|module|script|program|website|site|layout))/i,
-      /(?:build|create|make|generate|write|code)\s+(?:a|an|the)?\s*(.+)/i,
-      /(.+?)(?:\s+(?:page|app|component|form|function|class|module|script|program|website|site|layout))/i,
-    ];
-    for (const pattern of patterns) {
-      const match = prompt.match(pattern);
-      if (match?.[1]) {
-        const name = match[1]
-          .trim()
-          .replace(/[^a-z0-9\s]/gi, "")
-          .trim()
-          .split(/\s+/)
-          .slice(0, 3)
-          .map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-          .join("");
-        if (name && name.length >= 2) return `${name}.${ext}`;
-      }
-    }
-  }
-  
-  // Try to extract name from code content (e.g., title tag, class name, function name)
-  const titleMatch = code.match(/<title>([^<]+)<\/title>/i);
-  if (titleMatch) {
-    const name = titleMatch[1].replace(/[^a-z0-9\s]/gi, "").trim().split(/\s+/).slice(0, 3)
-      .map((w, i) => i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
-    if (name) return `${name}.${ext}`;
-  }
-  
-  const classMatch = code.match(/(?:class|function)\s+(\w+)/);
-  if (classMatch) return `${classMatch[1].charAt(0).toLowerCase() + classMatch[1].slice(1)}.${ext}`;
-  
-  // Fallback with readable name
-  return `untitled.${ext}`;
-}
-
-function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
-  // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
-  const blocks: { code: string; language: string; filename?: string }[] = [];
-  let match;
-  while ((match = regex.exec(markdown)) !== null) {
-    const filename = match[1] || undefined;
-    const lang = match[2] || "javascript";
-    blocks.push({ language: lang, code: match[3].trim(), filename });
-  }
-  // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
-  if (blocks.length > 0 && !blocks.some(b => b.filename)) {
-    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
-    let fnMatch;
-    while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
-      const unassigned = blocks.find(b => !b.filename);
-      if (unassigned) unassigned.filename = fnMatch[1];
-    }
-  }
-  // Generate proper filenames for blocks that still don't have one
-  blocks.forEach((block) => {
-    if (!block.filename) {
-      block.filename = generateFileName(block.language, block.code, userPrompt);
-    }
-  });
-  return blocks;
-}
 
 // -- File Explorer Item --
 const FileItem = ({
@@ -443,6 +361,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [showSiteGenerator, setShowSiteGenerator] = useState(false);
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -486,7 +405,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: domainName === "Web Development"
+      ? `👋 I'm your **${domainName}** AI assistant. Ask me to generate code, debug, or explain a concept — it lands in your files automatically.\n\nUse **Website Generator** below to build a full-stack site: previewable HTML, an Express API, and a MongoDB model.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -604,10 +525,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     const walk = (ns: FileNode[]) => {
       for (const n of ns) {
         if (n.type === "file" && n.content) {
-          // Store by full path id
           files[n.id] = n.content;
-          // Store by name — prefer src/ files (first occurrence wins since src is walked first)
-          if (!files[n.name]) files[n.name] = n.content;
+          const serverSide = /(^|\/)server\//.test(n.id) || n.name === "server.js";
+          if (!serverSide && !files[n.name]) files[n.name] = n.content;
         }
         if (n.children) walk(n.children);
       }
@@ -1307,11 +1227,11 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
-    // Add file context to the user message
-    const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+  const handleChatSend = useCallback(async (overrideText?: string, automation?: string) => {
+    const text = typeof overrideText === "string" ? overrideText : chatInput;
+    if (!text.trim() || chatLoading) return;
+    const fileContext = automation || !activeTab ? "" : `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\``;
+    const userMsg: Message = { role: "user", content: text };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
@@ -1330,7 +1250,7 @@ ${jsCode}
 
     // Check for cached response when offline
     if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+      const cached = findCachedAIResponse(text, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
@@ -1345,7 +1265,7 @@ ${jsCode}
           }
           return { role: m.role, content: m.content };
         });
-        const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel });
+        const resp = await fetchCodeEngine({ action: "generate", messages: messagesWithContext, domain: domainName, model: selectedModel, automation });
         if (!resp.ok) {
           const err = await resp.json().catch(() => ({}));
           let msg = err?.error || "Request failed.";
@@ -1387,7 +1307,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(text, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1407,28 +1327,15 @@ ${jsCode}
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const newId = editorPathForGeneratedFile(fname);
+        const name = newId.split("/").pop() || fname;
+        newFiles.push({ id: newId, name, lang: normalizedLang || getLang(name), code: block.code });
       });
 
-      // Batch update file tree in a single setState
       setFileTree(prev => {
         let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
+        newFiles.forEach(({ id, lang, code }) => {
+          tree = insertProjectFile(tree, id, { language: lang, content: code });
         });
         return tree;
       });
@@ -1491,7 +1398,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = text.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -1529,6 +1436,58 @@ ${jsCode}
 
     setChatLoading(false);
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+
+  const handleGenerateWebsite = useCallback((blueprintId: string, brief: string) => {
+    const blueprint = getWebsiteBlueprint(blueprintId);
+    if (!blueprint || chatLoading) return;
+
+    setFileTree((prev) => blueprint.files.reduce(
+      (tree, file) => insertProjectFile(tree, file.path, { language: file.language, content: file.content }),
+      prev,
+    ));
+
+    const htmlFile = blueprint.files.find((file) => file.path === "client/index.html");
+    const cssFile = blueprint.files.find((file) => file.path === "client/styles.css");
+    const jsFile = blueprint.files.find((file) => file.path === "client/script.js");
+    const serverFile = blueprint.files.find((file) => file.path === "server/index.js");
+
+    setOpenTabs((prev) => {
+      const next = [...prev];
+      for (const file of [htmlFile, serverFile]) {
+        if (!file) continue;
+        const tab = {
+          id: file.path,
+          name: file.path.split("/").pop() || file.path,
+          language: file.language,
+          content: file.content,
+          isModified: true,
+        };
+        const index = next.findIndex((item) => item.id === file.path);
+        if (index >= 0) next[index] = tab;
+        else next.push(tab);
+      }
+      return next;
+    });
+
+    if (htmlFile) {
+      setActiveTabId(htmlFile.path);
+      setShowPreview(true);
+      setPreviewContent(buildPreviewHtml(htmlFile.content, {
+        "index.html": htmlFile.content,
+        "styles.css": cssFile?.content || "",
+        "script.js": jsFile?.content || "",
+      }));
+    }
+    setShowSidebar(true);
+    setShowTerminal(true);
+    setOutput((prev) => [
+      ...prev,
+      `$ Website generator: ${blueprint.label}`,
+      "Wrote client/index.html, styles, script, Express API, and MongoDB model.",
+    ]);
+    setShowSiteGenerator(false);
+    void handleChatSend(buildWebsiteGeneratorPrompt(blueprint, brief), FULLSTACK_WEBSITE_AUTOMATION);
+  }, [buildPreviewHtml, chatLoading, handleChatSend]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2564,6 +2523,15 @@ ${jsCode}
 
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {domainId === "web-development" && (
+                <WebsiteGeneratorPanel
+                  open={showSiteGenerator}
+                  onToggle={() => setShowSiteGenerator((open) => !open)}
+                  disabled={chatLoading}
+                  themeColors={currentTheme.uiColors}
+                  onGenerate={handleGenerateWebsite}
+                />
+              )}
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
@@ -2593,7 +2561,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => { void handleChatSend(); }}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />
