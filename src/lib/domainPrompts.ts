@@ -10,12 +10,20 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor. Use vanilla HTML, CSS, and JavaScript on the client. NO React, TSX, TypeScript, or frameworks.
+
+SMALL WIDGETS (counter, todo, calculator, a single form): output ONE complete HTML file with <style> and <script> inside. Wrap it in an \`\`\`html code block.
+
+FULL-STACK WEBSITES (landing page, portfolio, blog, restaurant, shop, dashboard, or any request to generate a website): the Web Development assistant runs the website generator and writes these files into the project:
+- src/index.html, src/styles.css, src/app.js (browser only — no require)
+- src/server.js (Express JSON API under /api, plus static hosting of the client)
+- package.json and README.md
+If you are asked to extend that site, keep the same files. app.js must keep working when the API is offline. server.js must stay an Express server.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
+      "Generate a full-stack landing page website for a product called Lumen",
+      "Build a full-stack portfolio website for a designer named Studio North",
+      "Create a full-stack blog website called Field Notes",
+      "Build a full-stack restaurant website called Hearth and Oak",
     ],
   },
   "app-development": {

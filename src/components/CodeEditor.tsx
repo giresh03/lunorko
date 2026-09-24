@@ -22,6 +22,13 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  formatWebsiteAssistantMessage,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  WEBSITE_GENERATOR_PRESETS,
+  type GeneratedWebsite,
+} from "@/lib/fullStackWebsiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -485,8 +492,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+  const [messages, setMessages] = useState<Message[]>(() => [
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **Web Development** assistant.\n\nUse **Website generator** under the chat to scaffold a full-stack site — an HTML/CSS/JS client plus an Express API — straight into this project.\n\nYou can also ask me to debug, explain a concept, or build a small HTML widget.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -863,7 +875,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => {
+        if (!/\.(js|ts)$/.test(name) || injectedFiles.has(name) || name.includes("/") || name.endsWith(".html")) return false;
+        return !/lunor-node-server|\brequire\s*\(|module\.exports/.test(content);
+      })
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1306,16 +1321,81 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyWebsiteToWorkspace = useCallback((site: GeneratedWebsite) => {
+    const fileByName: Record<string, string> = {};
+    for (const file of site.files) {
+      fileByName[file.name] = file.content;
+      fileByName[file.path] = file.content;
+    }
+
+    setFileTree((prev) => {
+      let tree = prev;
+      if (!findFile(tree, "src")) {
+        tree = [{ id: "src", name: "src", type: "folder", isOpen: true, children: [] }, ...tree];
+      }
+      if (findFile(tree, "src/style.css")) tree = removeNode(tree, "src/style.css");
+      for (const file of site.files) {
+        const node: FileNode = {
+          id: file.path,
+          name: file.name,
+          type: "file",
+          language: file.language,
+          content: file.content,
+        };
+        if (findFile(tree, file.path)) {
+          tree = updateNode(tree, file.path, (n) => ({ ...n, content: file.content, language: file.language, name: file.name }));
+        } else if (file.path.startsWith("src/")) {
+          tree = addChild(tree, "src", node);
+        } else {
+          tree = [...tree, node];
+        }
+      }
+      return updateNode(tree, "src", (n) => ({ ...n, isOpen: true }));
+    });
+
+    const openNames = new Set(["index.html", "app.js", "server.js", "README.md"]);
+    setOpenTabs(site.files.filter((file) => openNames.has(file.name)).map((file) => ({
+      id: file.path,
+      name: file.name,
+      language: file.language,
+      content: file.content,
+      isModified: true,
+    })));
+    const html = site.files.find((file) => file.name === "index.html");
+    if (html) {
+      setActiveTabId(html.path);
+      setPreviewContent(buildPreviewHtml(html.content, fileByName));
+      setShowPreview(true);
+    }
+    setCurrentProjectName(site.title);
+    setShowTerminal(true);
+    setOutput([
+      `$ Website generator · ${site.title}`,
+      ...site.files.map((file) => `✔ ${file.path}`),
+      "$ Preview uses the generated page. Run npm install && npm start for the Express API.",
+    ]);
+  }, [findFile, updateNode, addChild, removeNode, buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
+  const handleChatSend = useCallback(async (override?: string) => {
+    const text = (typeof override === "string" ? override : chatInput).trim();
+    if (!text || chatLoading) return;
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+    const userMsg: Message = { role: "user", content: text };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
     setChatLoading(true);
+
+    if (domainId === "web-development" && isWebsiteGenerationRequest(text)) {
+      const site = generateFullStackWebsite(text);
+      applyWebsiteToWorkspace(site);
+      setMessages((prev) => [...prev, { role: "assistant", content: formatWebsiteAssistantMessage(site) }]);
+      setChatLoading(false);
+      return;
+    }
+
     let assistantSoFar = "";
 
     const upsert = (chunk: string) => {
@@ -1330,7 +1410,7 @@ ${jsCode}
 
     // Check for cached response when offline
     if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+      const cached = findCachedAIResponse(text, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
@@ -1387,7 +1467,7 @@ ${jsCode}
           }
         }
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(text, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1491,7 +1571,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = text.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -1528,10 +1608,15 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, applyWebsiteToWorkspace, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 Chat cleared. Ask for a full-stack website, or use the generator shortcuts below.`
+        : `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`,
+    }]);
   };
 
   // -- Project management --
@@ -2562,6 +2647,30 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Website generator</span>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {WEBSITE_GENERATOR_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => { void handleChatSend(preset.prompt); }}
+                      className="rounded-full px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
+                      style={{
+                        color: currentTheme.uiColors.text,
+                        backgroundColor: currentTheme.uiColors.bg,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
@@ -2593,7 +2702,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => { void handleChatSend(); }}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />

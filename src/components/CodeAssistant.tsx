@@ -3,6 +3,7 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import { formatWebsiteAssistantMessage, generateFullStackWebsite, isWebsiteGenerationRequest } from "@/lib/fullStackWebsiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -44,8 +45,18 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     const userMsg: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
+    const prompt = input;
     setInput("");
     setIsLoading(true);
+
+    if (domainId === "web-development" && isWebsiteGenerationRequest(prompt)) {
+      const site = generateFullStackWebsite(prompt);
+      setMessages((prev) => [...prev, { role: "assistant", content: formatWebsiteAssistantMessage(site) }]);
+      const html = site.files.find((file) => file.name === "index.html");
+      if (html && onSendToEditor) onSendToEditor(html.content, "html");
+      setIsLoading(false);
+      return;
+    }
 
     let assistantSoFar = "";
 
@@ -136,7 +147,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainName, domainId, onSendToEditor]);
 
   const handleClear = () => {
     setMessages([

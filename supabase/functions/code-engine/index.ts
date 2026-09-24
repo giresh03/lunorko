@@ -542,6 +542,7 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITE GENERATOR** — When the user asks to build or generate a website, landing page, portfolio, blog, restaurant, shop, or dashboard, keep the client as vanilla HTML/CSS/JS and add an Express API. Files: index.html, styles.css, app.js, server.js, package.json, README.md. app.js must not use require. server.js must start with the comment /* lunor-node-server */, use express.json(), serve JSON under /api, and serve the client with express.static. The page must still look complete if the API request fails.
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -615,6 +616,16 @@ async function callAINonStream(
   if (!resp.ok) throw new Error(`AI error: ${resp.status}`);
   const data = await resp.json();
   return data.choices?.[0]?.message?.content || "";
+}
+
+function wantsFullStackWebsite(messages: Array<{ role: string; content: string }> | undefined): boolean {
+  if (!Array.isArray(messages)) return false;
+  const userText = [...messages].reverse().find((message) => message?.role === "user" && typeof message.content === "string")?.content || "";
+  const text = userText.slice(0, 2000);
+  if (/\b(counter|calculator|todo|to-do|login form)\b/i.test(text) && !/\bwebsite\b/i.test(text)) return false;
+  const mentionsSite = /\b(full[\s-]?stack|website|web\s*site|landing\s*page|homepage|portfolio|blog|restaurant|online\s+store|e-?commerce|dashboard)\b/i.test(text);
+  const mentionsBuild = /\b(build|create|make|generate|scaffold|design|code)\b/i.test(text) || /\bfull[\s-]?stack\b/i.test(text);
+  return mentionsSite && mentionsBuild;
 }
 
 function normalizeLovableModel(requested?: string): string {
@@ -865,6 +876,7 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
+      const fullStackWebsite = domain === "web-development" && wantsFullStackWebsite(messages);
       const stackDirective = domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
@@ -872,6 +884,14 @@ serve(async (req) => {
 - index.html: <link href="styles.css"> and <script src="script.js"></script>
 - Add modern CSS animations (transitions, keyframes, hover effects)
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
+        : domain === "web-development" && fullStackWebsite
+        ? `
+- STACK: vanilla HTML/CSS/JS client PLUS an Express API. Do NOT generate React, JSX, TSX, Vue, or TypeScript.
+- Return these files: index.html, styles.css, app.js, server.js, package.json, README.md
+- index.html links styles.css and app.js, and includes a hero plus real Unsplash images
+- app.js is browser-only: no require, no module.exports. It fetches /api routes and leaves the static HTML in place if the request fails
+- server.js begins with the comment /* lunor-node-server */. Use express, express.json(), JSON routes under /api, and express.static(__dirname)
+- package.json script "start" runs node src/server.js and depends on express`
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
@@ -882,7 +902,8 @@ serve(async (req) => {
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
+- If the open project already has server.js, keep that Express API when you edit the page`
         : "";
       const systemPrompt = `${basePrompt}
 
