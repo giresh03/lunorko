@@ -3,6 +3,7 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import { generateWebsite, isWebsiteGenerationRequest } from "@/lib/websiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -59,6 +60,12 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
     };
+
+    if (domainId === "web-development" && isWebsiteGenerationRequest(userMsg.content)) {
+      upsert(generateWebsite(userMsg.content).markdown);
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -136,7 +143,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainName, domainId]);
 
   const handleClear = () => {
     setMessages([
