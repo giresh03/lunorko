@@ -5,6 +5,8 @@ import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
+import { WebsiteGeneratorPanel } from "@/components/editor/WebsiteGeneratorPanel";
+import { generateWebsite, matchWebsiteRequest, type WebsiteKind } from "@/lib/websiteGenerator";
 
 interface Message {
   role: "user" | "assistant";
@@ -25,12 +27,12 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
 
   const promptConfig = useMemo(() => getDomainPromptConfig(domainId), [domainId]);
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => [{
+    role: "assistant",
+    content: domainId === "web-development"
+      ? `👋 Hi! I'm your **Web Development** assistant. Use **Website Generator** below to scaffold a full-stack site, or ask me to build a landing page, portfolio, blog, shop, or dashboard.`
+      : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+  }]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -39,8 +41,25 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const describeWebsite = useCallback((brief: string, kind?: WebsiteKind, title?: string) => {
+    const site = generateWebsite({ brief, kind, title });
+    const blocks = site.files
+      .map((file) => `**${file.path}**\n\n\`\`\`${file.language === "plaintext" ? "" : file.language}\n${file.content}\n\`\`\``)
+      .join("\n\n");
+    return `**${site.title}**\n\n${site.summary}\n\n### Run the API\n\n\`\`\`bash\nnpm install\nnpm start\n\`\`\`\n\n${blocks}`;
+  }, []);
+
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
+    if (domainId === "web-development") {
+      const intent = matchWebsiteRequest(input);
+      if (intent) {
+        const reply = describeWebsite(intent.brief, intent.kind, intent.title);
+        setMessages((prev) => [...prev, { role: "user", content: input }, { role: "assistant", content: reply }]);
+        setInput("");
+        return;
+      }
+    }
     const userMsg: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -136,7 +155,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainName, domainId, describeWebsite]);
 
   const handleClear = () => {
     setMessages([
@@ -244,6 +263,16 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
             ))}
           </div>
         </div>
+      )}
+
+      {domainId === "web-development" && (
+        <WebsiteGeneratorPanel
+          busy={isLoading}
+          onGenerate={(request) => {
+            const reply = describeWebsite(request.brief, request.kind, request.title);
+            setMessages((prev) => [...prev, { role: "user", content: request.brief }, { role: "assistant", content: reply }]);
+          }}
+        />
       )}
 
       {/* Input */}
