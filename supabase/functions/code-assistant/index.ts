@@ -77,7 +77,9 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: For a small widget, output ONLY one \`\`\`html code block containing a complete page. No React, TSX, or TypeScript component files.
+
+If the user asks for a website, landing page, or full-stack site, output these paths (one fenced block each): client/index.html, client/styles.css, client/app.js, server/server.mjs, package.json, README.md. server/server.mjs is ESM Express on port 3000, serves ../client, and exposes /api JSON. client/app.js must render from seed data when fetch("/api") fails. package.json uses "type": "module" and "start": "node server/server.mjs".`;
     }
 
     if (useGoogleAI) {

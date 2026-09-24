@@ -542,6 +542,7 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITES** — The Web Development assistant scaffolds landing, portfolio, restaurant, store, blog, and dashboard sites as client/index.html, client/styles.css, client/app.js, server/server.mjs, package.json, and README.md. When you edit or regenerate a website, keep those paths. server/server.mjs is ESM Express (\`import express from "express"\`), port 3000, \`express.static\` of ../client, and JSON /api routes. client/app.js must still render from seed data if fetch("/api") fails. Do not emit React. Do not rename server.mjs to .js.
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -875,8 +876,9 @@ serve(async (req) => {
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
-- index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
+- For a small widget, return exactly 3 files: index.html, styles.css, script.js
+- For a website, return client/index.html, client/styles.css, client/app.js, server/server.mjs, package.json, and README.md. server/server.mjs is ESM Express on port 3000 and serves ../client. client/app.js must work from seed data if /api is down.
+- index.html must include: <link href="styles.css">, <script src="app.js"></script> or <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
