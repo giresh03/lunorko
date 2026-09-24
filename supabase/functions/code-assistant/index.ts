@@ -73,11 +73,28 @@ Rules:
 - If asked to debug, explain what's wrong and provide the fix
 - Suggest improvements when you see opportunity`;
 
+    const lastUser = Array.isArray(messages)
+      ? [...messages].reverse().find((m: { role?: string }) => m?.role === "user")?.content || ""
+      : "";
+    const fullStackWebsite = domain === "web-development" && /\[automation:fullstack-website\]|full-?stack website|website generator/i.test(String(lastUser));
+
     // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
-    if (domain === "web-development") {
+    if (domain === "web-development" && !fullStackWebsite) {
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+    }
+    if (fullStackWebsite) {
+      systemPrompt += `
+
+FULL-STACK WEBSITE GENERATOR:
+Ignore the single-file limit. Return a previewable vanilla site and a Node API. Put each path on its own line before its code fence:
+client/index.html, client/styles.css, client/script.js, server/index.js, server/routes/api.js, server/models/Item.js, package.json, .env.example, README.md.
+The HTML page must set data-themed on body, link styles.css, and load script.js. No React or JSX.
+server/index.js is CommonJS Express with cors, JSON parsing, GET /api/health, the router at /api, and static files from ../client.
+The route file serves GET and POST for the main resource and falls back to an in-memory array when MONGODB_URI is empty.
+server/models/Item.js is a Mongoose schema with title, summary, image, price, and tag.
+package.json starts with node server/index.js and depends on express, cors, dotenv, and mongoose.`;
     }
 
     if (useGoogleAI) {

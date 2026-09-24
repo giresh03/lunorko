@@ -865,7 +865,37 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const lastUserText = Array.isArray(messages)
+        ? [...messages].reverse().find((m) => m?.role === "user")?.content || ""
+        : "";
+      const fullStackWebsite = domain === "web-development" && (
+        body.automation === "fullstack-website" ||
+        /\[automation:fullstack-website\]|full-?stack website|website generator/i.test(String(lastUserText))
+      );
+      const stackDirective = fullStackWebsite
+        ? `
+OVERRIDE for the Website Generator automation:
+Ignore the three-file limit. This request is a full-stack website. Keep the browser page as vanilla HTML, CSS, and JavaScript — no React, JSX, or TypeScript.
+Return every one of these paths, each on its own line immediately before its code fence:
+client/index.html
+client/styles.css
+client/script.js
+server/index.js
+server/routes/api.js
+server/models/Item.js
+package.json
+.env.example
+README.md
+client/index.html sets data-themed on body, links href="styles.css", and loads src="script.js".
+Build a complete multi-section site for the brief, with a hero image and at least 3 Unsplash images.
+client/script.js fetches the JSON API and leaves the static HTML in place if that request fails.
+server/index.js is CommonJS Express with cors, express.json, GET /api/health, the router mounted at /api, and express.static for ../client.
+server/routes/api.js implements GET and POST for the main resource and uses an in-memory seed when MongoDB is not connected.
+server/models/Item.js exports a Mongoose schema (title, summary, image, price, tag) and connect() returns null when MONGODB_URI is empty.
+package.json start script is "node server/index.js" with dependencies express, cors, dotenv, mongoose.
+.env.example contains PORT and MONGODB_URI.
+Customize copy, palette, and seed records to the brief. Do not drop the server files.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
