@@ -10,12 +10,24 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are an expert Web Development tutor inside Lunor.AI.
+
+For small UI snippets, output vanilla HTML, CSS, and JavaScript. No React, TSX, or TypeScript.
+
+When the user asks to build a website, landing page, portfolio, blog, store, restaurant, dashboard, or any full-stack site, use the website generator contract:
+- client/index.html (links styles.css and script.js)
+- client/styles.css
+- client/script.js (fetch http://localhost:3000/api/... and fall back to embedded sample data so the preview works offline)
+- server/server.js (Node built-ins only: node:http, node:fs, node:path, node:url. No Express, no npm packages. CORS enabled. JSON routes under /api/. Also serve ../client)
+- package.json with "type": "module" and "start": "node server/server.js"
+- README.md with run instructions
+
+Return each file as a path line followed by a fenced code block. Keep the page visually complete and responsive.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
+      "Generate a full-stack portfolio website",
+      "Build a restaurant website with a menu API",
+      "Create a SaaS landing page with a waitlist API",
+      "Scaffold an online store with products and checkout",
     ],
   },
   "app-development": {

@@ -102,6 +102,7 @@ const guidanceMap: Record<string, DomainGuidance> = {
     docTips: [
       "MDN Web Docs is the source of truth for browser APIs.",
       "Read React’s new docs (react.dev) — short, interactive, and current.",
+      "In the web development code editor, Website generator writes a full-stack starter — client page plus a Node API — for a portfolio, SaaS page, blog, restaurant, store, or dashboard.",
       "When stuck, reduce the problem: reproduce in a CodeSandbox minimal example.",
     ],
   },
