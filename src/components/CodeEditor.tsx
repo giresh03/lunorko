@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { shouldInjectBrowserScript } from "@/lib/previewAssets";
+import {
+  WEBSITE_AUTOMATIONS,
+  describeWebsite,
+  generateFullStackWebsite,
+  isWebsiteGenerationRequest,
+  toProjectTree,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -395,6 +403,14 @@ const LAYOUT_SUGGESTIONS = [
   { id: "form", icon: "📝", label: "Adaptive Form", desc: "Keyboard-aware", prompt: "Generate a keyboard-aware form with TextInput fields, validation, and proper spacing that adapts to screen size" },
 ];
 
+function assistantWelcome(domainName: string): string {
+  const id = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  if (id === "web-development") {
+    return `👋 I'm your **Web Development** AI assistant.\n\nThe **Website generator** below scaffolds a full-stack site — HTML, CSS, and JavaScript on the client, plus an Express API — straight into your files.\n\nAsk me to build a website in your own words, or use a preset. I can also debug and explain code.`;
+  }
+  return `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`;
+}
+
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode[]>([]);
@@ -486,7 +502,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: assistantWelcome(domainName) },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -863,7 +879,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name]) => shouldInjectBrowserScript(name, allFiles) && !injectedFiles.has(name) && !name.includes("/"))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -941,7 +957,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name]) => shouldInjectBrowserScript(name, allFiles) && !name.includes("/") && name !== activeTab?.name)
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1306,6 +1322,60 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const scaffoldWebsite = useCallback((brief: string) => {
+    const site = generateFullStackWebsite(brief);
+    const tree = toProjectTree(site.files) as FileNode[];
+    setFileTree(tree);
+    setCurrentProjectName(site.title);
+    setShowWelcome(false);
+    setShowNewProject(false);
+    setSidebarTab("files");
+
+    const fileMap: Record<string, string> = {};
+    for (const file of site.files) {
+      fileMap[file.path] = file.content;
+      const base = file.path.split("/").pop() || file.path;
+      if (!fileMap[base]) fileMap[base] = file.content;
+    }
+
+    const openIds = ["client/index.html", "client/app.js", "server/index.js", "server/routes/api.js"];
+    const tabs: OpenTab[] = [];
+    for (const id of openIds) {
+      const file = site.files.find((entry) => entry.path === id);
+      if (!file) continue;
+      tabs.push({
+        id,
+        name: id.split("/").pop() || id,
+        language: file.language,
+        content: file.content,
+        isModified: true,
+      });
+    }
+    setOpenTabs(tabs);
+    setActiveTabId(site.previewFile);
+    setShowPreview(true);
+    setShowTerminal(true);
+    const html = site.files.find((file) => file.path === site.previewFile)?.content || "";
+    setPreviewContent(buildPreviewHtml(html, fileMap));
+    setOutput([
+      `$ Generated ${site.title}`,
+      "Client preview is using local seed data.",
+      "Run locally with: npm install && npm start",
+    ]);
+    return site;
+  }, [buildPreviewHtml]);
+
+  const launchWebsiteAutomation = useCallback((brief: string) => {
+    if (chatLoading) return;
+    const site = scaffoldWebsite(brief);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: brief },
+      { role: "assistant", content: describeWebsite(site) },
+    ]);
+    setChatInput("");
+  }, [chatLoading, scaffoldWebsite]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
@@ -1316,6 +1386,14 @@ ${jsCode}
     setMessages(updated);
     setChatInput("");
     setChatLoading(true);
+
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      const site = scaffoldWebsite(chatInput);
+      setMessages((prev) => [...prev, { role: "assistant", content: describeWebsite(site) }]);
+      setChatLoading(false);
+      return;
+    }
+
     let assistantSoFar = "";
 
     const upsert = (chunk: string) => {
@@ -1528,10 +1606,10 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, scaffoldWebsite]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{ role: "assistant", content: assistantWelcome(domainName) }]);
   };
 
   // -- Project management --
@@ -2558,6 +2636,34 @@ ${jsCode}
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Website generator</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {WEBSITE_AUTOMATIONS.map((automation) => (
+                    <button
+                      key={automation.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => launchWebsiteAutomation(automation.brief)}
+                      className="rounded px-1.5 py-1 text-left text-[9px] font-medium disabled:opacity-50"
+                      style={{
+                        backgroundColor: currentTheme.uiColors.card,
+                        color: currentTheme.uiColors.text,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                      title={automation.brief}
+                    >
+                      {automation.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
