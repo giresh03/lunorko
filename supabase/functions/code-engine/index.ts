@@ -874,15 +874,18 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- STACK: HTML + CSS + JS ONLY for the client. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
+- Always return these client files: client/index.html, client/styles.css, client/script.js
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
+- FULL-STACK WEBSITE AUTOMATION: if the user asks for a full-stack website, a site with a backend or API, or a landing, portfolio, blog, store, or dashboard site, ALSO return server/server.js and server/package.json
+- server/server.js uses Express only. Serve ../client as static files. Include GET /api/health, one GET collection such as /api/projects, POST /api/messages, and POST /api/orders. Keep data in memory. No secrets, no database URL, no MongoDB connection string.
+- client/script.js must fetch that collection and, on any failure, render embedded sample records so the in-editor preview still works. Put data-themed on the body.`
         : "";
       const systemPrompt = `${basePrompt}
 

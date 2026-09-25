@@ -22,6 +22,7 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { WEBSITE_AUTOMATIONS, buildWebsiteProject, type WebsiteKind } from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -486,10 +487,11 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n${domainId === "web-development" ? "- **Full-stack websites** — use the generator under this chat to drop in a client and an Express API\n" : ""}\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [showWebsiteGenerator, setShowWebsiteGenerator] = useState(domainId === "web-development");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Ghost text state
@@ -863,7 +865,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && name !== "server.js")
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -941,7 +943,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && name !== "server.js" && !name.startsWith("server/"))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1533,6 +1535,27 @@ ${jsCode}
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
   };
+
+  const handleGenerateWebsite = useCallback((kind: WebsiteKind) => {
+    const project = buildWebsiteProject(kind);
+    setFileTree(project.tree);
+    setOpenTabs(project.openTabs);
+    setActiveTabId(project.activeFileId);
+    setCurrentProjectName(project.name);
+    setShowPreview(true);
+    setShowTerminal(true);
+    setOutput([
+      `$ Generated ${project.name}`,
+      "client/index.html · client/styles.css · client/script.js",
+      "server/server.js · server/package.json",
+      "Preview uses sample data until you run: cd server && npm install && npm start",
+    ]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Generate the full-stack ${project.name} website` },
+      { role: "assistant", content: project.summary },
+    ]);
+  }, []);
 
   // -- Project management --
   const handleSaveProject = useCallback(() => {
@@ -2562,9 +2585,46 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && showWebsiteGenerator && (
+              <div className="border-t shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="px-3 py-2 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                    Full-stack website generator
+                  </span>
+                </div>
+                <div className="px-2 pb-2 grid grid-cols-2 gap-1">
+                  {WEBSITE_AUTOMATIONS.map((site) => (
+                    <button
+                      key={site.id}
+                      onClick={() => handleGenerateWebsite(site.id)}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded text-left transition-colors"
+                      style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}
+                    >
+                      <span className="text-sm">{site.icon}</span>
+                      <span>
+                        <span className="text-[9px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{site.label}</span>
+                        <span className="text-[7px]" style={{ color: currentTheme.uiColors.muted }}>{site.description}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {domainId === "web-development" && (
+                  <button
+                    onClick={() => setShowWebsiteGenerator((open) => !open)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showWebsiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showWebsiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Websites
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}
