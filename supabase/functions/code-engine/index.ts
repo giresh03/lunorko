@@ -1458,7 +1458,7 @@ How to use this library (frontend quality is judged on it):
       const shopIntent = /\b(e-?commerce|ecom|shop|shopping|store|storefront|cart|checkout|product catalog|marketplace|sneaker|clothing|apparel|grocery|electronics store)\b/i
         .test(shopIntentText.split("[CURRENT PROJECT STATE")[0]);
 
-      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${domain === "web-development" ? SITEFORGE_CHARTER : ""}${shopIntent ? COMMERCE_BLUEPRINT : ""}${exemplarBlock}${uiBlock}
+      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${BUILD_PIPELINE_CHARTER}${domain === "web-development" ? SITEFORGE_CHARTER : ""}${shopIntent ? COMMERCE_BLUEPRINT : ""}${exemplarBlock}${uiBlock}
 
 
 OPERATING MODE (decide this FIRST, before writing anything):
