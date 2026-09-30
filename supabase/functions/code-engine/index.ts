@@ -821,6 +821,24 @@ Only drop the backend if the user literally wrote "static", "no backend" or "UI 
 
 // Appended ONLY for shop/e-commerce prompts: a proven MERN-shop architecture mapped onto
 // Lunor's live runtime (vanilla multi-page + /api/*).
+const BUILD_PIPELINE_CHARTER = `
+=== LUNOR BUILD PIPELINE (MANDATORY ORDER FOR EVERY NEW BUILD) ===
+Work through these stages in order. Never skip one, and never write code before stages 1-6 are done.
+1. REQUIREMENTS: extract the concrete requirements from the user's prompt - business type, audience, must-have features, content needed. State them as a short list.
+2. SPECIFICATION: turn those into a website spec - page list with the purpose of each page, and the user flows (visitor, signed-in user, admin).
+3. ARCHITECTURE: state the architecture in one short block - pages, shared layout, api.js as the only backend access layer, auth-gated pages, admin area.
+4. COMPONENTS: pick the sections/components each page needs (hero, features, listing grid, detail view, forms, dashboard tables, empty/loading/error states).
+5. DATABASE SCHEMA: emit the DataModel JSON block. snake_case, money in integer cents, relations as uuid columns; never declare id/owner_id/created_at/updated_at.
+6. BACKEND API SPEC: list the endpoints each page uses (GET/POST /api/<collection>, /api/auth/register, /api/auth/login, /api/auth/me, LunorPay for payments). Do not invent endpoints outside the live runtime contract.
+7. FRONTEND GENERATION: write the real page files - index.html plus every page in the spec, styles.css, script.js. 8-14 real sections per page, real copy, no lorem ipsum, no dead buttons.
+8. BACKEND GENERATION: write api.js implementing every endpoint from stage 6, including auth token storage, requireAuth(), money(cents) and LunorPay.checkout.
+9. TESTING: after the files, self-check against a checklist - every nav link points to a file that exists, every fetch hits a declared endpoint, every list has loading/empty/error states, auth-gated pages redirect, checkout creates a record only after payment succeeds.
+10. AUTOMATIC FIXING: if the self-check finds a mismatch, immediately re-emit the corrected file in the same response. Never end a response with a known broken link or endpoint.
+11. PREVIEW: assume the user sees a live preview of exactly these files - the home page must render fully on first load with seeded or fetched content, not a blank shell.
+12. DEPLOY: keep everything deploy-ready - relative paths only, no local-only dependencies, no build step required.
+Keep stages 1-6 brief (a few lines each) so the code arrives quickly. Stages 1-6 are planning output, not prose padding.
+`;
+
 const COMMERCE_BLUEPRINT = `
 
 COMMERCE BLUEPRINT (this request is a shop/store — follow this reference architecture exactly)
@@ -1440,7 +1458,7 @@ How to use this library (frontend quality is judged on it):
       const shopIntent = /\b(e-?commerce|ecom|shop|shopping|store|storefront|cart|checkout|product catalog|marketplace|sneaker|clothing|apparel|grocery|electronics store)\b/i
         .test(shopIntentText.split("[CURRENT PROJECT STATE")[0]);
 
-      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${domain === "web-development" ? SITEFORGE_CHARTER : ""}${shopIntent ? COMMERCE_BLUEPRINT : ""}${exemplarBlock}${uiBlock}
+      const systemPrompt = `${basePrompt}${FULL_STACK_BUILDER_CHARTER}${BUILD_PIPELINE_CHARTER}${domain === "web-development" ? SITEFORGE_CHARTER : ""}${shopIntent ? COMMERCE_BLUEPRINT : ""}${exemplarBlock}${uiBlock}
 
 
 OPERATING MODE (decide this FIRST, before writing anything):
