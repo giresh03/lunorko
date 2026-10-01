@@ -22,6 +22,13 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_AUTOMATIONS,
+  filesToProjectTree,
+  generateWebsite,
+  isNodeServerSource,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -56,6 +63,7 @@ function deleteProject(id: string) {
 const PROJECT_TEMPLATES = [
   { id: "blank", name: "Blank Project", description: "Empty project with a single file", icon: "📄" },
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
+  { id: "full-stack-site", name: "Full-Stack Website", description: "Client plus Express API", icon: "🏗️" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
 ];
@@ -64,6 +72,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
   switch (templateId) {
     case "blank":
       return [{ id: "main.js", name: "main.js", type: "file", language: "javascript", content: `// ${projectName}\n// ${domain}\n\nconsole.log("Hello, World!");\n` }];
+    case "full-stack-site":
+      return filesToProjectTree(generateWebsite("landing", projectName).files) as FileNode[];
     case "web-app":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -237,7 +247,7 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[\*`]*([\w./-]+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -247,7 +257,7 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
   }
   // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
   if (blocks.length > 0 && !blocks.some(b => b.filename)) {
-    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
+    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?([\w./-]+\.\w+)[`"']?/gi;
     let fnMatch;
     while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
       const unassigned = blocks.find(b => !b.filename);
@@ -261,6 +271,35 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
     }
   });
   return blocks;
+}
+
+function insertFileNode(tree: FileNode[], filePath: string, language: string, content: string): FileNode[] {
+  const next = JSON.parse(JSON.stringify(tree)) as FileNode[];
+  const parts = filePath.split("/").filter(Boolean);
+  let level = next;
+  let acc = "";
+  parts.forEach((part, index) => {
+    acc = acc ? `${acc}/${part}` : part;
+    const isFile = index === parts.length - 1;
+    if (isFile) {
+      const existing = level.find((node) => node.id === acc && node.type === "file");
+      if (existing) {
+        existing.content = content;
+        existing.language = language;
+        return;
+      }
+      level.push({ id: acc, name: part, type: "file", language, content });
+      return;
+    }
+    let folder = level.find((node) => node.id === acc && node.type === "folder");
+    if (!folder) {
+      folder = { id: acc, name: part, type: "folder", isOpen: true, children: [] };
+      level.push(folder);
+    }
+    folder.children = folder.children || [];
+    level = folder.children;
+  });
+  return next;
 }
 
 // -- File Explorer Item --
@@ -485,9 +524,16 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+  const [messages, setMessages] = useState<Message[]>(() => [
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Website Generator** to write a full-stack site — client HTML/CSS/JS plus an Express API — or ask me to build one.\n\nGenerated code is **automatically applied** to your files.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
+  const [siteName, setSiteName] = useState("Lunor Studio");
+  const [showSiteGenerator, setShowSiteGenerator] = useState(domainId === "web-development");
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -506,7 +552,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const activeTab = openTabs.find((t) => t.id === activeTabId);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [messages]);
 
   useImperativeHandle(ref, () => ({
@@ -863,7 +909,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isNodeServerSource(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -941,7 +987,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       }
       // Inject ALL JS files (not just active) so DOM references work
       const allJs = Object.entries(allFiles)
-        .filter(([name]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name)
+        .filter(([name, content]) => /\.(js|ts)$/.test(name) && name !== activeTab?.name && !name.includes("/") && !isNodeServerSource(content))
         .map(([name, content]) => `/* ${name} */\n${content}`)
         .join("\n");
       const jsTag = `<script>${allJs}\n/* ${activeTab?.name || "active"} */\n${jsCode}<\/script>`;
@@ -1406,32 +1452,17 @@ ${jsCode}
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const fname = (block.filename || `untitled.${ext}`).replace(/^\/+/, "");
+        const relative = fname.includes("/") ? fname : `src/${fname}`;
+        const baseName = relative.split("/").pop() || fname;
+        newFiles.push({ id: relative, name: baseName, lang: normalizedLang || getLang(baseName), code: block.code });
       });
 
-      // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
-        });
-        return tree;
-      });
+      // Batch update file tree in a single setState, including nested client/server paths
+      setFileTree(prev => newFiles.reduce(
+        (tree, file) => insertFileNode(tree, file.id, file.lang, file.code),
+        prev,
+      ));
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1449,7 +1480,7 @@ ${jsCode}
 
       // Auto-select the best file for preview (prefer HTML, then first JS)
       const htmlFile = newFiles.find(f => f.lang === "html" || f.name.endsWith(".html"));
-      const jsFile = newFiles.find(f => ["javascript", "typescript"].includes(f.lang) || /\.(js|jsx|ts|tsx)$/.test(f.name));
+      const jsFile = newFiles.find(f => !isNodeServerSource(f.code) && (["javascript", "typescript"].includes(f.lang) || /\.(js|jsx|ts|tsx)$/.test(f.name)));
       const bestFile = htmlFile || jsFile || newFiles[0];
       if (bestFile) setActiveTabId(bestFile.id);
 
@@ -1531,8 +1562,46 @@ ${jsCode}
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
-    setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
+    setMessages([{
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 Chat cleared! I'm your **${domainName}** assistant. Use **Website Generator** for a full-stack site, or ask me to build one.`
+        : `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!`,
+    }]);
   };
+
+  const handleGenerateWebsite = useCallback((kind: WebsiteKind) => {
+    const name = siteName.trim() || "Lunor Site";
+    const site = generateWebsite(kind, name);
+    setFileTree(filesToProjectTree(site.files) as FileNode[]);
+    setCurrentProjectName(name);
+    const htmlFile = site.files.find((file) => file.path === "client/index.html");
+    if (htmlFile) {
+      setOpenTabs([{
+        id: htmlFile.path,
+        name: "index.html",
+        language: "html",
+        content: htmlFile.content,
+        isModified: true,
+      }]);
+      setActiveTabId(htmlFile.path);
+      const fileMap: Record<string, string> = {};
+      site.files.forEach((file) => {
+        fileMap[file.path] = file.content;
+        const base = file.path.split("/").pop() || file.path;
+        if (!isNodeServerSource(file.content)) fileMap[base] = file.content;
+      });
+      setShowPreview(true);
+      setPreviewContent(buildPreviewHtml(htmlFile.content, fileMap));
+    }
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Generate a full-stack ${site.label.toLowerCase()} named "${name}"` },
+      { role: "assistant", content: site.summary },
+    ]);
+    setOutput((prev) => [...prev, `🌐 Website generator wrote ${site.files.map((file) => file.path).join(", ")}`]);
+    setShowTerminal(true);
+  }, [siteName, buildPreviewHtml]);
 
   // -- Project management --
   const handleSaveProject = useCallback(() => {
@@ -2562,9 +2631,58 @@ ${jsCode}
               </div>
             )}
 
+            {/* Full-stack website generator — web development assistant only */}
+            {domainId === "web-development" && showSiteGenerator && (
+              <div className="border-t shrink-0 px-2 py-2" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Website Generator</span>
+                </div>
+                <input
+                  value={siteName}
+                  onChange={(e) => setSiteName(e.target.value)}
+                  placeholder="Site name"
+                  className="w-full rounded-md px-2 py-1 text-[11px] outline-none mb-1.5"
+                  style={{
+                    backgroundColor: currentTheme.uiColors.card,
+                    color: currentTheme.uiColors.text,
+                    border: `1px solid ${currentTheme.uiColors.border}`,
+                  }}
+                />
+                <div className="grid grid-cols-2 gap-1">
+                  {WEBSITE_AUTOMATIONS.map((automation) => (
+                    <button
+                      key={automation.id}
+                      type="button"
+                      onClick={() => handleGenerateWebsite(automation.id)}
+                      className="flex items-center gap-1.5 rounded px-2 py-1.5 text-left"
+                      style={{ backgroundColor: currentTheme.uiColors.card, border: `1px solid ${currentTheme.uiColors.border}` }}
+                      title={automation.description}
+                    >
+                      <span className="text-sm">{automation.icon}</span>
+                      <span>
+                        <span className="block text-[10px] font-medium" style={{ color: currentTheme.uiColors.text }}>{automation.label}</span>
+                        <span className="block text-[8px]" style={{ color: currentTheme.uiColors.muted }}>{automation.description}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {domainId === "web-development" && (
+                  <button
+                    onClick={() => setShowSiteGenerator((open) => !open)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showSiteGenerator ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showSiteGenerator ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Website Generator
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}

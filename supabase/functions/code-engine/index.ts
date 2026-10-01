@@ -542,6 +542,12 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **FULL-STACK WEBSITE GENERATOR** — When the user asks to build, generate, or scaffold a website, landing page, portfolio, blog, store, dashboard, or any site with an API:
+   - Client stays vanilla so the preview runs: client/index.html, client/styles.css, client/script.js
+   - index.html links styles.css and script.js and sets data-themed on body
+   - Add server/server.js (Express, ESM, comment /* lunor-node-server */, serves ../client, JSON routes) and server/package.json ("type": "module")
+   - script.js must still render if fetch fails, using embedded sample data or localStorage
+   - Put the relative path alone on the line immediately before each code fence
 
 ${WEB_COMPONENT_REFERENCE}
 
@@ -874,9 +880,12 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
-- index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
+- STACK: HTML + CSS + JS for the client. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any frontend framework. NEVER.
+- Small demos: index.html, styles.css, script.js
+- Websites, landing pages, portfolios, blogs, stores, dashboards, and anything full-stack: client/index.html, client/styles.css, client/script.js, server/server.js, server/package.json
+- index.html must include: <link href="styles.css">, <script src="script.js"></script>, Google Fonts via <link>, and data-themed on <body>
+- server/server.js is Express ESM, starts with /* lunor-node-server */, serves ../client, and exposes the JSON routes the client calls
+- The client must keep working when the API is offline
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
