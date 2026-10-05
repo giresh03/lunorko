@@ -22,6 +22,14 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  generateWebsiteProject,
+  interpretWebsitePrompt,
+  isNodeModuleSource,
+  WEBSITE_KINDS,
+  type WebsiteBrief,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -486,8 +494,17 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** assistant.\n\n**Generate website** builds a full-stack site in this editor: a previewable client plus an Express and MongoDB API.\n\nYou can also ask in chat, for example: *Generate a full-stack portfolio website called Lumen*.\n\nOther code I write is still applied to your files.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("portfolio");
+  const [siteName, setSiteName] = useState(WEBSITE_KINDS[0].defaultName);
+  const [siteTagline, setSiteTagline] = useState(WEBSITE_KINDS[0].defaultTagline);
+  const [showWebsiteGen, setShowWebsiteGen] = useState(true);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -863,7 +880,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isNodeModuleSource(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1306,9 +1323,54 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((brief: WebsiteBrief) => {
+    const project = generateWebsiteProject(brief);
+    setFileTree(project.tree);
+    setCurrentProjectName(brief.name);
+    setShowWelcome(false);
+    const tabs = project.files
+      .filter((file) => file.path === project.previewFileId || file.path === "server/index.js")
+      .map((file) => ({
+        id: file.path,
+        name: file.path.split("/").pop() || file.path,
+        language: file.language === "plaintext" ? "plaintext" : file.language,
+        content: file.content,
+        isModified: true,
+      }));
+    setOpenTabs(tabs);
+    setActiveTabId(project.previewFileId);
+    const html = project.files.find((file) => file.path === project.previewFileId);
+    const allFiles: Record<string, string> = {};
+    for (const file of project.files) {
+      allFiles[file.path] = file.content;
+      const base = file.path.split("/").pop() || file.path;
+      if (!allFiles[base]) allFiles[base] = file.content;
+    }
+    if (html) setPreviewContent(buildPreviewHtml(html.content, allFiles));
+    setShowPreview(true);
+    setShowTerminal(true);
+    setOutput([
+      `$ Generated ${brief.kind} website "${brief.name}"`,
+      `✓ ${project.files.length} files written`,
+      "$ Preview is using sample data",
+      "$ Run the API: cd server && npm install && npm start",
+    ]);
+    return project;
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development") {
+      const brief = interpretWebsitePrompt(chatInput);
+      if (brief) {
+        const project = applyGeneratedWebsite(brief);
+        const userMsg: Message = { role: "user", content: chatInput };
+        setMessages((prev) => [...prev, userMsg, { role: "assistant", content: project.summary }]);
+        setChatInput("");
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1590,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2562,8 +2624,88 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && showWebsiteGen && (
+              <div className="border-t shrink-0 overflow-y-auto" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "280px" }}>
+                <div className="px-3 py-2 flex items-center justify-between border-b" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} /> Generate website
+                  </span>
+                  <button onClick={() => setShowWebsiteGen(false)} className="text-[9px]" style={{ color: currentTheme.uiColors.muted }}>Hide</button>
+                </div>
+                <div className="p-2 space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    {WEBSITE_KINDS.map((kind) => (
+                      <button
+                        key={kind.id}
+                        onClick={() => {
+                          setSiteKind(kind.id);
+                          setSiteName(kind.defaultName);
+                          setSiteTagline(kind.defaultTagline);
+                        }}
+                        className="rounded-full px-2 py-1 text-[9px] font-medium"
+                        style={{
+                          backgroundColor: siteKind === kind.id ? currentTheme.uiColors.accent : currentTheme.uiColors.card,
+                          color: siteKind === kind.id ? "#111" : currentTheme.uiColors.text,
+                          border: `1px solid ${siteKind === kind.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                        }}
+                        title={kind.blurb}
+                      >
+                        {kind.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    placeholder="Website name"
+                    className="w-full rounded-md px-2 py-1.5 text-[11px] outline-none"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <input
+                    value={siteTagline}
+                    onChange={(e) => setSiteTagline(e.target.value)}
+                    placeholder="One-line description"
+                    className="w-full rounded-md px-2 py-1.5 text-[11px] outline-none"
+                    style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                  />
+                  <button
+                    onClick={() => {
+                      const meta = WEBSITE_KINDS.find((kind) => kind.id === siteKind) || WEBSITE_KINDS[0];
+                      const brief: WebsiteBrief = {
+                        kind: siteKind,
+                        name: siteName.trim() || meta.defaultName,
+                        tagline: siteTagline.trim() || meta.defaultTagline,
+                      };
+                      const project = applyGeneratedWebsite(brief);
+                      setMessages((prev) => [
+                        ...prev,
+                        { role: "user", content: `Generate a full-stack ${meta.label.toLowerCase()} website called ${brief.name}` },
+                        { role: "assistant", content: project.summary },
+                      ]);
+                    }}
+                    className="w-full rounded-md py-1.5 text-[11px] font-semibold"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#111" }}
+                  >
+                    Generate full-stack website
+                  </button>
+                  <p className="text-[9px] leading-snug" style={{ color: currentTheme.uiColors.muted }}>
+                    Writes the client, Express routes, and MongoDB store into the editor, then opens the preview.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {domainId === "web-development" && !showWebsiteGen && (
+                <button
+                  onClick={() => setShowWebsiteGen(true)}
+                  className="mb-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
+                  style={{ color: currentTheme.uiColors.accent }}
+                >
+                  <Wand2 className="h-3 w-3" /> Generate website
+                </button>
+              )}
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
