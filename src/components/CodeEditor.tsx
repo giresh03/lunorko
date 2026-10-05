@@ -22,6 +22,16 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  describeGeneratedWebsite,
+  generateFullStackWebsite,
+  getWebsitePreset,
+  listWebsitePresets,
+  mergeGeneratedFiles,
+  parseWebsiteRequest,
+  type GeneratedWebsite,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -486,10 +496,19 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **${domainName}** AI assistant.\n\n- **Generate code** — it lands in the editor\n- **Generate website** — builds a full-stack site (preview + Node API) from the button below\n- **Debug and explain** — paste code or ask a concept\n\nTry “Build a restaurant website called Olive & Oak”.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [showWebsiteGen, setShowWebsiteGen] = useState(false);
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("portfolio");
+  const [siteName, setSiteName] = useState(() => getWebsitePreset("portfolio").name);
+  const [siteTagline, setSiteTagline] = useState(() => getWebsitePreset("portfolio").tagline);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Ghost text state
@@ -888,6 +907,52 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   const isAppDomain = domainId === "app-development";
+  const isWebDevDomain = domainId === "web-development";
+
+  const applyGeneratedWebsite = useCallback((site: GeneratedWebsite) => {
+    const htmlFile = site.files.find((file) => file.path === site.previewPath);
+    setFileTree((prev) => mergeGeneratedFiles(prev, site.files));
+    setOpenTabs((prev) => {
+      const visible = new Set(["client/index.html", "client/styles.css", "server/index.js", "README.md"]);
+      let tabs = [...prev];
+      for (const file of site.files) {
+        if (!visible.has(file.path)) continue;
+        const existing = tabs.find((tab) => tab.id === file.path);
+        if (existing) {
+          tabs = tabs.map((tab) => tab.id === file.path ? { ...tab, content: file.content, language: file.language, isModified: true } : tab);
+        } else {
+          tabs = [...tabs, {
+            id: file.path,
+            name: file.path.split("/").pop() || file.path,
+            language: file.language,
+            content: file.content,
+            isModified: true,
+          }];
+        }
+      }
+      return tabs;
+    });
+    if (htmlFile) setActiveTabId(htmlFile.path);
+    setCurrentProjectName(site.name);
+    setShowWelcome(false);
+    setShowPreview(true);
+    setShowTerminal(true);
+    if (htmlFile) {
+      const allFiles: Record<string, string> = {};
+      for (const file of site.files) {
+        allFiles[file.path] = file.content;
+        const baseName = file.path.split("/").pop();
+        if (baseName) allFiles[baseName] = file.content;
+      }
+      setPreviewContent(buildPreviewHtml(htmlFile.content, allFiles));
+    }
+    setOutput((prev) => [
+      ...prev,
+      `$ Generated ${site.name}`,
+      "Client preview is using seed data.",
+      "Run `npm start` to serve the Node API on http://localhost:3000",
+    ]);
+  }, [buildPreviewHtml]);
 
   // Update preview content with debouncing
   // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
@@ -1307,8 +1372,55 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
+  const handlePickSiteKind = (kind: WebsiteKind) => {
+    const preset = getWebsitePreset(kind);
+    setSiteKind(kind);
+    setSiteName(preset.name);
+    setSiteTagline(preset.tagline);
+  };
+
+  const handleGenerateWebsite = useCallback((kind: WebsiteKind, name: string, tagline: string) => {
+    const site = generateFullStackWebsite({ kind, name, tagline });
+    applyGeneratedWebsite(site);
+    setShowWebsiteGen(false);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `Generate a ${kind} website called ${site.name}` },
+      { role: "assistant", content: describeGeneratedWebsite(site) },
+    ]);
+  }, [applyGeneratedWebsite]);
+
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+
+    if (isWebDevDomain) {
+      const request = parseWebsiteRequest(chatInput.trim());
+      if (request) {
+        const userMsg: Message = { role: "user", content: chatInput.trim() };
+        setChatInput("");
+        if (request.mode === "choose") {
+          setShowWebsiteGen(true);
+          setMessages((prev) => [
+            ...prev,
+            userMsg,
+            { role: "assistant", content: "Pick a site type in **Generate website** — portfolio, restaurant, SaaS, shop, or blog. I'll write the client and the Node API into this project." },
+          ]);
+          return;
+        }
+        const preset = getWebsitePreset(request.kind);
+        const site = generateFullStackWebsite({
+          kind: request.kind,
+          name: request.name || preset.name,
+          tagline: preset.tagline,
+        });
+        setSiteKind(request.kind);
+        setSiteName(site.name);
+        setSiteTagline(site.tagline);
+        applyGeneratedWebsite(site);
+        setMessages((prev) => [...prev, userMsg, { role: "assistant", content: describeGeneratedWebsite(site) }]);
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1640,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, isWebDevDomain, applyGeneratedWebsite, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2562,9 +2674,73 @@ ${jsCode}
               </div>
             )}
 
+            {isWebDevDomain && showWebsiteGen && (
+              <div className="border-t shrink-0 overflow-y-auto" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg, maxHeight: "280px" }}>
+                <div className="px-3 py-2 flex items-center justify-between border-b" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} /> Full-stack website
+                  </span>
+                  <button onClick={() => setShowWebsiteGen(false)} className="text-[9px]" style={{ color: currentTheme.uiColors.muted }}>Close</button>
+                </div>
+                <div className="p-2 space-y-2">
+                  <div className="grid grid-cols-2 gap-1">
+                    {listWebsitePresets().map((preset) => (
+                      <button
+                        key={preset.kind}
+                        onClick={() => handlePickSiteKind(preset.kind)}
+                        className="px-2 py-1.5 rounded text-left"
+                        style={{
+                          backgroundColor: siteKind === preset.kind ? currentTheme.uiColors.accent + "18" : currentTheme.uiColors.card,
+                          border: `1px solid ${siteKind === preset.kind ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                        }}
+                      >
+                        <span className="text-[10px] font-medium block" style={{ color: currentTheme.uiColors.text }}>{preset.label}</span>
+                        <span className="text-[8px]" style={{ color: currentTheme.uiColors.muted }}>{preset.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <label className="block">
+                    <span className="text-[8px]" style={{ color: currentTheme.uiColors.muted }}>Site name</span>
+                    <input
+                      value={siteName}
+                      onChange={(e) => setSiteName(e.target.value)}
+                      className="mt-0.5 w-full rounded-md px-2 py-1 text-[11px] outline-none"
+                      style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[8px]" style={{ color: currentTheme.uiColors.muted }}>Tagline</span>
+                    <input
+                      value={siteTagline}
+                      onChange={(e) => setSiteTagline(e.target.value)}
+                      className="mt-0.5 w-full rounded-md px-2 py-1 text-[11px] outline-none"
+                      style={{ backgroundColor: currentTheme.uiColors.card, color: currentTheme.uiColors.text, border: `1px solid ${currentTheme.uiColors.border}` }}
+                    />
+                  </label>
+                  <button
+                    onClick={() => handleGenerateWebsite(siteKind, siteName, siteTagline)}
+                    className="w-full rounded-md px-2 py-1.5 text-[11px] font-medium"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
+                  >
+                    Generate client + API
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
+                {isWebDevDomain && (
+                  <button
+                    onClick={() => setShowWebsiteGen((open) => !open)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors"
+                    style={{ color: showWebsiteGen ? currentTheme.uiColors.accent : currentTheme.uiColors.muted, backgroundColor: showWebsiteGen ? currentTheme.uiColors.accent + "15" : "transparent" }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Generate website
+                  </button>
+                )}
                 {isAppDomain && (
                   <button
                     onClick={() => setShowChecklist(!showChecklist)}
