@@ -21,7 +21,17 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import { WebsiteGeneratorPanel } from "@/components/editor/WebsiteGeneratorPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  WEBSITE_BLUEPRINTS,
+  buildWebsiteProject,
+  getWebsiteBlueprint,
+  normalizeProjectPath,
+  upsertProjectFile,
+  websiteGeneratorPrompt,
+  type ProjectFile,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -235,9 +245,14 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   return `untitled.${ext}`;
 }
 
+function isNodeServerSource(name: string, content: string): boolean {
+  if (/(^|\/)server\.js$/.test(name)) return true;
+  return /\brequire\s*\(/.test(content) || /\bmodule\.exports\b/.test(content) || /\bexpress\s*\(\s*\)/.test(content);
+}
+
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[`*]*)([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)(?:[`*]*)\s*:?\s*\n)?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -486,8 +501,16 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: domainName.toLowerCase().includes("web")
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Full-stack website** under the chat to generate a complete site: \`index.html\`, \`styles.css\`, \`script.js\`, and an Express API in \`server/server.js\`.\n\nYou can also ask me to debug, explain a concept, or build a smaller page. Code is **automatically applied** to your files.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
+  const [websiteBrief, setWebsiteBrief] = useState("");
+  const [selectedWebsiteId, setSelectedWebsiteId] = useState(WEBSITE_BLUEPRINTS[0].id);
+  const [websiteBusy, setWebsiteBusy] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -863,7 +886,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && !isNodeServerSource(name, content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -888,6 +911,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
   }, []);
 
   const isAppDomain = domainId === "app-development";
+  const isWebDevDomain = domainId === "web-development";
 
   // Update preview content with debouncing
   // Build a vanilla JS preview by finding the project's HTML and injecting JS + CSS
@@ -1227,6 +1251,18 @@ ${jsCode}
     if (!activeTab) return;
     setIsRunning(true);
     const lang = activeTab.language;
+    if (isNodeServerSource(activeTab.name, activeTab.content)) {
+      setShowTerminal(true);
+      setOutput([
+        `$ ${activeTab.name} is the Express API.`,
+        "Run it on your machine:",
+        "  npm install",
+        "  npm start",
+        "Then open http://localhost:3000 — the preview page calls that API and falls back to seed data.",
+      ]);
+      setIsRunning(false);
+      return;
+    }
     const isHtml = lang === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(lang) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
     const allFiles = collectFiles(fileTree);
@@ -1407,31 +1443,18 @@ ${jsCode}
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const projectPath = normalizeProjectPath(fname);
+        const name = projectPath.split("/").pop() || fname;
+        newFiles.push({ id: projectPath, name, lang: normalizedLang || getLang(name), code: block.code });
       });
 
       // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
-        });
-        return tree;
-      });
+      setFileTree(prev => newFiles.reduce((tree, file) => upsertProjectFile(tree, {
+        path: file.id,
+        name: file.name,
+        language: file.lang,
+        content: file.code,
+      }), prev));
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1529,6 +1552,121 @@ ${jsCode}
 
     setChatLoading(false);
   }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+
+  const applyProjectFiles = useCallback((files: ProjectFile[]) => {
+    setFileTree((prev) => files.reduce((tree, file) => upsertProjectFile(tree, file), prev));
+    const openNames = new Set(["index.html", "styles.css", "script.js", "server.js", "README.md"]);
+    setOpenTabs((prev) => {
+      let tabs = [...prev];
+      files.forEach((file) => {
+        if (!openNames.has(file.name)) return;
+        const existing = tabs.find((tab) => tab.id === file.path);
+        if (existing) {
+          tabs = tabs.map((tab) => tab.id === file.path ? { ...tab, content: file.content, isModified: true, language: file.language } : tab);
+        } else {
+          tabs = [...tabs, { id: file.path, name: file.name, language: file.language, content: file.content, isModified: true }];
+        }
+      });
+      return tabs;
+    });
+
+    const html = files.find((file) => file.name === "index.html");
+    if (!html) return;
+    setActiveTabId(html.path);
+    setShowPreview(true);
+    const allFiles: Record<string, string> = {};
+    files.forEach((file) => {
+      allFiles[file.name] = file.content;
+      allFiles[file.path] = file.content;
+    });
+    setPreviewContent(buildPreviewHtml(html.content, allFiles));
+  }, [buildPreviewHtml]);
+
+  const handleGenerateWebsite = useCallback(async () => {
+    if (!isWebDevDomain || websiteBusy || chatLoading) return;
+    const blueprint = getWebsiteBlueprint(selectedWebsiteId) ?? WEBSITE_BLUEPRINTS[0];
+    const brief = websiteBrief.trim();
+    const files = buildWebsiteProject(blueprint.id, brief);
+    applyProjectFiles(files);
+
+    const userText = brief
+      ? `Generate a full-stack ${blueprint.label.toLowerCase()} website: ${brief}`
+      : `Generate a full-stack ${blueprint.label.toLowerCase()} website`;
+    const starterNote = `I wrote **${blueprint.label}** into your project.\n\n- \`src/index.html\`, \`src/styles.css\`, \`src/script.js\` — live preview uses seed data\n- \`server/server.js\` — Express API (\`GET/POST /api/items\`, \`GET/POST /api/messages\`)\n- \`package.json\` — run \`npm install && npm start\`, then open http://localhost:3000\n\nThe preview stays up even before the API is running.`;
+    const userMsg: Message = { role: "user", content: userText };
+    setMessages((prev) => [...prev, userMsg, { role: "assistant", content: starterNote }]);
+    setOutput((prev) => [...prev, `🌐 Generated ${blueprint.label} website files.`, "▶ Preview updated. Start the API with npm start when you want live /api routes."]);
+    setShowTerminal(true);
+
+    if (!online) return;
+
+    setWebsiteBusy(true);
+    setChatLoading(true);
+    let assistantSoFar = "";
+    const upsert = (chunk: string) => {
+      assistantSoFar += chunk;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant") {
+          return prev.map((message, index) => index === prev.length - 1 ? { ...message, content: `${starterNote}\n\n---\n\n${assistantSoFar}` } : message);
+        }
+        return [...prev, { role: "assistant", content: assistantSoFar }];
+      });
+    };
+
+    try {
+      const resp = await fetchCodeEngine({
+        action: "generate-website",
+        domain: domainId,
+        model: selectedModel,
+        messages: [{ role: "user", content: websiteGeneratorPrompt(blueprint.id, brief) }],
+      });
+      if (!resp.ok || !resp.body) {
+        const err = await resp.json().catch(() => ({}));
+        upsert(`The starter site is ready. AI customization was skipped${err?.error ? `: ${err.error}` : "."}`);
+      } else {
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          let idx: number;
+          while ((idx = buf.indexOf("\n")) !== -1) {
+            let line = buf.slice(0, idx);
+            buf = buf.slice(idx + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line.startsWith("data: ")) continue;
+            const json = line.slice(6).trim();
+            if (json === "[DONE]") break;
+            try {
+              const parsed = JSON.parse(json);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) upsert(content);
+            } catch {
+              buf = line + "\n" + buf;
+              break;
+            }
+          }
+        }
+        const blocks = extractCodeBlocks(assistantSoFar, userText);
+        if (blocks.length > 0) {
+          const generated: ProjectFile[] = blocks.map((block) => {
+            const path = normalizeProjectPath(block.filename || "index.html");
+            const name = path.split("/").pop() || "index.html";
+            return { path, name, language: LANG_MAP[block.language] || block.language || getLang(name), content: block.code };
+          });
+          applyProjectFiles(generated);
+          setOutput((prev) => [...prev, "✨ AI customization applied on top of the starter site."]);
+        }
+      }
+    } catch (error) {
+      upsert(isAuthRequiredError(error) ? "Sign in to customize the site with AI. The starter files are already in the editor." : "Could not reach the AI service. The starter site is already in the editor.");
+    }
+    setWebsiteBusy(false);
+    setChatLoading(false);
+  }, [applyProjectFiles, chatLoading, domainId, isWebDevDomain, online, selectedModel, selectedWebsiteId, websiteBrief, websiteBusy, fetchCodeEngine]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2560,6 +2698,19 @@ ${jsCode}
                   </div>
                 </div>
               </div>
+            )}
+
+            {isWebDevDomain && (
+              <WebsiteGeneratorPanel
+                blueprints={WEBSITE_BLUEPRINTS}
+                selectedId={selectedWebsiteId}
+                brief={websiteBrief}
+                busy={websiteBusy || chatLoading}
+                themeColors={currentTheme.uiColors}
+                onSelect={setSelectedWebsiteId}
+                onBriefChange={setWebsiteBrief}
+                onGenerate={handleGenerateWebsite}
+              />
             )}
 
             {/* AI Input */}

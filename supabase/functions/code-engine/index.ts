@@ -857,15 +857,36 @@ serve(async (req) => {
       console.log(`[code-engine] Using Gemini/Google AI (fallback - LOVABLE_API_KEY not set)`);
     }
 
-    // ============= ACTION: generate (AI code generation with streaming) =============
-    if (action === "generate") {
+    // ============= ACTION: generate / generate-website (AI code generation with streaming) =============
+    if (action === "generate" || action === "generate-website") {
       const messages = body.messages as Array<{ role: string; content: string }>;
       const model = body.model as string | undefined;
       const selectedModel = normalizeLovableModel(model);
-      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
+      const userText = (messages || [])
+        .filter((m) => m.role === "user")
+        .map((m) => m.content.split("[Current file:")[0])
+        .join("\n");
+      const websiteRequest = action === "generate-website" || (domain === "web-development" && /full[-\s]?stack website|generate a .*website|landing page|online store|restaurant website|portfolio website|magazine website/i.test(userText));
+      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}, website=${websiteRequest}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const stackDirective = websiteRequest
+        ? `
+- FULL-STACK WEBSITE. Return exactly these files, each labeled with its path:
+  src/index.html
+  src/styles.css
+  src/script.js
+  server/server.js
+  package.json
+  README.md
+- Frontend is vanilla HTML, CSS, and JavaScript. No React, JSX, TSX, Vue, or TypeScript.
+- src/index.html links styles.css and script.js and includes <script id="site-data" type="application/json"> seed data.
+- src/script.js fetches http://localhost:3000/api/items and renders the seed when that request fails. The form POSTs to http://localhost:3000/api/messages and saves to localStorage if the API is down.
+- server/server.js is CommonJS Express. Serve ../src as static files, allow CORS, and implement GET /api/health, GET/POST /api/items, and GET/POST /api/messages.
+- Do not use require() or module.exports in src/script.js.
+- Include at least 3 relevant Unsplash images (https://images.unsplash.com/photo-ID?auto=format&fit=crop&w=1200&q=80).
+- The page needs a hero, a searchable catalog, and a working form.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
