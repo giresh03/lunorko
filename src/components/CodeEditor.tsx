@@ -22,6 +22,7 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import { generateWebsite, isWebsiteGenerationRequest, WEBSITE_PRESETS, type WebsiteFile } from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -56,14 +57,43 @@ function deleteProject(id: string) {
 const PROJECT_TEMPLATES = [
   { id: "blank", name: "Blank Project", description: "Empty project with a single file", icon: "📄" },
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
+  { id: "fullstack-website", name: "Full-Stack Website", description: "HTML, CSS, JS plus an Express API", icon: "🚀" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
 ];
+
+function websiteFilesToTree(files: WebsiteFile[]): FileNode[] {
+  const folders = new Map<string, FileNode>();
+  const roots: FileNode[] = [];
+  for (const file of files) {
+    const node: FileNode = {
+      id: file.folder === "root" ? file.name : `${file.folder}/${file.name}`,
+      name: file.name,
+      type: "file",
+      language: file.language,
+      content: file.content,
+    };
+    if (file.folder === "root") {
+      roots.push(node);
+      continue;
+    }
+    let folder = folders.get(file.folder);
+    if (!folder) {
+      folder = { id: file.folder, name: file.folder, type: "folder", isOpen: true, children: [] };
+      folders.set(file.folder, folder);
+      roots.unshift(folder);
+    }
+    folder.children!.push(node);
+  }
+  return roots;
+}
 
 function createProjectFromTemplate(templateId: string, projectName: string, domain: string): FileNode[] {
   switch (templateId) {
     case "blank":
       return [{ id: "main.js", name: "main.js", type: "file", language: "javascript", content: `// ${projectName}\n// ${domain}\n\nconsole.log("Hello, World!");\n` }];
+    case "fullstack-website":
+      return websiteFilesToTree(generateWebsite(`Build a full-stack landing page website for ${projectName}`).files);
     case "web-app":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -485,8 +515,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+  const [messages, setMessages] = useState<Message[]>(() => [
+    {
+      role: "assistant",
+      content: domainId === "web-development"
+        ? `👋 I'm your **Web Development** assistant. I can **build a full-stack website** — HTML, CSS, and JavaScript plus an Express API — and drop the files into this editor.\n\nUse **Full-stack website generator** below, or ask me to debug and explain code. Generated code is **automatically applied**.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -863,7 +898,7 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
       .map(([name, content]) => `<style>/* ${name} */\n${content}</style>`)
       .join("\n");
     const remainingJs = Object.entries(allFiles)
-      .filter(([name]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html"))
+      .filter(([name, content]) => /\.(js|ts)$/.test(name) && !injectedFiles.has(name) && !name.includes("/") && !name.endsWith(".html") && name !== "server.js" && !/\brequire\s*\(/.test(content))
       .map(([name, content]) => `<script>/* ${name} */\n${content}<\/script>`)
       .join("\n");
 
@@ -1306,9 +1341,83 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((files: WebsiteFile[]) => {
+    setFileTree((prev) => {
+      let tree = prev;
+      const ensureFolder = (id: string) => {
+        if (!findFile(tree, id)) {
+          tree = [{ id, name: id, type: "folder", isOpen: true, children: [] }, ...tree];
+        } else {
+          tree = updateNode(tree, id, (node) => ({ ...node, isOpen: true }));
+        }
+      };
+
+      files.forEach((file) => {
+        if (file.folder === "root") {
+          if (findFile(tree, file.name)) {
+            tree = updateNode(tree, file.name, (node) => ({ ...node, content: file.content, language: file.language }));
+          } else {
+            tree = [...tree, { id: file.name, name: file.name, type: "file", language: file.language, content: file.content }];
+          }
+          return;
+        }
+        ensureFolder(file.folder);
+        const id = `${file.folder}/${file.name}`;
+        if (findFile(tree, id)) {
+          tree = updateNode(tree, id, (node) => ({ ...node, content: file.content, language: file.language }));
+        } else {
+          tree = addChild(tree, file.folder, { id, name: file.name, type: "file", language: file.language, content: file.content });
+        }
+      });
+      return tree;
+    });
+
+    const html = files.find((file) => file.folder === "src" && file.name === "index.html");
+    setOpenTabs((prev) => {
+      let tabs = [...prev];
+      files.filter((file) => file.folder !== "root").forEach((file) => {
+        const id = `${file.folder}/${file.name}`;
+        if (tabs.some((tab) => tab.id === id)) {
+          tabs = tabs.map((tab) => tab.id === id ? { ...tab, content: file.content, language: file.language, isModified: true } : tab);
+        } else {
+          tabs = [...tabs, { id, name: file.name, language: file.language, content: file.content, isModified: true }];
+        }
+      });
+      return tabs;
+    });
+
+    if (!html) return;
+    setActiveTabId("src/index.html");
+    setShowPreview(true);
+    window.setTimeout(() => {
+      setFileTree((current) => {
+        setPreviewContent(buildPreviewHtml(html.content, collectFiles(current)));
+        return current;
+      });
+    }, 50);
+  }, [findFile, updateNode, addChild, buildPreviewHtml, collectFiles]);
+
+  const runWebsiteGenerator = useCallback((prompt: string) => {
+    const site = generateWebsite(prompt);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: prompt },
+      { role: "assistant", content: site.summary },
+    ]);
+    setCurrentProjectName(site.name);
+    applyGeneratedWebsite(site.files);
+    setShowAIPanel(true);
+  }, [applyGeneratedWebsite]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      const prompt = chatInput.trim();
+      setChatInput("");
+      runWebsiteGenerator(prompt);
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1637,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, runWebsiteGenerator]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2558,6 +2667,33 @@ ${jsCode}
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Full-stack website generator</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {WEBSITE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={chatLoading}
+                      onClick={() => runWebsiteGenerator(preset.prompt)}
+                      className="rounded-md px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50"
+                      style={{
+                        color: currentTheme.uiColors.text,
+                        backgroundColor: currentTheme.uiColors.card,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

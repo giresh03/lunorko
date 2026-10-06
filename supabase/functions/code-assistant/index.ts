@@ -75,7 +75,13 @@ Rules:
 
     // For web-development: inject reinforcement so model strictly outputs HTML/CSS/JS
     if (domain === "web-development") {
-      systemPrompt += `
+      const latestUser = [...(Array.isArray(messages) ? messages : [])].reverse().find((message: { role?: string }) => message?.role === "user")?.content || "";
+      const websiteRequest = typeof latestUser === "string" && /\b(website|landing page|portfolio|online store|full[-\s]?stack)\b/i.test(latestUser) && /\b(build|create|generate|make|design)\b/i.test(latestUser);
+      systemPrompt += websiteRequest
+        ? `
+
+FULL-STACK WEBSITE MODE: Return index.html, styles.css, script.js, and server.js. Put each filename on its own line before the code fence. Frontend is vanilla HTML/CSS/JS that still renders if the API is offline. server.js is Express with GET /api/health, GET /api/content, and POST /api/messages. No React.`
+        : `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
     }
