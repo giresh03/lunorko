@@ -3,6 +3,7 @@ import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lu
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
+import { formatWebsiteAssistantMessage, generateFullStackWebsite, isWebsiteGenerationRequest } from "@/lib/websiteGenerator";
 import { domains } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,7 +29,9 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
+      content: domainId === "web-development"
+        ? `👋 Hi! I'm your **${domainName}** AI assistant. Ask for a **full-stack website** and I'll write the client, Express API, and seed data. I can also debug HTML, CSS, and JavaScript.`
+        : `👋 Hi! I'm your **${domainName}** AI assistant. Ask me anything — code generation, debugging, concepts, best practices!`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -41,6 +44,18 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(input)) {
+      const site = generateFullStackWebsite(input.trim());
+      const html = site.files.find((file) => file.path === "client/index.html");
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: input.trim() },
+        { role: "assistant", content: formatWebsiteAssistantMessage(site, { includeCode: true }) },
+      ]);
+      if (html) onSendToEditor?.(html.content, "html");
+      setInput("");
+      return;
+    }
     const userMsg: Message = { role: "user", content: input };
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -136,7 +151,7 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
     }
 
     setIsLoading(false);
-  }, [input, isLoading, messages, domainName]);
+  }, [input, isLoading, messages, domainName, domainId, onSendToEditor]);
 
   const handleClear = () => {
     setMessages([
