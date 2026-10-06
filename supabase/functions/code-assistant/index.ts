@@ -32,24 +32,14 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development assistant. The page is vanilla HTML, CSS, and JavaScript. Never use React, JSX, TSX, Vue, or Angular.
 
-FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+When asked to build a website, return a full-stack project:
+- index.html, styles.css, and script.js (no imports; script.js works in the browser and falls back if /api is offline)
+- backend/server.js and backend/routes/api.js (Express)
+- backend/data/db.json, package.json ("type": "module", start script "node backend/server.js"), and README.md
 
-Example structure:
-\`\`\`html
-<!DOCTYPE html>
-<html>
-<head><style>/* CSS here */</style></head>
-<body>
-  <!-- HTML here -->
-  <script>/* JavaScript here */</script>
-</body>
-</html>
-\`\`\`
-
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+For a small widget that is not a website, return one runnable \`\`\`html file with <style> and <script> inside.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +67,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: Frontend stays vanilla HTML, CSS, and JavaScript. For a website, also include the Express files backend/server.js, backend/routes/api.js, backend/data/db.json, package.json, and README.md. Never output React, TSX, or .tsx files.`;
     }
 
     if (useGoogleAI) {
