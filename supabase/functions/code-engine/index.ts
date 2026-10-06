@@ -865,7 +865,27 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const websiteGenerator = Array.isArray(messages) && messages.some(
+        (message) => typeof message?.content === "string" && message.content.includes("[WEBSITE_GENERATOR]")
+      );
+      const stackDirective = domain === "web-development" && websiteGenerator
+        ? `
+FULL-STACK WEBSITE GENERATOR OVERRIDE:
+Ignore the three-file limit. Return exactly these five files and no others:
+index.html
+styles.css
+script.js
+server.js
+package.json
+- Vanilla HTML, CSS, and JavaScript only in the browser files. No React, JSX, TSX, TypeScript, Vue, imports, or exports.
+- index.html sets data-themed on body, links styles.css, and loads script.js before the closing body tag.
+- script.js calls the Express routes and includes fallback data so the page still renders when fetch fails.
+- server.js is CommonJS. Require express and cors, then serve static files from __dirname.
+- Every fetch() path in script.js must have a matching app.get, app.post, app.patch, or app.delete route.
+- package.json depends on express and cors, with a start script of "node server.js".
+- Do not reference server.js from index.html.
+- Include a hero, at least three sections, responsive CSS, and Unsplash images.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
