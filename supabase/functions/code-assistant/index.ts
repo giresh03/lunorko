@@ -49,7 +49,9 @@ Example structure:
 </html>
 \`\`\`
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.
+
+The in-editor Web Development assistant includes a Website Generator automation. If the user asks to build or scaffold a full website, landing page, portfolio, blog, dashboard, or store, point them at that generator: it writes client/index.html, client/styles.css, client/app.js, and an Express server. For ordinary component questions, still return one HTML file.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -77,7 +79,7 @@ Rules:
     if (domain === "web-development") {
       systemPrompt += `
 
-REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+REMINDER: For ordinary UI requests, output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files. If they asked for a full website, point them to the Website Generator automation instead of inventing a React app.`;
     }
 
     if (useGoogleAI) {

@@ -22,6 +22,13 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  generateFullStackWebsite,
+  parseWebsiteRequest,
+  websiteFilesToTree,
+  WEBSITE_KINDS,
+  type WebsiteKind,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -485,10 +492,16 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const intro = domainId === "web-development"
+      ? `👋 I'm your **${domainName}** AI assistant.\n\n- **Website Generator** — builds a full-stack site (client + Express API) into this editor\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n\nTry **Generate a full-stack landing website called Northwind**, or open Website Generator below.`
+      : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`;
+    return [{ role: "assistant", content: intro }];
+  });
   const [chatInput, setChatInput] = useState("");
+  const [showSiteGen, setShowSiteGen] = useState(domainId === "web-development");
+  const [siteKind, setSiteKind] = useState<WebsiteKind>("landing");
+  const [siteNameInput, setSiteNameInput] = useState("Lunor Studio");
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -1306,9 +1319,54 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((brief: { kind: WebsiteKind; name: string; tagline?: string }) => {
+    const site = generateFullStackWebsite(brief);
+    setFileTree(websiteFilesToTree(site.files) as FileNode[]);
+    const html = site.files.find((file) => file.path.endsWith("index.html"));
+    if (html) {
+      const baseName = html.path.split("/").pop() || "index.html";
+      setOpenTabs([{ id: html.path, name: baseName, language: "html", content: html.content, isModified: true }]);
+      setActiveTabId(html.path);
+      setShowPreview(true);
+      const allFiles: Record<string, string> = {};
+      for (const file of site.files) {
+        allFiles[file.path] = file.content;
+        const base = file.path.split("/").pop();
+        if (base && !allFiles[base]) allFiles[base] = file.content;
+      }
+      setPreviewContent(buildPreviewHtml(html.content, allFiles));
+    }
+    setCurrentProjectName(site.name);
+    setShowTerminal(true);
+    setOutput([
+      `$ Website generator · ${site.kind}`,
+      `Wrote ${site.files.length} files for ${site.name}`,
+      ...site.files.map((file) => `  ${file.path}`),
+      "$ Preview uses sample data until the API is running:",
+      "$   cd server && npm install && npm start",
+    ]);
+    return site.summary;
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+
+    if (domainId === "web-development") {
+      const brief = parseWebsiteRequest(chatInput);
+      if (brief) {
+        const summary = applyGeneratedWebsite(brief);
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: chatInput },
+          { role: "assistant", content: summary },
+        ]);
+        setChatInput("");
+        setShowAIPanel(true);
+        setShowSiteGen(true);
+        return;
+      }
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1586,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2029,6 +2087,15 @@ ${jsCode}
               <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Docs">
                 <BookOpen className="h-3.5 w-3.5" />
               </button>
+              {domainId === "web-development" && (
+                <button
+                  onClick={() => { setShowAIPanel(true); setShowSiteGen(true); }}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Full-stack website generator"
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                </button>
+              )}
               <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-6 gap-1 px-2.5 text-[10px]">
                 {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
                 Run
@@ -2562,8 +2629,77 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && showSiteGen && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.bg }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-semibold flex items-center gap-1.5" style={{ color: currentTheme.uiColors.text }}>
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                    Website Generator
+                  </span>
+                  <button
+                    onClick={() => setShowSiteGen(false)}
+                    className="text-[9px]"
+                    style={{ color: currentTheme.uiColors.muted }}
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {WEBSITE_KINDS.map((kind) => (
+                    <button
+                      key={kind.id}
+                      onClick={() => setSiteKind(kind.id)}
+                      className="rounded px-1.5 py-0.5 text-[9px] font-medium"
+                      style={{
+                        color: siteKind === kind.id ? "#062018" : currentTheme.uiColors.text,
+                        backgroundColor: siteKind === kind.id ? currentTheme.uiColors.accent : currentTheme.uiColors.card,
+                        border: `1px solid ${siteKind === kind.id ? currentTheme.uiColors.accent : currentTheme.uiColors.border}`,
+                      }}
+                      title={kind.blurb}
+                    >
+                      {kind.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <input
+                    value={siteNameInput}
+                    onChange={(e) => setSiteNameInput(e.target.value)}
+                    placeholder="Site name"
+                    className="flex-1 rounded-md px-2 py-1 text-[10px] outline-none"
+                    style={{
+                      backgroundColor: currentTheme.uiColors.card,
+                      color: currentTheme.uiColors.text,
+                      border: `1px solid ${currentTheme.uiColors.border}`,
+                    }}
+                  />
+                  <button
+                    className="rounded-md px-2 py-1 text-[10px] font-medium"
+                    style={{ backgroundColor: currentTheme.uiColors.accent, color: "#062018" }}
+                    onClick={() => {
+                      const summary = applyGeneratedWebsite({
+                        kind: siteKind,
+                        name: siteNameInput.trim() || "Lunor Studio",
+                      });
+                      setMessages((prev) => [
+                        ...prev,
+                        { role: "user", content: `Generate a full-stack ${siteKind} website called ${siteNameInput.trim() || "Lunor Studio"}` },
+                        { role: "assistant", content: summary },
+                      ]);
+                    }}
+                  >
+                    Generate
+                  </button>
+                </div>
+                <p className="mt-1 text-[8px]" style={{ color: currentTheme.uiColors.muted }}>
+                  {WEBSITE_KINDS.find((kind) => kind.id === siteKind)?.blurb}. Writes the client and an Express API into the editor.
+                </p>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {(isAppDomain || (domainId === "web-development" && !showSiteGen)) && (
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
@@ -2575,7 +2711,18 @@ ${jsCode}
                     Responsive
                   </button>
                 )}
+                {domainId === "web-development" && !showSiteGen && (
+                  <button
+                    onClick={() => setShowSiteGen(true)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium"
+                    style={{ color: currentTheme.uiColors.accent }}
+                  >
+                    <Wand2 className="h-3 w-3" />
+                    Website Generator
+                  </button>
+                )}
               </div>
+              )}
               <div className="flex gap-1.5">
                 <input
                   value={chatInput}
