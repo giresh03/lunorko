@@ -875,14 +875,15 @@ serve(async (req) => {
         : domain === "web-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- For UI demos, return exactly 3 files: index.html, styles.css, script.js
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
+- WEBSITE GENERATOR: if the user asks to generate, build, or create a website, landing page, or full-stack site, also return server.js and package.json in addition to index.html, styles.css, and script.js. server.js is Express with GET /api/site, GET /api/items, and POST /api/messages, and it starts only when typeof window === "undefined". script.js fetches /api/site and still renders if the API is offline.`
         : "";
       const systemPrompt = `${basePrompt}
 
