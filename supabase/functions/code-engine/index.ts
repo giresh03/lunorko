@@ -617,6 +617,24 @@ async function callAINonStream(
   return data.choices?.[0]?.message?.content || "";
 }
 
+function lastUserText(messages: unknown): string {
+  if (!Array.isArray(messages)) return "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i] as { role?: string; content?: string };
+    if (message?.role === "user" && typeof message.content === "string") return message.content;
+  }
+  return "";
+}
+
+function wantsFullStackWebsite(text: string): boolean {
+  const value = text.toLowerCase();
+  if (/\b(fix|debug|explain|why|error|bug|refactor)\b/.test(value)) return false;
+  const site = /\b(website|web site|landing page|homepage|portfolio|storefront|online store)\b/.test(value);
+  const build = /\b(build|create|generate|make|scaffold|design)\b/.test(value);
+  const stack = /\bfull[-\s]?stack\b/.test(value) || /\b(express api|backend)\b/.test(value);
+  return (site && (build || stack)) || (stack && build);
+}
+
 function normalizeLovableModel(requested?: string): string {
   const m = (requested || "").toLowerCase();
   if (!m) return DEFAULT_MODEL;
@@ -865,6 +883,7 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
+      const fullStackSite = domain === "web-development" && wantsFullStackWebsite(lastUserText(messages));
       const stackDirective = domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
@@ -873,7 +892,16 @@ serve(async (req) => {
 - Add modern CSS animations (transitions, keyframes, hover effects)
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
+        ? fullStackSite
         ? `
+- FULL-STACK WEBSITE MODE. Do NOT use React, JSX, TSX, Vue, or TypeScript.
+- Return these files. Put each filename alone on the line before its fence: index.html, styles.css, script.js, server.js
+- index.html: complete page with <body data-themed>, <link href="styles.css">, <script src="script.js"></script>, and a Google Font
+- styles.css: responsive layout and CSS variables
+- script.js: vanilla JavaScript only. No require() and no imports. Include local fallback content, fetch /api/content, and POST /api/messages
+- server.js: Express with cors and express.json(). Routes: GET /api/health, GET /api/content, POST /api/messages (validate name, email, message). Serve ../src as static files
+- Include a hero, a catalog or feature section, a contact form, and at least 3 Unsplash images`
+        : `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
