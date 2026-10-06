@@ -858,14 +858,41 @@ serve(async (req) => {
     }
 
     // ============= ACTION: generate (AI code generation with streaming) =============
-    if (action === "generate") {
-      const messages = body.messages as Array<{ role: string; content: string }>;
+    // generate-website is the Web Development assistant's full-stack site automation.
+    if (action === "generate" || action === "generate-website") {
+      const messages = (Array.isArray(body.messages) ? body.messages : []) as Array<{ role: string; content: string }>;
+      if (action === "generate-website" && messages.length === 0) {
+        const brief = typeof body.brief === "string" && body.brief.trim() ? body.brief.trim() : "a modern marketing website";
+        messages.push({ role: "user", content: brief });
+      }
       const model = body.model as string | undefined;
       const selectedModel = normalizeLovableModel(model);
-      console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
+      console.log(`[code-engine] ${action} domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
-      const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const websiteGeneratorPrompt = `You are Lunor.AI's full-stack website generator for the Web Development assistant.
+
+Return exactly these sibling files. Put the filename alone on the line before each fence:
+index.html
+styles.css
+script.js
+server.js
+package.json
+
+Rules:
+- Vanilla HTML, CSS, and JavaScript only. No React, JSX, TSX, TypeScript, Vue, or npm UI libraries.
+- index.html links styles.css and script.js, includes a Google font, and sets data-themed on body.
+- script.js renders from embedded fallback data, then tries fetch("/api/...") and keeps the fallback when the request fails so the in-editor preview still works.
+- server.js uses Node's built-in http, fs, and path. ROOT is __dirname. It serves the sibling files and the JSON routes script.js calls. No extra dependencies.
+- package.json start script is "node server.js".
+- Use real images, responsive layout, and at least one interactive control wired to the API.
+- Output ONLY file blocks. No intro, no outro.`;
+
+      const basePrompt = action === "generate-website"
+        ? websiteGeneratorPrompt
+        : (domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`);
+      const stackDirective = action === "generate-website"
+        ? ""
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
@@ -884,7 +911,7 @@ serve(async (req) => {
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
 - Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
         : "";
-      const systemPrompt = `${basePrompt}
+      const systemPrompt = action === "generate-website" ? websiteGeneratorPrompt : `${basePrompt}
 
 Rules:
 - Always use markdown formatting with fenced code blocks and syntax highlighting
