@@ -22,6 +22,13 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  detectWebsiteRequest,
+  filesToProjectTree,
+  generateFullStackWebsite,
+  insertProjectFile,
+  WEBSITE_AUTOMATIONS,
+} from "@/lib/fullStackWebsiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -58,6 +65,7 @@ const PROJECT_TEMPLATES = [
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
+  { id: "full-stack-website", name: "Full-Stack Website", description: "HTML client plus Express API", icon: "🌐" },
 ];
 
 function createProjectFromTemplate(templateId: string, projectName: string, domain: string): FileNode[] {
@@ -81,6 +89,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
         ]},
         { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "main": "src/server.js",\n  "scripts": { "start": "node src/server.js" }\n}\n` },
       ];
+    case "full-stack-website":
+      return filesToProjectTree(generateFullStackWebsite({ kind: "landing", name: projectName }).files) as FileNode[];
     case "react":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -237,7 +247,7 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
 
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[\*`]*([A-Za-z0-9_./-]+\.[A-Za-z0-9]+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -485,8 +495,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
+  const isWebDevDomain = domainId === "web-development";
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: isWebDevDomain
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Generate website** to scaffold a full-stack site — a previewable HTML client plus an Express API — or ask me to generate, debug, and explain code.\n\nGenerated files are **automatically applied** to the editor.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -606,8 +622,9 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
         if (n.type === "file" && n.content) {
           // Store by full path id
           files[n.id] = n.content;
-          // Store by name — prefer src/ files (first occurrence wins since src is walked first)
-          if (!files[n.name]) files[n.name] = n.content;
+          // Server files stay path-only so Express code is not injected into the browser preview.
+          const isServerFile = n.id === "server" || n.id.startsWith("server/");
+          if (!isServerFile && !files[n.name]) files[n.name] = n.content;
         }
         if (n.children) walk(n.children);
       }
@@ -994,7 +1011,12 @@ ${jsCode}
     const filesList = Object.entries(allFiles).map(([path, content]) => ({ path, content }));
     const isReactProject = hasJSX(filesList);
 
-    if (isHtml) {
+    const previewHtml = activeTab.id.startsWith("server/")
+      ? allFiles["client/index.html"] || allFiles["index.html"]
+      : "";
+    if (previewHtml && !isHtml) {
+      setPreviewContent(buildPreviewHtml(previewHtml, allFiles));
+    } else if (isHtml) {
       setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
     } else if (isJsLike && hasJSXContent) {
       setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
@@ -1306,9 +1328,41 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const applyGeneratedWebsite = useCallback((prompt: string) => {
+    const site = generateFullStackWebsite({ prompt });
+    const tree = filesToProjectTree(site.files) as FileNode[];
+    const html = site.files.find((file) => file.path === "client/index.html");
+    const fileMap: Record<string, string> = {};
+    for (const file of site.files) {
+      fileMap[file.path] = file.content;
+      if (!file.path.startsWith("server/")) {
+        const base = file.path.split("/").pop() || file.path;
+        if (!fileMap[base]) fileMap[base] = file.content;
+      }
+    }
+    setFileTree(tree);
+    setOpenTabs(html ? [{ id: html.path, name: "index.html", language: "html", content: html.content, isModified: false }] : []);
+    setActiveTabId(html?.path ?? null);
+    setCurrentProjectName(site.name);
+    setShowPreview(true);
+    if (html) setPreviewContent(buildPreviewHtml(html.content, fileMap));
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: prompt },
+      { role: "assistant", content: site.summary },
+    ]);
+    setChatInput("");
+    setOutput((prev) => [`🌐 Generated full-stack website "${site.name}".`, ...site.files.map((file) => `  • ${file.path}`), ...prev]);
+    setShowTerminal(true);
+  }, [buildPreviewHtml]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (isWebDevDomain && detectWebsiteRequest(chatInput)) {
+      applyGeneratedWebsite(chatInput.trim());
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1406,32 +1460,17 @@ ${jsCode}
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
-        const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
+        const rawPath = (block.filename || `untitled.${ext}`).replace(/^\.?\//, "");
+        const fname = rawPath.split("/").pop() || rawPath;
+        const newId = rawPath.includes("/") ? rawPath : `src/${fname}`;
         newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
       });
 
-      // Batch update file tree in a single setState
-      setFileTree(prev => {
-        let tree = [...prev];
-        // Ensure src folder exists
-        let srcFolder = tree.find(n => n.id === "src" && n.type === "folder");
-        if (!srcFolder) {
-          srcFolder = { id: "src", name: "src", type: "folder", isOpen: true, children: [] };
-          tree = [srcFolder, ...tree];
-        }
-
-        newFiles.forEach(({ id, name, lang, code }) => {
-          const existingInTree = findFile(tree, id);
-          if (existingInTree) {
-            tree = updateNode(tree, id, n => ({ ...n, content: code }));
-          } else {
-            const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
-          }
-        });
-        return tree;
-      });
+      // Batch update file tree in a single setState, keeping nested paths such as client/ and server/
+      setFileTree(prev => newFiles.reduce(
+        (tree, file) => insertProjectFile(tree, file.id, file.lang, file.code) as FileNode[],
+        prev,
+      ));
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
@@ -1528,7 +1567,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, isWebDevDomain, applyGeneratedWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2564,6 +2603,32 @@ ${jsCode}
 
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+              {isWebDevDomain && (
+                <div className="mb-2">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                    <span className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>Generate website</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {WEBSITE_AUTOMATIONS.map((automation) => (
+                      <button
+                        key={automation.id}
+                        type="button"
+                        disabled={chatLoading}
+                        onClick={() => applyGeneratedWebsite(automation.prompt)}
+                        className="rounded-full px-2 py-1 text-[9px] font-medium transition-colors disabled:opacity-40"
+                        style={{
+                          color: currentTheme.uiColors.text,
+                          backgroundColor: currentTheme.uiColors.bg,
+                          border: `1px solid ${currentTheme.uiColors.border}`,
+                        }}
+                      >
+                        {automation.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-1">
                 {isAppDomain && (
                   <button
