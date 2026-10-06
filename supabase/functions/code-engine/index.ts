@@ -874,15 +874,16 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- STACK: HTML + CSS + JS ONLY for ordinary pages. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
+- Ordinary pages: return exactly 3 files: index.html, styles.css, script.js
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
+- FULL-STACK WEBSITE EXCEPTION: if the user asks to generate a website, a full-stack site, or a site with an API, return these files instead of the 3-file page: client/index.html, client/styles.css, client/app.js, server/data.js, server/server.js, package.json, README.md. Client stays vanilla and must render embedded seed data when the API is offline. Server is Node + Express + cors (CommonJS) with GET /api/items and POST /api/messages, and express.static for the client folder. package.json start script is node server/server.js.`
         : "";
       const systemPrompt = `${basePrompt}
 
