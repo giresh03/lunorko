@@ -865,7 +865,25 @@ serve(async (req) => {
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
       const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const latestUserText = [...(messages || [])].reverse().find((message) => message?.role === "user")?.content || "";
+      const wantsFullStackWebsite = domain === "web-development" && /\b(full[\s-]*stack|express|backend|api server|node\.?js server)\b/i.test(latestUserText);
+      const stackDirective = wantsFullStackWebsite
+        ? `
+- FULL-STACK WEBSITE: return these files and no others unless the user asked to edit one of them:
+  client/index.html
+  client/styles.css
+  client/app.js
+  server/data.js
+  server/index.js
+  package.json
+  README.md
+- Frontend is vanilla HTML, CSS, and JavaScript. Do NOT use React, JSX, or TypeScript.
+- client/index.html links styles.css and app.js and must render without the API.
+- client/app.js fetches the catalog and posts the form, and keeps the static HTML if fetch fails.
+- server/index.js is an ES module Express app (import syntax) that serves ../client and JSON routes.
+- package.json sets "type": "module" and "start": "node server/index.js".
+- Put the file path alone on the line immediately before each code fence.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
