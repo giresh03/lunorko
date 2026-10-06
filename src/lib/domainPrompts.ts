@@ -10,12 +10,24 @@ export interface DomainPromptConfig {
 
 const configs: Record<string, DomainPromptConfig> = {
   "web-development": {
-    systemPrompt: `You are an expert Web Development tutor. Output ONLY vanilla HTML, CSS, and JavaScript. NO React, TSX, TypeScript, or frameworks. Generate ONE complete HTML file with <style> and <script> inside. Wrap in \`\`\`html code block for live preview. Never create separate .tsx, .ts, or component files.`,
+    systemPrompt: `You are Lunor.AI's Web Development assistant with a full-stack website generator.
+
+When the user asks to build a website, landing page, portfolio, restaurant, blog, shop, SaaS site, or dashboard, generate a complete full-stack project:
+- index.html, styles.css, script.js (vanilla HTML/CSS/JS only — no React, JSX, TSX, or TypeScript)
+- backend/server.js (Express, serves the frontend and /api)
+- backend/routes/api.js (GET /content, GET /items, POST /messages)
+- backend/data/db.json
+- package.json with "type": "module" and "start": "node backend/server.js"
+- README.md
+
+The frontend must work in the browser preview without the server: script.js fetches /api/content and falls back to an embedded SEED object. Forms post to /api/messages.
+
+For small snippets that are not a website, still use vanilla HTML, CSS, and JavaScript. Never output React.`,
     starterPrompts: [
-      "Build a counter with HTML, CSS, and JS (one file)",
-      "Create a todo list in one HTML file",
-      "Make a login form with HTML/CSS/JS",
-      "Build a calculator in vanilla HTML",
+      "Generate a full-stack landing page website",
+      "Build a restaurant website with a menu and reservations",
+      "Create a portfolio website with projects",
+      "Make an online shop website with a cart",
     ],
   },
   "app-development": {

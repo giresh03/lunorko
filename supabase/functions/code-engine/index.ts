@@ -503,19 +503,33 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 - You can COMBINE effects: e.g. scales pattern + aurora blobs, or dotted glow + gradient animation for extra premium feel.
 `;
 
+const FULL_STACK_WEBSITE_CONTRACT = `
+FULL-STACK WEBSITE GENERATOR:
+When the user asks for a website, landing page, portfolio, restaurant, blog, shop, SaaS site, dashboard, or full-stack site, return these files (vanilla frontend, no React):
+- index.html — links styles.css and script.js
+- styles.css
+- script.js — browser only. fetch("/api/content") and POST /api/messages, with an embedded SEED fallback so the preview works without Node
+- backend/server.js — Express, express.json(), CORS, app.use("/api", api), express.static of the parent folder, listens on process.env.PORT || 3000
+- backend/routes/api.js — GET /health, GET /content, GET /items, POST /messages
+- backend/data/db.json — seed content matching the page
+- package.json — "type": "module", "start": "node backend/server.js", dependency express
+- README.md — npm install && npm start
+Do not put Express code in script.js. Do not put browser DOM code in backend/server.js.
+`;
+
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
-  "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
+  "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING websites. The page is vanilla HTML, CSS, and JavaScript. A full-stack site also includes an Express API.
 
-CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, TypeScript, or any framework. Use ONLY:
+CRITICAL: NEVER use React, JSX, TSX, Vue, Angular, or TypeScript in the frontend. Frontend files:
 - index.html
 - styles.css
 - script.js
 
 RULES:
-1. **HTML only** — semantic HTML5, no JSX or React. No import statements. No components.
+1. **HTML only** — semantic HTML5, no JSX or React. No import statements in the page. No components.
 2. **CSS only** — styles.css with modern animations (transitions, keyframes, hover effects, gradients).
-3. **Vanilla JS only** — plain JavaScript, no import/export, no modules, no require, no npm packages.
+3. **Vanilla browser JS** — script.js has no import/export, no require, and no npm packages. Express belongs only in backend/server.js.
 4. **IMAGES ARE MANDATORY** — Every website MUST include high-quality images. Use these image sources:
    - **Unsplash (primary)**: <img src="https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80"> — use real Unsplash photo IDs for relevant topics.
    - **Picsum (random beautiful photos)**: <img src="https://picsum.photos/WIDTH/HEIGHT?random=N"> where N is a unique number per image.
@@ -542,10 +556,12 @@ RULES:
 8. **Use the UI Component Library below** — when the user asks for tabs, accordions, modals, cards, alerts, dropdowns, use the vanilla HTML/CSS/JS patterns from the component reference. NEVER translate them to React.
 9. **Design quality** — Use a consistent color palette, proper typography hierarchy (Google Fonts via <link>), generous whitespace, and smooth scroll behavior.
 10. **ADVANCED BACKGROUND EFFECTS** — For ANY prompt that mentions modern, advanced, premium, stunning, creative, portfolio, landing page, SaaS, or startup, ALWAYS include an animated background effect from the Background Effects Library below. Choose the most fitting effect for the topic.
+11. **Full-stack websites** — when the user asks to build a site, include the Express API files from the contract below. Keep script.js runnable in the preview.
 
 ${WEB_COMPONENT_REFERENCE}
 
-${BACKGROUND_EFFECTS_LIBRARY}`,
+${BACKGROUND_EFFECTS_LIBRARY}
+${FULL_STACK_WEBSITE_CONTRACT}`,
   "app-development": `You are Lunor.AI's expert Mobile App Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE code using ONLY vanilla HTML, CSS, and JavaScript.
 
 CRITICAL: NEVER use React, JSX, TSX, Vue, TypeScript, or any framework. Use ONLY:
@@ -874,9 +890,10 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- STACK: Vanilla HTML, CSS, and JS for the page. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript.
+- For a website or full-stack site, return index.html, styles.css, script.js, backend/server.js, backend/routes/api.js, backend/data/db.json, package.json, and README.md.
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
+- script.js must run in the browser preview and fall back if /api is offline. Keep Express only in backend/server.js.
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
