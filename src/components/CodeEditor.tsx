@@ -22,6 +22,13 @@ import {
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
 import { hasJSX } from "@/lib/sandpackProject";
+import {
+  generateWebsite,
+  isWebsiteGenerationRequest,
+  toProjectTree,
+  filesToPreviewMap,
+  WEBSITE_BLUEPRINTS,
+} from "@/lib/websiteGenerator";
 
 // -- Project types --
 interface SavedProject {
@@ -58,6 +65,7 @@ const PROJECT_TEMPLATES = [
   { id: "web-app", name: "Web Application", description: "HTML, CSS, JS starter", icon: "🌐" },
   { id: "node-api", name: "Node.js API", description: "Express-style API boilerplate", icon: "🔧" },
   { id: "react", name: "React App", description: "React component boilerplate", icon: "⚛️" },
+  { id: "fullstack-website", name: "Full-Stack Website", description: "HTML, CSS, JS client plus an Express API", icon: "🚀" },
 ];
 
 function createProjectFromTemplate(templateId: string, projectName: string, domain: string): FileNode[] {
@@ -81,6 +89,8 @@ function createProjectFromTemplate(templateId: string, projectName: string, doma
         ]},
         { id: "package.json", name: "package.json", type: "file", language: "json", content: `{\n  "name": "${projectName.toLowerCase().replace(/[^a-z0-9]/g, "-")}",\n  "version": "1.0.0",\n  "main": "src/server.js",\n  "scripts": { "start": "node src/server.js" }\n}\n` },
       ];
+    case "fullstack-website":
+      return toProjectTree(generateWebsite({ blueprintId: "saas", prompt: `called ${projectName}` }).files);
     case "react":
       return [
         { id: "src", name: "src", type: "folder", isOpen: true, children: [
@@ -485,8 +495,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 
   // AI Chat
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
+  const isWebDevAssistant = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") === "web-development";
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
+    {
+      role: "assistant",
+      content: isWebDevAssistant
+        ? `👋 I'm your **${domainName}** AI assistant.\n\nUse **Website Generator** below to drop in a full-stack site — HTML, CSS, and JavaScript plus an Express API — or ask me to build one.\n\nI can also debug, explain concepts, and apply other code to your files.`
+        : `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀`,
+    },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -1306,9 +1322,46 @@ ${jsCode}
     if (original?.content) handleCodeChange(original.content);
   };
 
+  const handleGenerateWebsite = useCallback((blueprintId?: string, prompt?: string) => {
+    if (chatLoading) return;
+    const request = (prompt ?? "").trim();
+    const site = generateWebsite({
+      blueprintId,
+      prompt: request || undefined,
+    });
+    const html = site.files.find((file) => file.path === site.previewFile);
+    setFileTree(toProjectTree(site.files));
+    setCurrentProjectName(site.siteName);
+    setShowWelcome(false);
+    if (html) {
+      const fileName = html.path.split("/").pop() || "index.html";
+      setOpenTabs([{ id: html.path, name: fileName, language: "html", content: html.content, isModified: true }]);
+      setActiveTabId(html.path);
+      setPreviewContent(buildPreviewHtml(html.content, filesToPreviewMap(site.files)));
+      setShowPreview(true);
+    }
+    setShowTerminal(true);
+    setOutput([
+      `$ Website generator · ${site.name}`,
+      `✓ Wrote ${site.files.length} files for ${site.siteName}`,
+      "$ npm install && npm start",
+      "→ http://localhost:3000",
+    ]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: request || `Generate a ${site.name} website` },
+      { role: "assistant", content: site.summary },
+    ]);
+    setChatInput("");
+  }, [buildPreviewHtml, chatLoading]);
+
   // -- AI Chat with auto-apply --
   const handleChatSend = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
+    if (domainId === "web-development" && isWebsiteGenerationRequest(chatInput)) {
+      handleGenerateWebsite(undefined, chatInput);
+      return;
+    }
     // Add file context to the user message
     const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
     const userMsg: Message = { role: "user", content: chatInput };
@@ -1528,7 +1581,7 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, handleGenerateWebsite]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -2562,6 +2615,34 @@ ${jsCode}
               </div>
             )}
 
+            {domainId === "web-development" && (
+              <div className="border-t px-2 py-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <Wand2 className="h-3 w-3" style={{ color: currentTheme.uiColors.accent }} />
+                  <span className="text-[10px] font-semibold" style={{ color: currentTheme.uiColors.text }}>Website Generator</span>
+                </div>
+                <div className="flex gap-1 overflow-x-auto pb-0.5">
+                  {WEBSITE_BLUEPRINTS.map((blueprint) => (
+                    <button
+                      key={blueprint.id}
+                      type="button"
+                      title={blueprint.blurb}
+                      disabled={chatLoading}
+                      onClick={() => handleGenerateWebsite(blueprint.id)}
+                      className="shrink-0 rounded-full px-2 py-1 text-[10px] font-medium disabled:opacity-50"
+                      style={{
+                        color: currentTheme.uiColors.text,
+                        backgroundColor: currentTheme.uiColors.bg,
+                        border: `1px solid ${currentTheme.uiColors.border}`,
+                      }}
+                    >
+                      {blueprint.icon} {blueprint.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* AI Input */}
             <div className="border-t p-2 shrink-0" style={{ borderColor: currentTheme.uiColors.border, backgroundColor: currentTheme.uiColors.card }}>
               <div className="flex items-center justify-between mb-1">
@@ -2600,7 +2681,9 @@ ${jsCode}
                 </button>
               </div>
               <p className="mt-1.5 text-[9px] text-center" style={{ color: currentTheme.uiColors.muted }}>
-                Code is <span className="font-medium" style={{ color: currentTheme.uiColors.accent }}>automatically applied</span> to your files
+                {domainId === "web-development"
+                  ? <>Ask for a website, or pick one above. Files are <span className="font-medium" style={{ color: currentTheme.uiColors.accent }}>written into the project</span>.</>
+                  : <>Code is <span className="font-medium" style={{ color: currentTheme.uiColors.accent }}>automatically applied</span> to your files</>}
               </p>
             </div>
           </div>
