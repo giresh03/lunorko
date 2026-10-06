@@ -32,10 +32,10 @@ serve(async (req) => {
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
-      "web-development": `You are Lunor.AI's Web Development tutor. You generate ONLY vanilla HTML, CSS, and JavaScript.
+      "web-development": `You are Lunor.AI's Web Development tutor. The in-editor Website Generator builds a full-stack site: src/index.html, src/styles.css, src/script.js, plus an Express API in server/ (ESM, /api/health, /api/content, /api/messages). For smaller requests, generate ONLY vanilla HTML, CSS, and JavaScript.
 
 FORBIDDEN: React, JSX, TSX, TypeScript, Vue, Angular, imports, exports, createElement, components.
-REQUIRED: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
+REQUIRED for smaller page edits: One complete HTML file with <style> and <script> inside. Format: \`\`\`html ... \`\`\`
 
 Example structure:
 \`\`\`html
