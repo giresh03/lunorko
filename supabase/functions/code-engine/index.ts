@@ -503,6 +503,24 @@ When the user asks for an "advanced", "modern", "stunning", "premium", "creative
 - You can COMBINE effects: e.g. scales pattern + aurora blobs, or dotted glow + gradient animation for extra premium feel.
 `;
 
+const FULL_STACK_WEBSITE_PROMPT = `You are Lunor.AI's full-stack website generator for the Web Development assistant.
+
+Write a small production-shaped website:
+- client/index.html, client/styles.css, client/app.js — vanilla HTML, CSS, and JavaScript only. The editor preview runs these files. No React, JSX, Vue, or TypeScript.
+- server/index.js, server/routes.js, server/store.js — Node.js + Express. Serve client/ as static files and mount routes at /api.
+- package.json with express and "start": "node server/index.js"
+- README.md with install and run steps
+- .env.example with PORT=3000
+
+API contract:
+- GET /api/health
+- GET /api/catalog returns { headline, subhead, items: [{ title, text, image, meta }] }
+- POST /api/submissions requires name and email and returns 201
+- GET /api/submissions lists saved entries
+
+The browser script must keep working when fetch("/api/...") fails (editor preview). Use real <img> tags (https://picsum.photos/seed/... ) and set data-themed="true" on <body>.
+Link styles with href="styles.css" and the script with src="app.js".`;
+
 // Domain-specific system prompts for AI code generation
 const domainPrompts: Record<string, string> = {
   "web-development": `You are Lunor.AI's expert Web Development coding assistant. You generate SELF-CONTAINED, ERROR-FREE, VISUALLY STUNNING code using ONLY vanilla HTML, CSS, and JavaScript.
@@ -864,8 +882,20 @@ serve(async (req) => {
       const selectedModel = normalizeLovableModel(model);
       console.log(`[code-engine] generate domain=${domain}, model=${selectedModel}, messages=${messages?.length}`);
 
-      const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-      const stackDirective = domain === "app-development"
+      const lastUserContent = Array.isArray(messages)
+        ? [...messages].reverse().find((message) => message?.role === "user")?.content || ""
+        : "";
+      const fullStackWebsite = domain === "web-development" && /\[website-generator\]|full-stack website|website generator/i.test(lastUserContent);
+      const basePrompt = fullStackWebsite
+        ? FULL_STACK_WEBSITE_PROMPT
+        : (domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`);
+      const stackDirective = fullStackWebsite
+        ? `
+- STACK: vanilla client (client/index.html, client/styles.css, client/app.js) plus Express server (server/index.js, server/routes.js, server/store.js), package.json, README.md, .env.example.
+- Do NOT generate React, JSX, TSX, Vue, or TypeScript.
+- Keep GET /api/catalog, GET /api/health, POST /api/submissions, and GET /api/submissions.
+- client/app.js must catch failed fetch calls so the preview still renders.`
+        : domain === "app-development"
         ? `
 - STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
 - Return exactly 3 files: index.html, styles.css, script.js
