@@ -65,14 +65,22 @@ const RunLocallyDialog = ({
   const domainId = domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   const safeName = projectName.replace(/[^a-z0-9-_]/gi, "-").toLowerCase() || "my-app";
+  const serverFile = files.find((file) => file.path.endsWith("/server.js") || file.path === "server.js");
+  const serverDir = serverFile ? serverFile.path.replace(/\/?server\.js$/, "") || "." : "";
   const runCommands = isReact
     ? `cd ${safeName}
 npm install
 npm run dev`
+    : serverFile
+    ? `# Extract the zip, then start the Express site:
+cd ${safeName}${serverDir && serverDir !== "." ? `/${serverDir}` : ""}
+npm install
+npm start
+# Site and API at http://localhost:3000`
     : `# Extract the zip, then:
 cd ${safeName}
 npx serve .
-# Opens at http://localhost:3000`
+# Opens at http://localhost:3000`;
 
   const handleCopyCommands = () => {
     navigator.clipboard.writeText(runCommands);
