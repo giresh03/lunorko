@@ -874,15 +874,17 @@ serve(async (req) => {
 - Include 2-3 images in HTML using: <img src="https://image.pollinations.ai/prompt/URL_ENCODED_DESCRIPTION"> (e.g. prompt=modern%20hero%20illustration)`
         : domain === "web-development"
         ? `
-- STACK: HTML + CSS + JS ONLY. Do NOT generate .jsx, .tsx, React, Vue, TypeScript, or any framework. NEVER.
-- Return exactly 3 files: index.html, styles.css, script.js
+- STACK: HTML + CSS + JS for the page. Do NOT generate .jsx, .tsx, React, Vue, or TypeScript.
+- The Web Development assistant already has a Website Generator automation. If the user asks to build or generate a whole website, remind them they can use the Website panel (it writes src/index.html, src/styles.css, src/script.js, and an Express API in server/).
+- For page edits, return index.html, styles.css, and script.js.
 - index.html must include: <link href="styles.css">, <script src="script.js"></script>, and Google Fonts via <link>
 - Add modern CSS animations (transitions, keyframes, hover effects, gradients, scroll animations)
 - MANDATORY: Include 3-5+ high-quality images using Unsplash URLs (https://images.unsplash.com/photo-ID?w=WIDTH&h=HEIGHT&fit=crop&q=80) or Picsum (https://picsum.photos/WIDTH/HEIGHT?random=N)
 - Use a hero section with a full-width background image
 - Use responsive design with flexbox/grid and media queries
 - Add smooth scroll behavior: html { scroll-behavior: smooth; }
-- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)`
+- Use CSS custom properties for consistent theming (--primary, --accent, --bg, --text colors)
+- If the user asks to change the API, also return server files with paths such as server/src/routes/api.js. The API is Express ESM: GET /api/health, GET /api/content, POST /api/messages.`
         : "";
       const systemPrompt = `${basePrompt}
 
