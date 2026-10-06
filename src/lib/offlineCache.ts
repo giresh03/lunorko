@@ -63,6 +63,10 @@ function writeJSON(key: string, data: unknown): void {
 // Built-in snippets per domain (no network needed)
 const DOMAIN_SNIPPETS: Record<string, CachedSnippet[]> = {
   "web-development": [
+    { id: "wd-site-api", domain: "web-development", title: "Website API routes", language: "javascript", cachedAt: 0,
+      code: "const express = require('express');\nconst app = express();\napp.use(express.json());\n\napp.get('/api/site', (_req, res) => {\n  res.json({ brand: 'Lumen Atelier', items: [] });\n});\n\napp.post('/api/messages', (req, res) => {\n  const name = String(req.body?.name || '').trim();\n  const email = String(req.body?.email || '').trim();\n  const message = String(req.body?.message || '').trim();\n  if (!name || !email || !message) return res.status(400).json({ error: 'Name, email, and message are required.' });\n  res.status(201).json({ id: Date.now().toString(36), name, email, message });\n});\n\napp.listen(3000, () => console.log('Website API on http://localhost:3000'));" },
+    { id: "wd-site-client", domain: "web-development", title: "Website API client", language: "javascript", cachedAt: 0,
+      code: "async function loadSite(fallback) {\n  try {\n    const response = await fetch('/api/site');\n    if (!response.ok) throw new Error('API unavailable');\n    return await response.json();\n  } catch {\n    return fallback;\n  }\n}\n\nasync function sendMessage(payload) {\n  const response = await fetch('/api/messages', {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(payload),\n  });\n  if (!response.ok) throw new Error('Could not store message');\n  return response.json();\n}" },
     { id: "wd-1", domain: "web-development", title: "Express Server", language: "javascript", cachedAt: 0,
       code: "const express = require('express');\nconst app = express();\n\napp.get('/', (req, res) => {\n  res.json({ message: 'Hello World!' });\n});\n\napp.listen(3000, () => console.log('Server running on port 3000'));" },
     { id: "wd-2", domain: "web-development", title: "Fetch API Helper", language: "javascript", cachedAt: 0,

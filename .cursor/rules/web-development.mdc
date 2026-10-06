@@ -15,6 +15,15 @@ When the prompt mentions **MERN**, **MongoDB**, **Express**, **Node.js** (backen
 - Official docs: `docs/mern-stack/official-docs.md`
 - Follow official Node, Express, MongoDB, React documentation conventions
 
+## Full-stack website generator
+
+When a Web Development prompt asks to generate, build, or create a website, landing page, or full-stack site, use `src/lib/websiteGenerator.ts`. The editor assistant and `CodeAssistant` already run this generator and apply the files.
+
+- Files: `index.html`, `styles.css`, `script.js`, `server.js`, `package.json`, `README.md`
+- API: `GET /api/site`, `GET /api/items`, `POST /api/messages`
+- The preview must stay usable when the API is offline
+- `server.js` starts only when `window` is undefined, so the editor preview does not execute the Express server
+
 ## Theme & Style
 
 - **Design system**: Radix UI + shadcn/ui (radix-nova style)
