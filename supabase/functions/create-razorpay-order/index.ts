@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { getPurchasePrice } from "../_shared/subscriptionPricing.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,23 +26,19 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { plan_id, domain_id } = await req.json();
-
-    // Server-side price table (never trust client amounts)
-    const PRICES: Record<string, number> = {
-      pro: 15000,
-      premium: 25000,
-      professional: 50000,
-      topup: 5000,
-    };
-
-    if (!plan_id || typeof plan_id !== "string" || !(plan_id in PRICES)) {
-      return new Response(JSON.stringify({ error: "Invalid plan_id" }), { status: 400, headers: corsHeaders });
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), { status: 400, headers: corsHeaders });
     }
-    if (plan_id !== "topup" && (!domain_id || typeof domain_id !== "string")) {
+    const { plan_id, domain_id, coupon_code } = body;
+    let pricing;
+    try { pricing = getPurchasePrice(plan_id, coupon_code); } catch (error) {
+      return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid purchase" }), { status: 400, headers: corsHeaders });
+    }
+    if (plan_id !== "topup" && (!domain_id || typeof domain_id !== "string" || domain_id.length > 100)) {
       return new Response(JSON.stringify({ error: "Missing domain_id" }), { status: 400, headers: corsHeaders });
     }
-    const amount = PRICES[plan_id];
+    const { amount, couponCode } = pricing;
 
     const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
     const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
@@ -64,7 +57,7 @@ serve(async (req) => {
         amount: amount,
         currency: "INR",
         receipt: `s_${userId.slice(0, 8)}_${Date.now()}`,
-        notes: { plan_id, user_id: userId, domain_id: plan_id === "topup" ? "all" : domain_id },
+        notes: { plan_id, user_id: userId, domain_id: plan_id === "topup" ? "all" : domain_id, coupon_code: couponCode },
       }),
     });
 
@@ -82,7 +75,7 @@ serve(async (req) => {
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
       );
-      await adminClient.from("payment_orders").insert({
+      const { error: recordError } = await adminClient.from("payment_orders").insert({
         user_id: userId,
         plan_id,
         amount_cents: order.amount,
@@ -90,9 +83,12 @@ serve(async (req) => {
         razorpay_order_id: order.id,
         status: "created",
         kind: plan_id === "topup" ? "topup" : "subscription",
+        coupon_code: couponCode || null,
       });
+      if (recordError) throw recordError;
     } catch (recordErr) {
       console.error("payment_orders insert failed:", recordErr);
+      return new Response(JSON.stringify({ error: "Unable to record payment order. Please try again." }), { status: 500, headers: corsHeaders });
     }
 
     return new Response(JSON.stringify({ order_id: order.id, amount: order.amount, currency: order.currency, key_id: RAZORPAY_KEY_ID }), {
