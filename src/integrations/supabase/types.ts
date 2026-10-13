@@ -1303,6 +1303,7 @@ export type Database = {
       payment_orders: {
         Row: {
           amount_cents: number
+          coupon_code: string | null
           created_at: string
           currency: string
           id: string
@@ -1316,6 +1317,7 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          coupon_code?: string | null
           created_at?: string
           currency?: string
           id?: string
@@ -1329,6 +1331,7 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          coupon_code?: string | null
           created_at?: string
           currency?: string
           id?: string

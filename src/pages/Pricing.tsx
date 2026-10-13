@@ -3,6 +3,9 @@ import { useSearchParams } from "react-router-dom";
 import { Check, X, Crown, Zap, Rocket, Star, Loader2, Coins, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FESTIVAL_COUPON, getPurchasePrice, normalizeCoupon } from "../../supabase/functions/_shared/subscriptionPricing";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { domains } from "@/lib/domains";
@@ -143,6 +146,9 @@ const Pricing = () => {
   const { getPlanForDomain, refetch } = useSubscription();
   const { credits, refetch: refetchCredits } = useCredits();
   const [submitting, setSubmitting] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState("");
+  const [couponError, setCouponError] = useState("");
 
   const loadRazorpayScript = (): Promise<void> =>
     new Promise((resolve) => {
@@ -168,19 +174,19 @@ const Pricing = () => {
       setSubmitting(true);
       try {
         const { data: orderData, error: orderError } = await supabase.functions.invoke("create-razorpay-order", {
-          body: { plan_id: plan.id, amount: plan.amountPaise, domain_id: selectedDomainId },
+          body: { plan_id: plan.id, domain_id: selectedDomainId, coupon_code: plan.id === "topup" ? undefined : appliedCoupon },
         });
 
         if (orderError) throw orderError;
-        const { order_id, key_id } = orderData as { order_id: string; key_id: string };
-        if (!order_id || !key_id) throw new Error("Invalid order response");
+        const { order_id, key_id, amount, currency } = orderData as { order_id: string; key_id: string; amount: number; currency: string };
+        if (!order_id || !key_id || !Number.isSafeInteger(amount) || amount <= 0 || currency !== "INR") throw new Error("Invalid order response");
 
         await loadRazorpayScript();
 
         const rzp = new (window as any).Razorpay({
           key: key_id,
-          amount: plan.amountPaise,
-          currency: "INR",
+          amount,
+          currency,
           order_id,
           name: "Lunor.AI",
           description: `${plan.name} Plan - ${selectedDomain?.name || "All domains"}`,
@@ -224,7 +230,7 @@ const Pricing = () => {
         setSubmitting(false);
       }
     },
-    [user, selectedDomainId, selectedDomain, refetch, refetchCredits]
+    [user, selectedDomainId, selectedDomain, refetch, refetchCredits, appliedCoupon]
   );
 
   const currentPlan = user ? getPlanForDomain(selectedDomainId) : "free";
@@ -244,10 +250,43 @@ const Pricing = () => {
           </p>
         </div>
 
+        <form
+          className="max-w-xl mx-auto mb-12"
+          onSubmit={(event) => {
+            event.preventDefault();
+            try {
+              const code = normalizeCoupon(couponInput);
+              if (code !== FESTIVAL_COUPON) throw new Error("Invalid coupon code");
+              getPurchasePrice("pro", code);
+              setAppliedCoupon(code);
+              setCouponInput(code);
+              setCouponError("");
+            } catch {
+              setCouponError("Invalid coupon code. Please check and try again.");
+            }
+          }}
+        >
+          <Label htmlFor="festival-coupon">Coupon code</Label>
+          <div className="flex flex-col sm:flex-row gap-2 mt-2">
+            <Input id="festival-coupon" value={couponInput} maxLength={64} disabled={submitting || Boolean(appliedCoupon)}
+              onChange={(event) => { setCouponInput(event.target.value); setCouponError(""); }}
+              placeholder="Enter coupon code" autoComplete="off" aria-invalid={Boolean(couponError)} aria-describedby="coupon-status" />
+            {appliedCoupon ? (
+              <Button type="button" variant="outline" disabled={submitting} onClick={() => { setAppliedCoupon(""); setCouponInput(""); setCouponError(""); }}>Remove coupon</Button>
+            ) : (
+              <Button type="submit" disabled={submitting || !couponInput.trim()}>Apply coupon</Button>
+            )}
+          </div>
+          <p id="coupon-status" role="status" className={`text-sm mt-2 min-h-5 ${couponError ? "text-destructive" : "text-primary"}`}>
+            {couponError || (appliedCoupon ? `${appliedCoupon} applied — Dushera festival prices unlocked.` : "")}
+          </p>
+        </form>
+
         {/* Plan cards */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto mb-16">
           {plans.map((p) => {
             const Icon = p.icon;
+            const displayPrice = p.id === "free" ? 0 : getPurchasePrice(p.id, appliedCoupon).amount / 100;
             const isCurrentPlan = currentPlan === p.id;
             const planRank = ["free", "pro", "premium", "professional"];
             const isDowngrade = planRank.indexOf(p.id) < planRank.indexOf(currentPlan);
@@ -275,7 +314,8 @@ const Pricing = () => {
                     <span className="text-4xl font-bold text-foreground">Free</span>
                   ) : (
                     <>
-                      <span className="text-4xl font-bold text-foreground">₹{p.price}</span>
+                      {appliedCoupon && <span className="block text-sm text-muted-foreground line-through mb-1">₹{p.price}/month</span>}
+                      <span className="text-4xl font-bold text-foreground">₹{displayPrice}</span>
                       <span className="text-sm text-muted-foreground">/month</span>
                     </>
                   )}
@@ -323,7 +363,7 @@ const Pricing = () => {
                     ) : (
                       <>
                         <CreditCard className="mr-2 h-4 w-4" />
-                        Subscribe ₹{p.price}/mo
+                        Subscribe ₹{displayPrice}/mo
                       </>
                     )}
                   </Button>
