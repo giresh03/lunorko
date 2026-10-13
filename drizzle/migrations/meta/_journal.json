@@ -99,6 +99,13 @@
       "when": 1790135137858,
       "tag": "0013_community_guidelines_moderation_and_domain_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791902478233,
+      "tag": "0014_festival_coupon_purchase_amount",
+      "breakpoints": true
     }
   ]
 }
