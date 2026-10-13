@@ -87,15 +87,17 @@ const PopAd = () => {
             className="fixed inset-0 z-[101] flex items-center justify-center bg-background/95 p-3 pt-16 sm:p-6 sm:pt-16 focus:outline-none"
           >
             <DialogTitle className="sr-only">Dussehra subscription offer</DialogTitle>
+            <div className="absolute right-4 top-4 z-10">
             <Button
               variant="outline"
               size="icon"
               aria-label="Close festival offer"
-              className="absolute right-4 top-4 h-10 w-10 bg-background text-foreground shadow-lg"
+              className="h-10 w-10 bg-background text-foreground shadow-lg"
               onClick={() => setFestivalOpen(false)}
             >
               <X className="h-5 w-5" />
             </Button>
+            </div>
             <Link
               to="/pricing"
               aria-label="View Dussehra subscription pricing"
