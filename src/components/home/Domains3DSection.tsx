@@ -44,9 +44,9 @@ const learnerArcs = [
 ];
 
 const globeStats = [
-  { icon: Users, label: "Active Learners", value: "50K+" },
-  { icon: Globe2, label: "Countries", value: "120+" },
-  { icon: BookOpen, label: "Learning Paths", value: "200+" },
+  { icon: Users, label: "Active Learners", value: "5k+" },
+  { icon: Globe2, label: "Domains", value: "4" },
+  { icon: BookOpen, label: "Levels per Domain", value: "30" },
 ];
 
 const Domain3DCard = ({ domain, index }: { domain: typeof domains[0]; index: number }) => {
@@ -135,7 +135,7 @@ const Domains3DSection = () => {
           {/* Text */}
           <div className="flex-1 text-center lg:text-left scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
             <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase text-primary">
-              12+ Domains · 120+ Countries
+              4 Domains · 5k+ Students
             </span>
             <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl lg:text-5xl mt-4">
               Explore Every{" "}

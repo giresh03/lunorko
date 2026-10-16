@@ -49,8 +49,8 @@ const Index = () => {
               { icon: Code2, title: "AI Code Assistant", desc: "Domain-specific AI that generates, debugs, and explains code in real-time." },
               { icon: BookOpen, title: "Curated Learning", desc: "Handpicked YouTube videos, Udemy courses, and reading materials for each domain." },
               { icon: Zap, title: "Guided Roadmaps", desc: "Step-by-step learning paths designed by industry professionals." },
-              { icon: Shield, title: "12+ Domains", desc: "Web Dev, App Dev, Cybersecurity, ML, Cloud, DevOps, and many more." },
-              { icon: Users, title: "Community Driven", desc: "Learn alongside thousands of students and share your projects." },
+              { icon: Shield, title: "4 Domains", desc: "Web Development, App Development, DSA & Competitive Programming, and UI/UX Design." },
+              { icon: Users, title: "Community Driven", desc: "Learn alongside 5k+ students and share your projects." },
               { icon: Sparkles, title: "AI Debugging", desc: "Paste your code, get instant fixes and explanations from AI." },
             ].map((f, i) => (
               <div
@@ -138,7 +138,7 @@ const Index = () => {
                 ]}
                 className="font-serif justify-center text-foreground"
               />
-              <p className="mt-3 text-muted-foreground">Start learning with AI-powered assistance across 12+ domains</p>
+              <p className="mt-3 text-muted-foreground">Start learning with AI-powered assistance across 4 domains</p>
               <Button size="lg" className="mt-6 hover-scale" asChild>
                 <Link to="/domains">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
               </Button>

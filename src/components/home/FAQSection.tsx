@@ -8,7 +8,7 @@ import {
 const faqs = [
   {
     q: "Is Lunor.AI really free to use?",
-    a: "Yes! Our Free Forever plan gives you access to all 12+ domain roadmaps, limited AI code assistant queries per day, curated learning resources, and community access — no credit card required.",
+    a: "Yes! Our Free Forever plan gives you access to all 4 domain roadmaps, limited AI code assistant queries per day, curated learning resources, and community access — no credit card required.",
   },
   {
     q: "How is Lunor.AI different from just using YouTube or ChatGPT?",
@@ -16,7 +16,7 @@ const faqs = [
   },
   {
     q: "Which engineering domains are supported?",
-    a: "We currently support 12+ domains including Web Development, App Development, Data Science & ML, Cybersecurity, Cloud Computing, DevOps, Blockchain, IoT, System Design, DSA, UI/UX Design, and Database Management — with more being added regularly.",
+    a: "We currently support 4 domains: Web Development, App Development, DSA & Competitive Programming, and UI/UX Design — with more being added over time.",
   },
   {
     q: "Do I need prior coding experience to start?",

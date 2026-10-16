@@ -92,7 +92,7 @@ const PromoVideo = () => {
 
           <div className="mt-12 grid gap-6 text-left md:grid-cols-3">
             {[
-              { title: "12+ Domains", desc: "Web Dev, Cybersecurity, Data Science, Cloud Computing, and more." },
+              { title: "4 Domains", desc: "Web Development, App Development, DSA & Competitive Programming, and UI/UX Design." },
               { title: "AI Code Assistant", desc: "Real-time AI help while you code — like having a mentor 24/7." },
               { title: "Gamified Learning", desc: "Daily challenges, XP points, achievements, and leaderboards." },
             ].map((item) => (
