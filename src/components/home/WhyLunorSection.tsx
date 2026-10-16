@@ -12,7 +12,7 @@ const problems = [
 ];
 
 const solutions = [
-  "Curated, structured roadmaps for 12+ domains",
+  "Curated, structured roadmaps for 4 domains",
   "Free tier with AI-powered learning tools",
   "Real-time AI code assistant that understands your domain",
   "Industry-aligned curriculum updated regularly",

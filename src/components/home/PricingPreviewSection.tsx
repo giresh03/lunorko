@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const freeTier = [
-  "Access to all 12+ domain roadmaps",
+  "Access to all 4 domain roadmaps",
   "AI Code Assistant (limited queries/day)",
   "Curated YouTube & article resources",
   "Community access & discussions",

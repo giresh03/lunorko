@@ -42,7 +42,7 @@ const TestimonialsSection = () => (
           Student Stories
         </span>
         <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl">
-          Loved by <span className="text-primary">10,000+ Students</span>
+          Loved by <span className="text-primary">5k+ Students</span>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
           Hear from engineering students who transformed their careers with Lunor.AI

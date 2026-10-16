@@ -226,7 +226,7 @@ const Internships = () => {
               Internships at <span className="text-primary">Lunor.AI</span>
             </h1>
             <p className="mt-5 text-base sm:text-lg text-muted-foreground">
-              Work on a real AI product used by thousands of learners. Ship features, get mentored by
+              Work on a real AI product used by 5k+ learners. Ship features, get mentored by
               engineers, and walk out with a verified certificate, a recommendation letter and a shot at a
               full-time offer.
             </p>

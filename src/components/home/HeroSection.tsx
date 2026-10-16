@@ -117,8 +117,8 @@ export default function HeroSection() {
 
           <div className="mt-14 flex items-center gap-8 md:gap-10 animate-hero-cta">
             {[
-              { value: "16+", label: "Domains" },
-              { value: "50K+", label: "Students" },
+              { value: "4", label: "Domains" },
+              { value: "5k+", label: "Students" },
               { value: "AI", label: "Powered" },
             ].map((stat) => (
               <div key={stat.label} className="flex flex-col items-center">
