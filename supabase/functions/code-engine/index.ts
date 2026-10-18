@@ -1278,6 +1278,8 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    // User's own Anthropic key: when present, Claude generates websites directly.
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
     // Prefer the Lovable AI Gateway (reliable quota). A directly-configured Gemini key
     // is only used when no gateway key exists.
     const GOOGLE_AI_API_KEY = LOVABLE_API_KEY
@@ -1301,9 +1303,11 @@ serve(async (req) => {
     if (action === "ping") {
       return new Response(
         JSON.stringify({
-          provider: LOVABLE_API_KEY ? "lovable" : "gemini",
+          provider: ANTHROPIC_API_KEY ? "claude" : LOVABLE_API_KEY ? "lovable" : "gemini",
           projectRef,
-          hint: LOVABLE_API_KEY ? "Using Lovable AI Gateway (preferred)." : "Using Gemini (fallback).",
+          hint: ANTHROPIC_API_KEY
+            ? "Using your Anthropic key (Claude) for generation."
+            : LOVABLE_API_KEY ? "Using Lovable AI Gateway (preferred)." : "Using Gemini (fallback).",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -1579,6 +1583,75 @@ Iterative editing (critical — the user keeps chatting about the SAME project):
 - Never return an empty response or a file with placeholder/TODO content.
 ${stackDirective}`;
 
+
+      if (ANTHROPIC_API_KEY) {
+        const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-5",
+            max_tokens: 32768,
+            temperature: 0.85,
+            stream: true,
+            system: systemPrompt,
+            messages: messages.filter((m) => m.role !== "system"),
+          }),
+        });
+        if (!claudeResp.ok) {
+          const status = claudeResp.status;
+          const text = await claudeResp.text();
+          console.error(`[code-engine] Anthropic error: ${status}`, text);
+          const msg = status === 429
+            ? "Claude rate limit reached. Please wait a moment and try again."
+            : status === 401
+              ? "Your Anthropic API key was rejected. Please check it in project secrets."
+              : `AI service error (${status})`;
+          return new Response(JSON.stringify({ error: msg }), {
+            status: status === 429 ? 429 : status === 401 ? 503 : 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        let buf = "";
+        const dec = new TextDecoder();
+        const rd = claudeResp.body!.getReader();
+        const stream = new ReadableStream({
+          async start(ctrl) {
+            try {
+              while (true) {
+                const { done, value } = await rd.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n");
+                buf = lines.pop() || "";
+                for (const line of lines) {
+                  if (!line.startsWith("data: ")) continue;
+                  const j = line.slice(6).trim();
+                  if (!j) continue;
+                  try {
+                    const p = JSON.parse(j);
+                    if (p.type === "content_block_delta" && p.delta?.type === "text_delta" && p.delta.text) {
+                      ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: p.delta.text } }] })}\n\n`));
+                    }
+                  } catch {}
+                }
+              }
+              if (buf.trim().startsWith("data: ")) {
+                try {
+                  const p = JSON.parse(buf.slice(6).trim());
+                  if (p.type === "content_block_delta" && p.delta?.type === "text_delta" && p.delta.text) {
+                    ctrl.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: p.delta.text } }] })}\n\n`));
+                  }
+                } catch {}
+              }
+            } finally { ctrl.close(); }
+          },
+        });
+        return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+      }
 
       if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
         const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
