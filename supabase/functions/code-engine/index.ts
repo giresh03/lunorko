@@ -1278,6 +1278,8 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY") || "";
+    // User's own Anthropic key: when present, Claude generates websites directly.
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
     // Prefer the Lovable AI Gateway (reliable quota). A directly-configured Gemini key
     // is only used when no gateway key exists.
     const GOOGLE_AI_API_KEY = LOVABLE_API_KEY
@@ -1301,9 +1303,11 @@ serve(async (req) => {
     if (action === "ping") {
       return new Response(
         JSON.stringify({
-          provider: LOVABLE_API_KEY ? "lovable" : "gemini",
+          provider: ANTHROPIC_API_KEY ? "claude" : LOVABLE_API_KEY ? "lovable" : "gemini",
           projectRef,
-          hint: LOVABLE_API_KEY ? "Using Lovable AI Gateway (preferred)." : "Using Gemini (fallback).",
+          hint: ANTHROPIC_API_KEY
+            ? "Using your Anthropic key (Claude) for generation."
+            : LOVABLE_API_KEY ? "Using Lovable AI Gateway (preferred)." : "Using Gemini (fallback).",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
