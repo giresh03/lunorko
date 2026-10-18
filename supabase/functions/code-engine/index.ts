@@ -1620,7 +1620,6 @@ ${stackDirective}`;
           console.log("[code-engine] Anthropic balance empty — falling back to Lovable AI Gateway");
         } else {
         let buf = "";
-        let buf = "";
         const dec = new TextDecoder();
         const rd = claudeResp.body!.getReader();
         const stream = new ReadableStream({
@@ -1656,6 +1655,7 @@ ${stackDirective}`;
           },
         });
         return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+        }
       }
 
       if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
