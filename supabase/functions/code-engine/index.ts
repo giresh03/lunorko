@@ -1605,16 +1605,20 @@ ${stackDirective}`;
           const status = claudeResp.status;
           const text = await claudeResp.text();
           console.error(`[code-engine] Anthropic error: ${status}`, text);
-          const msg = status === 429
-            ? "Claude rate limit reached. Please wait a moment and try again."
-            : status === 401
-              ? "Your Anthropic API key was rejected. Please check it in project secrets."
-              : `AI service error (${status})`;
-          return new Response(JSON.stringify({ error: msg }), {
-            status: status === 429 ? 429 : status === 401 ? 503 : 502,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
+          const isBalanceError = status === 400 && text.includes("credit balance");
+          if (!isBalanceError) {
+            const msg = status === 429
+              ? "Claude rate limit reached. Please wait a moment and try again."
+              : status === 401
+                ? "Your Anthropic API key was rejected. Please check it in project secrets."
+                : `AI service error (${status})`;
+            return new Response(JSON.stringify({ error: msg }), {
+              status: status === 429 ? 429 : status === 401 ? 503 : 502,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          console.log("[code-engine] Anthropic balance empty — falling back to Lovable AI Gateway");
+        } else {
         let buf = "";
         const dec = new TextDecoder();
         const rd = claudeResp.body!.getReader();
@@ -1651,6 +1655,7 @@ ${stackDirective}`;
           },
         });
         return new Response(stream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+        }
       }
 
       if (!LOVABLE_API_KEY && GOOGLE_AI_API_KEY) {
