@@ -31,7 +31,13 @@ export function toClaudeMessages(messages: ChatMessage[]): { role: "user" | "ass
   return out;
 }
 
-export function callClaude(opts: {
+const FALLBACK_MODELS = ["claude-sonnet-4-5", "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"];
+
+function isModelProblem(status: number, text: string): boolean {
+  return (status === 400 || status === 404) && /model/i.test(text);
+}
+
+export async function callClaude(opts: {
   system: string;
   messages: ChatMessage[];
   maxTokens?: number;
@@ -39,8 +45,29 @@ export function callClaude(opts: {
   stream?: boolean;
   model?: string;
 }): Promise<Response> {
+  const models = [opts.model || anthropicModel(), ...FALLBACK_MODELS].filter((m, i, a) => a.indexOf(m) === i);
+  let last: Response | null = null;
+  for (const model of models) {
+    const resp = await callClaudeOnce({ ...opts, model });
+    if (resp.ok) return resp;
+    const text = await resp.clone().text().catch(() => "");
+    if (!isModelProblem(resp.status, text)) return resp;
+    console.error(`[claude] model ${model} rejected (${resp.status}); trying next`, text.slice(0, 200));
+    last = resp;
+  }
+  return last!;
+}
+
+function callClaudeOnce(opts: {
+  system: string;
+  messages: ChatMessage[];
+  maxTokens?: number;
+  temperature?: number;
+  stream?: boolean;
+  model: string;
+}): Promise<Response> {
   const body: Record<string, unknown> = {
-    model: opts.model || anthropicModel(),
+    model: opts.model,
     max_tokens: opts.maxTokens ?? 8192,
     system: opts.system,
     messages: toClaudeMessages(opts.messages),
@@ -95,7 +122,12 @@ export function claudeErrorResponse(status: number, detail: string, headers: Rec
   if (status === 400 && detail.includes("credit balance")) {
     return new Response(JSON.stringify({ error: "The Claude API account is out of credits. Add credits in the Anthropic console." }), { status: 402, headers: json });
   }
-  return new Response(JSON.stringify({ error: `AI service error (${status})` }), { status: 502, headers: json });
+  let reason = "";
+  try { reason = JSON.parse(detail)?.error?.message || ""; } catch { reason = detail.slice(0, 200); }
+  return new Response(
+    JSON.stringify({ error: `AI service error (${status})${reason ? `: ${reason}` : ""}` }),
+    { status: 502, headers: json },
+  );
 }
 
 /**
