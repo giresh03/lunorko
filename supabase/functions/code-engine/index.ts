@@ -1285,15 +1285,15 @@ serve(async (req) => {
     const GOOGLE_AI_API_KEY = LOVABLE_API_KEY
       ? ""
       : (Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY"));
-    const apiKey = LOVABLE_API_KEY || GOOGLE_AI_API_KEY;
+    const apiKey = LOVABLE_API_KEY || GOOGLE_AI_API_KEY || ANTHROPIC_API_KEY;
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || "unknown";
 
     if (!apiKey) {
       return new Response(
         JSON.stringify({
-          error: "GEMINI_API_KEY or LOVABLE_API_KEY is not configured",
-          hint: "Set: supabase secrets set GEMINI_API_KEY=your_key",
+          error: "ANTHROPIC_API_KEY (or GEMINI_API_KEY / LOVABLE_API_KEY) is not configured",
+          hint: "Set: supabase secrets set ANTHROPIC_API_KEY=your_key",
         }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -1593,7 +1593,7 @@ ${stackDirective}`;
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-5",
+            model: (Deno.env.get("ANTHROPIC_MODEL") || "claude-sonnet-5-5").trim(),
             max_tokens: 32768,
             temperature: 0.85,
             stream: true,

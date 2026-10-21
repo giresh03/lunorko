@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { anthropicKey, callClaude, claudeErrorResponse, claudeStreamToOpenAi } from "../_shared/claude.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,11 +81,12 @@ serve(async (req) => {
     const { messages, domain } = await req.json();
     const GOOGLE_AI_API_KEY = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY");
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const apiKey = GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("GOOGLE_AI_API_KEY or LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_KEY = anthropicKey();
+    const apiKey = ANTHROPIC_KEY || GOOGLE_AI_API_KEY || LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY (or GEMINI_API_KEY / LOVABLE_API_KEY) is not configured");
 
-    const useGoogleAI = !!GOOGLE_AI_API_KEY;
-    console.log(`[code-assistant] domain=${domain}, messages=${messages.length}, provider=${useGoogleAI ? "google" : "lovable"}`);
+    const useGoogleAI = !ANTHROPIC_KEY && !!GOOGLE_AI_API_KEY;
+    console.log(`[code-assistant] domain=${domain}, messages=${messages.length}, provider=${ANTHROPIC_KEY ? "claude" : useGoogleAI ? "google" : "lovable"}`);
 
     // Domain-specific system prompts
     const domainPrompts: Record<string, string> = {
@@ -105,7 +107,9 @@ Example structure:
 </html>
 \`\`\`
 
-Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.`,
+Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .jsx files.
+
+After the code block, add a short "**Output**" section (2-4 lines) describing what the page looks like and does when it runs, so the learner knows what to expect. The app renders your html block as a live preview right below it.`,
       "app-development": `You are Lunor.AI's expert Mobile App Development tutor covering React Native, Flutter, Swift, Kotlin, Expo, and Firebase. Understand platform nuances (iOS vs Android), navigation patterns, state management, and performance optimization. Generate production-ready cross-platform code.`,
       "cybersecurity": `You are Lunor.AI's expert Cybersecurity tutor specializing in ethical hacking, penetration testing, network security, cryptography, OWASP Top 10, and digital forensics. Explain vulnerabilities with real-world examples, provide secure coding practices. Always emphasize ethical and legal boundaries.`,
       "data-science": `You are Lunor.AI's expert Data Science & ML tutor covering Python, TensorFlow, PyTorch, Pandas, NumPy, Scikit-learn, NLP, and Computer Vision. Explain statistics intuitively, write vectorized code, guide through the full ML pipeline: EDA, feature engineering, training, evaluation, deployment.`,
@@ -136,6 +140,21 @@ Rules:
       systemPrompt += `
 
 REMINDER: Output ONLY one \`\`\`html code block containing a complete page. No React, TSX, TypeScript, or separate component files. Never suggest creating Input.tsx, Button.tsx, auth.ts, or any .tsx/.ts files.`;
+    }
+
+    if (ANTHROPIC_KEY) {
+      const claudeResp = await callClaude({
+        system: systemPrompt,
+        messages,
+        maxTokens: 16000,
+        stream: true,
+      });
+      if (!claudeResp.ok) {
+        return claudeErrorResponse(claudeResp.status, await claudeResp.text().catch(() => ""), corsHeaders);
+      }
+      return new Response(claudeStreamToOpenAi(claudeResp), {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
     }
 
     if (useGoogleAI) {

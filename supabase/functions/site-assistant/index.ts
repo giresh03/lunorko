@@ -1,5 +1,6 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { anthropicKey, claudeText, ClaudeError } from '../_shared/claude.ts';
 
 const ROUTES: { path: string; what: string }[] = [
   { path: '/', what: 'Home / landing page' },
@@ -50,8 +51,9 @@ Deno.serve(async (req) => {
     const currentPath = typeof body?.currentPath === 'string' ? body.currentPath : '/';
     if (!message) return json({ error: 'message is required' }, 400);
 
+    const claudeKey = anthropicKey();
     const key = Deno.env.get('LOVABLE_API_KEY');
-    if (!key) return json({ error: 'Assistant is not configured' }, 500);
+    if (!claudeKey && !key) return json({ error: 'Assistant is not configured' }, 500);
 
     // ---- AI credit enforcement (admin exempt) ----
     const email = String(claimsData?.claims?.email ?? '').toLowerCase();
@@ -152,27 +154,48 @@ Set "navigate" to a route ONLY when the learner clearly wants to go somewhere or
       { role: 'user', content: message.slice(0, 2000) },
     ];
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages,
-        response_format: { type: 'json_object' },
-        temperature: 0.6,
-      }),
-    });
+    let raw = '';
+    if (claudeKey) {
+      try {
+        const text = await claudeText({
+          system: systemPrompt,
+          messages: messages.filter((m: any) => m.role !== 'system'),
+          maxTokens: 1024,
+        });
+        // Claude may wrap JSON in a code fence; keep just the object.
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        raw = start >= 0 && end > start ? text.slice(start, end + 1) : text;
+      } catch (e) {
+        if (e instanceof ClaudeError) {
+          console.error('site-assistant claude error', e.status, e.detail.slice(0, 300));
+          if (e.status === 429 || e.status === 529) return json({ error: 'The assistant is busy right now. Try again in a moment.' }, 429);
+        }
+        return json({ error: 'The assistant could not answer right now.' }, 502);
+      }
+    } else {
+      const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages,
+          response_format: { type: 'json_object' },
+          temperature: 0.6,
+        }),
+      });
 
-    if (aiRes.status === 429) return json({ error: 'The assistant is busy right now. Try again in a moment.' }, 429);
-    if (aiRes.status === 402) return json({ error: 'AI credits are exhausted. Please top up to keep chatting.', code: 'credits_exhausted' }, 402);
-    if (!aiRes.ok) {
-      const detail = await aiRes.text().catch(() => '');
-      console.error('site-assistant gateway error', aiRes.status, detail);
-      return json({ error: 'The assistant could not answer right now.' }, 502);
+      if (aiRes.status === 429) return json({ error: 'The assistant is busy right now. Try again in a moment.' }, 429);
+      if (aiRes.status === 402) return json({ error: 'AI credits are exhausted. Please top up to keep chatting.', code: 'credits_exhausted' }, 402);
+      if (!aiRes.ok) {
+        const detail = await aiRes.text().catch(() => '');
+        console.error('site-assistant gateway error', aiRes.status, detail);
+        return json({ error: 'The assistant could not answer right now.' }, 502);
+      }
+
+      const data = await aiRes.json();
+      raw = data?.choices?.[0]?.message?.content ?? '';
     }
-
-    const data = await aiRes.json();
-    const raw = data?.choices?.[0]?.message?.content ?? '';
     let reply = '';
     let navigate = '';
     try {

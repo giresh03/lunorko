@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles } from "lucide-react";
+import { Send, Bot, User, Loader2, Trash2, ArrowRightToLine, Sparkles, Play, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 import { getDomainPromptConfig } from "@/lib/domainPrompts";
@@ -15,6 +15,36 @@ interface CodeAssistantProps {
   domainName: string;
   onSendToEditor?: (code: string, language: string) => void;
 }
+
+/** Live output for an HTML code block. Runs in a sandboxed iframe (no same-origin access). */
+const HtmlOutputPreview = ({ code }: { code: string }) => {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="mt-2 rounded-md border border-border overflow-hidden bg-background">
+      <div className="flex items-center justify-between px-2 py-1 border-b border-border bg-secondary/40">
+        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Live output</span>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+        >
+          {open ? <EyeOff className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+          {open ? "Hide" : "Run"}
+        </button>
+      </div>
+      {open && (
+        <iframe
+          title="Live output"
+          sandbox="allow-scripts allow-forms allow-modals"
+          srcDoc={code}
+          className="w-full h-72 bg-white"
+        />
+      )}
+    </div>
+  );
+};
+
+const looksLikeHtml = (lang: string, code: string) =>
+  lang === "html" || /^\s*<!doctype html|^\s*<html[\s>]/i.test(code);
 
 const CODE_ASSISTANT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/code-assistant`;
 
@@ -190,6 +220,10 @@ const CodeAssistant = ({ domainName, onSendToEditor }: CodeAssistantProps) => {
                       return (
                         <div className="relative group">
                           <pre {...props}>{children}</pre>
+                          {msg.role === "assistant" &&
+                            !(isLoading && i === messages.length - 1) &&
+                            looksLikeHtml(lang, String(codeText)) &&
+                            String(codeText).trim().length > 0 && <HtmlOutputPreview code={String(codeText)} />}
                           {onSendToEditor && msg.role === "assistant" && String(codeText).trim().length > 0 && (
                             <button
                               onClick={() => onSendToEditor(String(codeText).trim(), lang)}
