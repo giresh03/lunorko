@@ -6,7 +6,6 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useScrollReveal, scrollRevealStyle } from "@/hooks/useScrollReveal";
 import { ParallaxLayer } from "@/hooks/useParallax";
-import DomainParallaxSection from "@/components/home/DomainParallaxSection";
 import WhyLunorSection from "@/components/home/WhyLunorSection";
 import Domains3DSection from "@/components/home/Domains3DSection";
 import StatsSection from "@/components/home/StatsSection";
@@ -17,6 +16,7 @@ import ComparisonSection from "@/components/home/ComparisonSection";
 import FAQSection from "@/components/home/FAQSection";
 import HeroSection from "@/components/home/HeroSection";
 import FeaturesSection from "@/components/home/FeaturesSection";
+import VideoSection from "@/components/home/VideoSection";
 
 const Index = () => {
   const pageRef = useScrollReveal();
@@ -27,9 +27,6 @@ const Index = () => {
 
       {/* Hero – no parallax (has its own scroll-driven opacity) */}
       <HeroSection />
-
-      {/* Domain Parallax Showcase */}
-      <DomainParallaxSection />
 
       {/* Features */}
       <ParallaxLayer speed={0.04}>
@@ -52,8 +49,8 @@ const Index = () => {
               { icon: Code2, title: "AI Code Assistant", desc: "Domain-specific AI that generates, debugs, and explains code in real-time." },
               { icon: BookOpen, title: "Curated Learning", desc: "Handpicked YouTube videos, Udemy courses, and reading materials for each domain." },
               { icon: Zap, title: "Guided Roadmaps", desc: "Step-by-step learning paths designed by industry professionals." },
-              { icon: Shield, title: "12+ Domains", desc: "Web Dev, App Dev, Cybersecurity, ML, Cloud, DevOps, and many more." },
-              { icon: Users, title: "Community Driven", desc: "Learn alongside thousands of students and share your projects." },
+              { icon: Shield, title: "4 Domains", desc: "Web Development, App Development, DSA & Competitive Programming, and UI/UX Design." },
+              { icon: Users, title: "Community Driven", desc: "Learn alongside 5k+ students and share your projects." },
               { icon: Sparkles, title: "AI Debugging", desc: "Paste your code, get instant fixes and explanations from AI." },
             ].map((f, i) => (
               <div
@@ -90,6 +87,12 @@ const Index = () => {
       <ParallaxLayer speed={0.03}>
         <FeaturesSection />
       </ParallaxLayer>
+
+      {/* Explainer Video */}
+      <ParallaxLayer speed={0.04}>
+        <VideoSection />
+      </ParallaxLayer>
+
 
       {/* Stats */}
       <ParallaxLayer speed={0.02}>
@@ -135,7 +138,7 @@ const Index = () => {
                 ]}
                 className="font-serif justify-center text-foreground"
               />
-              <p className="mt-3 text-muted-foreground">Start learning with AI-powered assistance across 12+ domains</p>
+              <p className="mt-3 text-muted-foreground">Start learning with AI-powered assistance across 4 domains</p>
               <Button size="lg" className="mt-6 hover-scale" asChild>
                 <Link to="/domains">Get Started Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
               </Button>

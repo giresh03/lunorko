@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { getPurchasePrice } from "../_shared/subscriptionPricing.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -29,20 +26,27 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const payload = await req.json();
-    const {
-      plan_id,
-      amount,
-      domain_id,
-      purchase_type = "subscription",
-      project_id,
-    } = payload as {
-      plan_id?: string;
-      amount?: number;
-      domain_id?: string;
-      purchase_type?: "subscription" | "hackathon_project";
-      project_id?: string;
-    };
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), { status: 400, headers: corsHeaders });
+    }
+    const { plan_id, domain_id, coupon_code, project_id } = body;
+    const purchase_type: "subscription" | "hackathon_project" =
+      body.purchase_type === "hackathon_project" ? "hackathon_project" : "subscription";
+
+    // Subscription prices are computed server-side; the client-sent amount is never trusted.
+    let pricing: { amount: number; couponCode: string } = { amount: 0, couponCode: "" };
+    if (purchase_type === "subscription") {
+      try { pricing = getPurchasePrice(plan_id, coupon_code); } catch (error) {
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid purchase" }), { status: 400, headers: corsHeaders });
+      }
+      if (plan_id !== "topup" && (!domain_id || typeof domain_id !== "string" || domain_id.length > 100)) {
+        return new Response(JSON.stringify({ error: "Missing domain_id" }), { status: 400, headers: corsHeaders });
+      }
+    } else if (typeof project_id !== "string" || !project_id || project_id.length > 100) {
+      return new Response(JSON.stringify({ error: "Missing project_id for hackathon project purchase" }), { status: 400, headers: corsHeaders });
+    }
+    const couponCode = pricing.couponCode;
 
     const RAZORPAY_KEY_ID = Deno.env.get("RAZORPAY_KEY_ID");
     const RAZORPAY_KEY_SECRET = Deno.env.get("RAZORPAY_KEY_SECRET");
@@ -51,7 +55,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Razorpay not configured" }), { status: 500, headers: corsHeaders });
     }
 
-    let resolvedAmount = amount;
+    let resolvedAmount = pricing.amount;
     let notes: Record<string, string> = { user_id: userId };
 
     if (purchase_type === "hackathon_project") {
@@ -85,14 +89,12 @@ serve(async (req) => {
         user_id: userId,
       };
     } else {
-      if (!plan_id || !resolvedAmount || !domain_id) {
-        return new Response(JSON.stringify({ error: "Missing plan_id, amount, or domain_id" }), { status: 400, headers: corsHeaders });
-      }
       notes = {
         purchase_type: "subscription",
         plan_id,
-        domain_id,
+        domain_id: plan_id === "topup" ? "all" : domain_id,
         user_id: userId,
+        coupon_code: couponCode,
       };
     }
 
@@ -117,6 +119,28 @@ serve(async (req) => {
     }
 
     const order = await orderResponse.json();
+
+    // Record the order so payments are auditable and metrics have a revenue source
+    try {
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+      const { error: recordError } = await adminClient.from("payment_orders").insert({
+        user_id: userId,
+        plan_id: purchase_type === "hackathon_project" ? "hackathon_project" : plan_id,
+        amount_cents: order.amount,
+        currency: order.currency ?? "INR",
+        razorpay_order_id: order.id,
+        status: "created",
+        kind: purchase_type === "hackathon_project" ? "hackathon_project" : plan_id === "topup" ? "topup" : "subscription",
+        coupon_code: couponCode || null,
+      });
+      if (recordError) throw recordError;
+    } catch (recordErr) {
+      console.error("payment_orders insert failed:", recordErr);
+      return new Response(JSON.stringify({ error: "Unable to record payment order. Please try again." }), { status: 500, headers: corsHeaders });
+    }
 
     return new Response(JSON.stringify({ order_id: order.id, amount: order.amount, currency: order.currency, key_id: RAZORPAY_KEY_ID }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

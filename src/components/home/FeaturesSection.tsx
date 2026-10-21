@@ -17,14 +17,14 @@ const FeaturesSection = () => {
     {
       title: "AI Code Assistant for Every Domain",
       description:
-        "Get real-time code generation, debugging, and explanations powered by domain-specific AI models across 12+ engineering fields.",
+        "Get real-time code generation, debugging, and explanations powered by domain-specific AI models across 4 learning domains.",
       skeleton: <SkeletonOne />,
       className: "col-span-1 lg:col-span-4 border-b lg:border-r border-border",
     },
     {
-      title: "12+ Specialized Domains",
+      title: "4 Specialized Domains",
       description:
-        "From Web Dev to Cybersecurity, each domain comes with curated resources, structured roadmaps, and hands-on projects.",
+        "From Web Development to UI/UX Design, each domain comes with curated resources, structured roadmaps, and hands-on projects.",
       skeleton: <SkeletonTwo />,
       className: "border-b col-span-1 lg:col-span-2 border-border",
     },
@@ -206,7 +206,9 @@ const SkeletonThree = () => (
         muted
         loop
         playsInline
-        autoPlay
+        preload="none"
+        onMouseEnter={(e) => void e.currentTarget.play().catch(() => {})}
+        onMouseLeave={(e) => e.currentTarget.pause()}
       />
       <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/video:bg-black/10 transition-colors">
         <div className="h-14 w-14 rounded-full bg-primary/90 flex items-center justify-center shadow-lg">

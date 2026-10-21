@@ -2,10 +2,10 @@ import { Users, BookOpen, Code2, Award } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 const stats = [
-  { icon: Users, value: 10000, suffix: "+", label: "Active Students" },
-  { icon: BookOpen, value: 12, suffix: "+", label: "Engineering Domains" },
-  { icon: Code2, value: 50000, suffix: "+", label: "AI Code Sessions" },
-  { icon: Award, value: 95, suffix: "%", label: "Satisfaction Rate" },
+  { icon: Users, value: 5000, suffix: "+", label: "Students" },
+  { icon: BookOpen, value: 4, suffix: "", label: "Learning Domains" },
+  { icon: Code2, value: 4, suffix: "", label: "AI Code Assistants" },
+  { icon: Award, value: 30, suffix: "", label: "Levels per Domain" },
 ];
 
 const formatNumber = (n: number) => n.toLocaleString("en-IN");

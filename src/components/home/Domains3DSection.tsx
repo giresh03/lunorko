@@ -14,7 +14,7 @@ const globeConfig = {
 // Arcs representing popular learner paths between domain hubs worldwide
 const learnerArcs = [
   // India → Singapore (Web Dev)
-  { startLat: 28.6139, startLng: 77.209, endLat: 1.3521, endLng: 103.8198, color: "#06b6d4" },
+  { startLat: 28.6139, startLng: 77.209, endLat: 1.3521, endLng: 103.8198, color: "#f97316" },
   // India → USA (Data Science)
   { startLat: 12.9716, startLng: 77.5946, endLat: 37.7595, endLng: -122.4367, color: "#f59e0b" },
   // UK → Germany (DevOps)
@@ -22,31 +22,31 @@ const learnerArcs = [
   // USA → Japan (Cybersecurity)
   { startLat: 40.7128, startLng: -74.006, endLat: 35.6762, endLng: 139.6503, color: "#ef4444" },
   // Australia → Hong Kong (Cloud)
-  { startLat: -33.8688, startLng: 151.2093, endLat: 22.3193, endLng: 114.1694, color: "#3b82f6" },
+  { startLat: -33.8688, startLng: 151.2093, endLat: 22.3193, endLng: 114.1694, color: "#ef4444" },
   // Brazil → India (App Dev)
-  { startLat: -22.9068, startLng: -43.1729, endLat: 28.6139, endLng: 77.209, color: "#8b5cf6" },
+  { startLat: -22.9068, startLng: -43.1729, endLat: 28.6139, endLng: 77.209, color: "#dc2626" },
   // Korea → USA (AI/ML)
   { startLat: 37.5665, startLng: 126.978, endLat: 34.0522, endLng: -118.2437, color: "#f59e0b" },
   // France → Singapore (Blockchain)
-  { startLat: 48.8566, startLng: 2.3522, endLat: 1.3521, endLng: 103.8198, color: "#06b6d4" },
+  { startLat: 48.8566, startLng: 2.3522, endLat: 1.3521, endLng: 103.8198, color: "#f97316" },
   // Canada → UK (IoT)
   { startLat: 49.2827, startLng: -123.1207, endLat: 51.5072, endLng: -0.1276, color: "#22c55e" },
   // India (Chennai) → Australia (UI/UX)
-  { startLat: 13.0827, startLng: 80.2707, endLat: -33.8688, endLng: 151.2093, color: "#a855f7" },
+  { startLat: 13.0827, startLng: 80.2707, endLat: -33.8688, endLng: 151.2093, color: "#f43f5e" },
   // Japan → Germany (System Design)
-  { startLat: 35.6762, startLng: 139.6503, endLat: 52.52, endLng: 13.405, color: "#6366f1" },
+  { startLat: 35.6762, startLng: 139.6503, endLat: 52.52, endLng: 13.405, color: "#ef4444" },
   // USA → Brazil (Database)
   { startLat: 34.0522, startLng: -118.2437, endLat: -22.9068, endLng: -43.1729, color: "#14b8a6" },
   // Mumbai → Dubai (DSA)
   { startLat: 19.076, startLng: 72.8777, endLat: 25.2048, endLng: 55.2708, color: "#f97316" },
   // Singapore → Korea (Web Dev)
-  { startLat: 1.3521, startLng: 103.8198, endLat: 37.5665, endLng: 126.978, color: "#06b6d4" },
+  { startLat: 1.3521, startLng: 103.8198, endLat: 37.5665, endLng: 126.978, color: "#f97316" },
 ];
 
 const globeStats = [
-  { icon: Users, label: "Active Learners", value: "50K+" },
-  { icon: Globe2, label: "Countries", value: "120+" },
-  { icon: BookOpen, label: "Learning Paths", value: "200+" },
+  { icon: Users, label: "Active Learners", value: "5k+" },
+  { icon: Globe2, label: "Domains", value: "4" },
+  { icon: BookOpen, label: "Levels per Domain", value: "30" },
 ];
 
 const Domain3DCard = ({ domain, index }: { domain: typeof domains[0]; index: number }) => {
@@ -135,7 +135,7 @@ const Domains3DSection = () => {
           {/* Text */}
           <div className="flex-1 text-center lg:text-left scroll-reveal opacity-0 translate-y-6 transition-all duration-700 ease-out">
             <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-semibold tracking-wider uppercase text-primary">
-              12+ Domains · 120+ Countries
+              4 Domains · 5k+ Students
             </span>
             <h2 className="font-serif text-3xl font-bold text-foreground md:text-4xl lg:text-5xl mt-4">
               Explore Every{" "}

@@ -12,10 +12,11 @@ const buttonVariants = cva(
       variant: {
         default: "text-primary-foreground",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+        outline: "btn-outline-glow border border-input bg-background/40 backdrop-blur-sm hover:bg-accent/40 hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all duration-300 hover:-translate-y-0.5",
+        ghost: "hover:bg-accent hover:text-accent-foreground transition-colors duration-300",
         link: "text-primary underline-offset-4 hover:underline",
+
       },
       size: {
         default: "h-10 px-4 py-2",
@@ -47,25 +48,26 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <NoiseBackground
           containerClassName={cn(
             buttonVariants({ variant, size, className }),
-            "rounded-md bg-primary"
+            "btn-sheen rounded-lg bg-primary border border-primary/40"
           )}
           gradientColors={[
-            "rgb(200, 120, 255)",
-            "rgb(100, 180, 255)",
-            "rgb(255, 160, 200)",
+            "rgb(239, 68, 68)",
+            "rgb(190, 18, 18)",
+            "rgb(249, 115, 22)",
           ]}
-          noiseIntensity={0.12}
+          noiseIntensity={0.1}
           speed={0.08}
           className="flex items-center justify-center"
         >
           <Comp
-            className="relative z-10 inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium text-primary-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+            className="relative z-10 inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold text-primary-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
             ref={ref}
             {...props}
           />
         </NoiseBackground>
       );
     }
+
 
     return (
       <Comp

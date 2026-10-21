@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { Link } from "react-router-dom";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import posterAsset from "@/assets/dussehra_poster.png.asset.json";
+
+const festivalSessionKey = "lunor-dussehra-poster-shown";
 
 interface PopAd {
   id: string;
@@ -16,6 +22,22 @@ interface PopAd {
 const PopAd = () => {
   const [ad, setAd] = useState<PopAd | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [festivalOpen, setFestivalOpen] = useState(() => {
+    try {
+      return sessionStorage.getItem(festivalSessionKey) !== "1";
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (!festivalOpen) return;
+    try {
+      sessionStorage.setItem(festivalSessionKey, "1");
+    } catch {
+      // The popup remains dismissible when browser storage is blocked.
+    }
+  }, [festivalOpen]);
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -46,10 +68,54 @@ const PopAd = () => {
   }, []);
 
   const handleDismiss = () => {
-    if (ad) sessionStorage.setItem(`popad-dismissed-${ad.id}`, "1");
+    try {
+      if (ad) sessionStorage.setItem(`popad-dismissed-${ad.id}`, "1");
+    } catch {
+      // Dismiss in memory even when session storage is unavailable.
+    }
     setDismissed(true);
     setAd(null);
   };
+
+  if (festivalOpen) {
+    return (
+      <Dialog open={festivalOpen} onOpenChange={setFestivalOpen}>
+        <DialogPortal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm" />
+          <DialogPrimitive.Content
+            aria-describedby={undefined}
+            className="fixed inset-0 z-[101] flex items-center justify-center bg-background/95 p-3 pt-16 sm:p-6 sm:pt-16 focus:outline-none"
+          >
+            <DialogTitle className="sr-only">Dussehra subscription offer</DialogTitle>
+            <div className="absolute right-4 top-4 z-10">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Close festival offer"
+              className="h-10 w-10 bg-background text-foreground shadow-lg"
+              onClick={() => setFestivalOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            </div>
+            <Link
+              to="/pricing"
+              aria-label="View Dussehra subscription pricing"
+              onClick={() => setFestivalOpen(false)}
+              className="flex h-full w-full items-center justify-center rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <img
+                src={posterAsset.url}
+                alt="Happy Dussehra. Festival subscription offer. Grab your offer now."
+                className="h-full w-full object-contain"
+                fetchPriority="high"
+              />
+            </Link>
+          </DialogPrimitive.Content>
+        </DialogPortal>
+      </Dialog>
+    );
+  }
 
   if (!ad || dismissed) return null;
 

@@ -1,7 +1,7 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import EditorPaywall from "@/components/EditorPaywall";
 import DesignEditorMain from "@/components/design-editor/DesignEditorMain";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft, BookOpen, Video, FileText, ExternalLink,
   CheckCircle2, Maximize2, Play, Clock, GraduationCap, Star, BookMarked,
@@ -16,17 +16,26 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import LockGate from "@/components/LockGate";
 import CodeEditorComponent, { type CodeEditorHandle } from "@/components/CodeEditor";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useCredits, FREE_TRIAL_CREDITS } from "@/hooks/useCredits";
+
 import { useDashboard } from "@/hooks/useDashboard";
 import { domains, type Resource } from "@/lib/domains";
 import { supabase } from "@/integrations/supabase/client";
+import LearnBuildToggle, { type LearnMode } from "@/components/learn/LearnBuildToggle";
+import RoadmapMap from "@/components/learn/RoadmapMap";
+import ProgressHud from "@/components/learn/ProgressHud";
+
+import { getRoadmap } from "@/lib/learningRoadmap";
+import { useLearningProgress } from "@/hooks/useLearningProgress";
 
 const sourceColors: Record<string, string> = {
   YouTube: "bg-red-500/10 text-red-400 border-red-500/20",
-  Udemy: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  Coursera: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  Udemy: "bg-primary/10 text-primary border-primary/20",
+  Coursera: "bg-primary/10 text-primary border-primary/20",
   GeeksforGeeks: "bg-green-500/10 text-green-400 border-green-500/20",
   MDN: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 };
@@ -195,9 +204,13 @@ const PdfCard = ({ resource }: { resource: Resource }) => {
 
 const DomainDetail = () => {
   const { domainId } = useParams();
+  const navigate = useNavigate();
   const domain = domains.find((d) => d.id === domainId);
   const editorRef = useRef<CodeEditorHandle>(null);
   const [activeTab, setActiveTab] = useState("guidance");
+  const [learnMode, setLearnMode] = useState<LearnMode>("learn");
+  const roadmap = useMemo(() => getRoadmap(domainId ?? ""), [domainId]);
+  const learning = useLearningProgress(domainId ?? "");
   const [isFullscreenIDE, setIsFullscreenIDE] = useState(false);
   const [adminResources, setAdminResources] = useState<Resource[]>([]);
 
@@ -230,7 +243,13 @@ const DomainDetail = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const { hasEditorAccessForDomain } = useSubscription();
-  const hasEditorAccess = domainId ? hasEditorAccessForDomain(domainId) : false;
+  const { credits } = useCredits();
+  const paidEditorAccess = domainId ? hasEditorAccessForDomain(domainId) : false;
+  // Free users get a credit-metered trial of the workspace.
+  const trialCreditsLeft = credits?.planId === "free" ? credits.balance : 0;
+  const isTrialWorkspace = !paidEditorAccess && trialCreditsLeft > 0;
+  const hasEditorAccess = paidEditorAccess || isTrialWorkspace;
+
   const { progress, bookmarks, activity, bookings, updateProgress, logActivity } = useDashboard();
 
   const handleSendToEditor = (code: string, language: string) => {
@@ -432,6 +451,42 @@ const DomainDetail = () => {
           );
         })()}
 
+        {/* Learn / Build toggle */}
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <LearnBuildToggle
+            mode={learnMode}
+            onChange={(m) => {
+              setLearnMode(m);
+              setActiveTab(m === "build" ? "editor" : "guidance");
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            {learnMode === "learn"
+              ? "Gamified roadmap · AI lessons · live coding · AI tutor"
+              : "Full AI coding workspace for this domain"}
+          </p>
+        </div>
+
+        {learnMode === "learn" && (
+          <div className="mb-10 space-y-6 animate-in fade-in duration-500">
+            <ProgressHud
+              domainName={domain.name}
+              currentLevelTitle={roadmap[Math.min(roadmap.length - 1, learning.currentLevel - 1)]?.title ?? ""}
+              currentLevel={learning.currentLevel}
+              completed={learning.completedLevels.length}
+              xp={learning.xp}
+              streak={learning.streak}
+              progressPct={learning.progressPct}
+            />
+            <RoadmapMap
+              levels={roadmap}
+              statusFor={learning.statusFor}
+              scoreFor={learning.scoreFor}
+              onOpen={(lvl) => navigate(`/domain/${domainId}/level/${lvl.index}`)}
+            />
+          </div>
+        )}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="mb-8 w-full justify-start border-b border-border bg-transparent p-0 rounded-none">
             <TabsTrigger
@@ -595,10 +650,26 @@ const DomainDetail = () => {
                       : `Full-screen VS Code-style IDE with file explorer, multi-tab editing, integrated terminal, and AI assistant — all tuned for ${domain.name}.`
                     }
                   </p>
+                  {isTrialWorkspace ? (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+                      <span className="font-semibold text-primary">Free trial</span>{" "}
+                      <span className="text-muted-foreground">
+                        · {trialCreditsLeft} of {FREE_TRIAL_CREDITS} credits left. Full advanced AI engine — upgrade
+                        anytime for 1,500 credits.
+                      </span>
+                    </div>
+                  ) : credits ? (
+                    <div className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
+                      <span className="font-semibold text-primary">{credits.balance} AI credits</span>
+                      <span className="text-muted-foreground"> · {credits.planCredits} plan + {credits.topupCredits} top-up</span>
+                    </div>
+                  ) : null}
+
                   <Button size="lg" onClick={() => setIsFullscreenIDE(true)} className="mt-2">
                     <Maximize2 className="mr-2 h-4 w-4" />
                     {isUIUXDomain ? 'Launch Design Studio' : 'Launch Full-Screen Editor'}
                   </Button>
+
                 </div>
               </div>
             ) : (
@@ -610,6 +681,7 @@ const DomainDetail = () => {
 
           {/* Videos Tab */}
           <TabsContent value="videos">
+            <LockGate lockKey="videos" name="Video Library" compact>
             {videos.length > 0 ? (
               domainId === "app-development" ? (
                 <VideoLearningHub videos={videos} domainColor={domain.color} />
@@ -685,10 +757,12 @@ const DomainDetail = () => {
                 <p className="mt-4 text-muted-foreground">Videos coming soon. Check back later!</p>
               </div>
             )}
+            </LockGate>
           </TabsContent>
 
           {/* Materials Tab */}
           <TabsContent value="materials">
+            <LockGate lockKey="materials" name="Learning Materials" compact>
             {pdfs.length > 0 && (
               <div className="mb-8">
                 <h3 className="mb-4 text-lg font-bold text-foreground flex items-center gap-2">
@@ -720,6 +794,7 @@ const DomainDetail = () => {
                 <p className="mt-4 text-muted-foreground">Materials coming soon. Check back later!</p>
               </div>
             ) : null}
+            </LockGate>
           </TabsContent>
         </Tabs>
       </main>

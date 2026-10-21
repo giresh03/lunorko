@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FeatureGate from "@/components/FeatureGate";
+import LockGate from "@/components/LockGate";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectDetailView from "@/components/projects/ProjectDetailView";
 import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
@@ -49,16 +50,18 @@ const ProjectBuilder = () => {
     if (projectList.length > 0) {
       // Fetch owner profiles
       const ownerIds = [...new Set(projectList.map((p: any) => p.owner_id))];
-      const { data: profs } = await supabase.from("profiles").select("user_id, display_name").in("user_id", ownerIds);
+      const { data: profs } = await supabase.from("public_profiles").select("user_id, display_name, username").in("user_id", ownerIds);
       const map: Record<string, string> = {};
-      (profs || []).forEach((p: any) => { map[p.user_id] = p.display_name || "User"; });
+      (profs || []).forEach((p: any) => { map[p.user_id] = p.username || p.display_name || "User"; });
       setProfiles(map);
 
-      // Fetch member counts
-      const projectIds = projectList.map((p: any) => p.id);
-      const { data: mems } = await supabase.from("team_members").select("project_id").in("project_id", projectIds);
+      // Fetch member counts via security-definer RPC (membership rows are private)
+      const projectIds = new Set(projectList.map((p: any) => p.id));
+      const { data: countRows } = await supabase.rpc("team_member_counts");
       const counts: Record<string, number> = {};
-      (mems || []).forEach((m: any) => { counts[m.project_id] = (counts[m.project_id] || 0) + 1; });
+      (countRows || []).forEach((r: any) => {
+        if (projectIds.has(r.project_id)) counts[r.project_id] = Number(r.member_count) || 0;
+      });
       setMemberCounts(counts);
     }
     setLoading(false);
@@ -89,7 +92,7 @@ const ProjectBuilder = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <FeatureGate feature="projects" featureName="Project Builder" requiredPlan="premium">
+      <LockGate lockKey="projects" name="Project Builder"><FeatureGate feature="projects" featureName="Project Builder" requiredPlan="premium">
       <main className="container mx-auto px-4 pt-24 pb-20">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -152,7 +155,7 @@ const ProjectBuilder = () => {
           </div>
         )}
       </main>
-      </FeatureGate>
+      </FeatureGate></LockGate>
       <Footer />
       <CreateProjectDialog open={showCreate} onOpenChange={setShowCreate} onCreated={fetchProjects} />
     </div>

@@ -144,7 +144,7 @@ function Marker({ marker, radius, defaultSize, onClick, onHover }: MarkerProps) 
           <div
             className={cn(
               "rounded-full overflow-hidden border-2 transition-all duration-300 cursor-pointer",
-              hovered ? "border-blue-400 scale-125 shadow-lg shadow-blue-500/30" : "border-white/30 scale-100"
+              hovered ? "border-primary scale-125 shadow-lg shadow-primary/30" : "border-white/30 scale-100"
             )}
             style={{ width: `${size * 600}px`, height: `${size * 600}px` }}
           >

@@ -1,0 +1,111 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789218457782,
+      "tag": "0000_live_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789225502108,
+      "tag": "0001_workspace_history_and_team_file_versions",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789235427981,
+      "tag": "0002_create_ui_components_library",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789235482961,
+      "tag": "0003_grant_ui_components_sandbox_import",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789235520483,
+      "tag": "0004_improve_match_ui_components",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789235539805,
+      "tag": "0005_diversify_match_ui_components",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789236215549,
+      "tag": "0006_runtime_real_schema_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789329937746,
+      "tag": "0007_workspace_history_realtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789331695946,
+      "tag": "0008_create_demo_builds",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789373093674,
+      "tag": "0009_add_demo_builds_seed_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789895702341,
+      "tag": "0010_startup_backend_core",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789895923557,
+      "tag": "0011_tighten_new_function_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790018851293,
+      "tag": "0012_create_internship_submissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790135137858,
+      "tag": "0013_community_guidelines_moderation_and_domain_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791902478233,
+      "tag": "0014_festival_coupon_purchase_amount",
+      "breakpoints": true
+    }
+  ]
+}

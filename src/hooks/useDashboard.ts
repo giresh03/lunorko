@@ -125,10 +125,10 @@ export function useDashboard() {
     if (!user) return;
     const booking = bookings.find((b) => b.id === bookingId);
     if (!booking) return;
-    await Promise.all([
-      supabase.from("bookings").delete().eq("id", bookingId),
-      supabase.from("mentor_slots").update({ is_booked: false }).eq("id", booking.slot_id),
-    ]);
+    // Release the slot while the booking still exists (RLS ties the slot to your booking)
+    await supabase.from("mentor_slots").update({ is_booked: false }).eq("id", booking.slot_id);
+    await supabase.from("bookings").delete().eq("id", bookingId);
+
     setBookings((prev) => prev.filter((b) => b.id !== bookingId));
   };
 

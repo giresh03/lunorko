@@ -6,12 +6,14 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useProfile } from "@/hooks/useProfile";
 import { domains } from "@/lib/domains";
 import { formatDistanceToNow } from "date-fns";
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { progress, bookmarks, activity, loading, toggleBookmark } = useDashboard();
+  const { profile } = useProfile();
 
   if (!authLoading && !user) return <Navigate to="/auth" replace />;
 
@@ -29,7 +31,7 @@ const Dashboard = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="mt-1 text-muted-foreground">
-            Welcome back, {user?.user_metadata?.display_name || user?.email?.split("@")[0]}
+            Welcome back, {profile?.display_name || (profile?.username ? `@${profile.username}` : null) || user?.email?.split("@")[0]}
           </p>
         </div>
 

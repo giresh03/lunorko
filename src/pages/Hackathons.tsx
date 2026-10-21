@@ -9,25 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
-declare global {
-  interface Window {
-    Razorpay: new (options: {
-      key: string;
-      amount: number;
-      currency: string;
-      order_id: string;
-      name: string;
-      description: string;
-      prefill?: { email?: string };
-      modal?: { ondismiss?: () => void };
-      handler: (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
-    }) => {
-      on: (event: string, handler: () => void) => void;
-      open: () => void;
-    };
-  }
-}
-
 type Hackathon = {
   id: string;
   title: string;

@@ -93,10 +93,16 @@ const Auth = () => {
     }
   }, []);
 
-  // Redirect to domains when user is already logged in (e.g. after OAuth callback)
+  // Redirect when user is already logged in (e.g. after OAuth callback)
   useEffect(() => {
     if (user) {
-      navigate("/domains", { replace: true });
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect");
+      const safe =
+        redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+          ? redirect
+          : "/domains";
+      navigate(safe, { replace: true });
     }
   }, [user, navigate]);
 

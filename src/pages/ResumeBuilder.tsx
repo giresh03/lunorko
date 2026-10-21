@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FeatureGate from "@/components/FeatureGate";
+import LockGate from "@/components/LockGate";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -57,7 +58,7 @@ const ResumeBuilder = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <FeatureGate feature="resume-builder" featureName="Resume Builder" requiredPlan="professional">
+      <LockGate lockKey="resume_builder" name="Resume Builder"><FeatureGate feature="resume-builder" featureName="Resume Builder" requiredPlan="professional">
       <main className="container mx-auto px-4 pt-24 pb-20 max-w-4xl">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
@@ -118,7 +119,7 @@ const ResumeBuilder = () => {
           </div>
         )}
       </main>
-      </FeatureGate>
+      </FeatureGate></LockGate>
       <Footer />
     </div>
   );

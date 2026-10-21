@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useRef, useState } from "react";
 import platformDemoVideo from "@/assets/sections/platform-demo.mp4";
 
@@ -53,6 +54,11 @@ const VideoSection = () => {
                 <span className="mt-4 text-sm font-medium text-foreground">Watch Demo</span>
               </button>
             )}
+          </div>
+          <div className="mt-4 text-center">
+            <Link to="/promo" className="text-sm font-medium text-primary hover:underline">
+              Watch the full explainer →
+            </Link>
           </div>
         </div>
       </div>

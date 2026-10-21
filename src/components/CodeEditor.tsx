@@ -7,10 +7,15 @@ import {
   Search, GitBranch, ArrowRightToLine, Sparkles, PanelRightClose, PanelRightOpen,
   FolderPlus as NewProject, Clock, ChevronDown, Save, FolderInput, FileCode2,
   Eye, EyeOff, RefreshCw, Smartphone, Monitor, Tablet, Palette, Grid3X3, Ruler,
-  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download
+  Maximize2, ExternalLink, TestTube2, BookOpen, Wand2, Download, Github,
+  History as HistoryIcon, MousePointerClick, ZoomIn, ZoomOut, Undo2, Redo2, Coins
 } from "lucide-react";
+import { annotateHtml, applyVisualEdit, VISUAL_EDIT_AGENT, type VisualEditOp } from "@/lib/visualEdit";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import GitHubPushDialog from "@/components/GitHubPushDialog";
+import { useGitHub } from "@/hooks/useGitHub";
 import ReactMarkdown from "react-markdown";
 import { editorThemes, getThemeById, type EditorTheme } from "@/lib/editorThemes";
 import { getDomainEnvironment, domainEnvironments } from "@/lib/domainEnvironments";
@@ -21,7 +26,113 @@ import {
 } from "@/lib/offlineCache";
 import RunLocallyDialog from "@/components/editor/RunLocallyDialog";
 import SandpackPreviewPanel from "@/components/editor/SandpackPreviewPanel";
+import LiveBackendPanel from "@/components/editor/LiveBackendPanel";
+import { useLiveRuntime } from "@/hooks/useLiveRuntime";
+import { injectApiShim, filesNeedBackend, type DataModelTable } from "@/lib/liveRuntime";
+import { resolveModelId } from "@/components/editor/ModelSelector";
 import { hasJSX } from "@/lib/sandpackProject";
+import { scaffoldPage } from "@/lib/siteScaffold";
+import { findDemoBuild, type DemoBuild } from "@/lib/demoBuilds";
+import { seedForDemo } from "@/lib/demoSeeds";
+import VoiceAssistant from "@/components/editor/VoiceAssistant";
+import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
+import { useCredits } from "@/hooks/useCredits";
+import GenerationHistoryPanel from "@/components/editor/GenerationHistoryPanel";
+import {
+  getHistory, syncHistory, addHistoryEntry, deleteHistoryEntry, clearHistory, isFullStackFiles,
+  type GenerationEntry,
+} from "@/lib/generationHistory";
+import {
+  PREVIEW_SELF_TEST_SCRIPT, SELF_TEST_TIMEOUT_MS, summarizeResults, type SelfTestResult,
+} from "@/lib/previewSelfTest";
+
+
+// -- Preview runtime guard: sandbox-safe storage + error reporting --
+const PREVIEW_RUNTIME_GUARD = `<script id="__lunor_guard">(function(){
+  function memStore(){
+    var m = {};
+    return {
+      getItem: function(k){ return Object.prototype.hasOwnProperty.call(m, k) ? m[k] : null; },
+      setItem: function(k, v){ m[k] = String(v); },
+      removeItem: function(k){ delete m[k]; },
+      clear: function(){ m = {}; },
+      key: function(i){ return Object.keys(m)[i] || null; },
+      get length(){ return Object.keys(m).length; }
+    };
+  }
+  ['localStorage','sessionStorage'].forEach(function(name){
+    var ok = false;
+    try { var s = window[name]; s.setItem('__lunor_probe','1'); s.removeItem('__lunor_probe'); ok = true; } catch(e) { ok = false; }
+    if (!ok) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true, writable: true }); } catch(e) {} }
+  });
+  // When no live backend is attached yet, /api calls would die as "Failed to fetch".
+  // Answer them with a readable message and tell the editor to start the backend.
+  var of = window.fetch ? window.fetch.bind(window) : null;
+  if (of) {
+    window.fetch = function(input, init) {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (/\\/api\\//.test(url) && !window.__LUNOR_API_URL__) {
+        try { parent.postMessage({ __lunorPreview: true, type: 'backend_needed' }, '*'); } catch(e) {}
+        return Promise.resolve(new Response(JSON.stringify({
+          success: false,
+          message: 'Live backend is not running yet. Start the backend, then try again.'
+        }), { status: 503, headers: { 'Content-Type': 'application/json' } }));
+      }
+      return of(input, init);
+    };
+  }
+  function report(m, s){
+    var k = String(m || 'Unknown error');
+    if (/ResizeObserver loop|^Script error\\.?$/i.test(k)) return;
+    window.__lunorSeen = window.__lunorSeen || {};
+    if (window.__lunorSeen[k]) return;
+    if (Object.keys(window.__lunorSeen).length > 6) return;
+    window.__lunorSeen[k] = 1;
+    try { parent.postMessage({ __lunorPreview: true, type: 'error', message: k, stack: String(s || '') }, '*'); } catch(e) {}
+  }
+  // Only genuine script failures are reported. Missing images/fonts, console.error
+  // noise and non-200 responses are NOT treated as app errors.
+  window.addEventListener('error', function(e){
+    if (e && e.target && e.target !== window && e.target.tagName) return;
+    if (e && e.message) report(e.message, e.error && e.error.stack);
+  }, true);
+  window.addEventListener('unhandledrejection', function(e){ var r = e && e.reason; report((r && r.message) || r || 'Unhandled promise rejection', r && r.stack); });
+})();<\/script>`;
+
+function injectRuntimeGuard(html: string): string {
+  if (!html || html.includes("__lunor_guard")) return html;
+  const injected = PREVIEW_RUNTIME_GUARD + PREVIEW_SELF_TEST_SCRIPT;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + injected);
+  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + injected);
+  return injected + html;
+}
+
+/**
+ * A sandboxed srcdoc preview cannot navigate by URL, so generated code that does
+ * `location.href = "dashboard.html"`, `location.assign(...)`, `location.reload()` or reads
+ * `location.search` is pointed at window.__lunorLoc — a virtual location provided by the
+ * in-iframe pager (see buildPreviewHtml). Applies to <script> bodies and inline on* handlers.
+ */
+const LOCATION_MEMBER_RE = /\b(?:window\.|document\.|self\.|top\.)?location\.(href|search|pathname|assign|replace|reload)\b/g;
+const LOCATION_ASSIGN_RE = /(?<!(?:const|let|var|\.)\s*)\b(?:window\.|self\.|top\.)?location\s*=(?![=>])/g;
+function rewriteLocationSource(src: string): string {
+  if (!src || src.includes("__lunorLoc")) return src;
+  return src
+    .replace(LOCATION_MEMBER_RE, "window.__lunorLoc.$1")
+    .replace(LOCATION_ASSIGN_RE, "window.__lunorLoc.href =");
+}
+function rewriteLocationForPreview(html: string): string {
+  if (!html) return html;
+  return html
+    .replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (_m, open: string, body: string, close: string) =>
+      open + rewriteLocationSource(body) + close)
+    .replace(/(\son[a-z]+=)("([^"]*)"|'([^']*)')/gi, (m, attr: string, _q: string, dq?: string, sq?: string) => {
+      if (dq != null) return `${attr}"${rewriteLocationSource(dq)}"`;
+      if (sq != null) return `${attr}'${rewriteLocationSource(sq)}'`;
+      return m;
+    });
+}
+
 
 // -- Project types --
 interface SavedProject {
@@ -50,6 +161,34 @@ function saveProject(project: SavedProject) {
 function deleteProject(id: string) {
   const projects = getSavedProjects().filter(p => p.id !== id);
   localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+}
+
+
+// Build a FileNode tree from a flat path/content snapshot (used by generation history)
+function buildTreeFromSnapshot(files: { path: string; language?: string; content: string }[]): FileNode[] {
+  const root: FileNode[] = [];
+  files.forEach((f) => {
+    const parts = f.path.split("/").filter(Boolean);
+    let level = root;
+    let prefix = "";
+    parts.forEach((part, idx) => {
+      prefix = prefix ? `${prefix}/${part}` : part;
+      if (idx === parts.length - 1) {
+        if (!level.some((n) => n.id === prefix)) {
+          level.push({ id: prefix, name: part, type: "file", language: f.language || getLang(part), content: f.content });
+        }
+      } else {
+        let folder = level.find((n) => n.id === prefix && n.type === "folder");
+        if (!folder) {
+          folder = { id: prefix, name: part, type: "folder", isOpen: true, children: [] };
+          level.push(folder);
+        }
+        folder.children = folder.children || [];
+        level = folder.children;
+      }
+    });
+  });
+  return root;
 }
 
 // -- Project templates --
@@ -132,9 +271,9 @@ const getLang = (name: string) => {
 const getFileIcon = (name: string) => {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   const colors: Record<string, string> = {
-    js: "text-yellow-400", ts: "text-blue-400", py: "text-green-400",
-    html: "text-orange-400", css: "text-purple-400", json: "text-yellow-300",
-    jsx: "text-cyan-400", tsx: "text-blue-300", md: "text-muted-foreground",
+    js: "text-yellow-400", ts: "text-primary", py: "text-green-400",
+    html: "text-orange-400", css: "text-primary", json: "text-yellow-300",
+    jsx: "text-primary", tsx: "text-primary", md: "text-muted-foreground",
   };
   return colors[ext] || "text-muted-foreground";
 };
@@ -235,9 +374,47 @@ function generateFileName(language: string, code: string, userPrompt?: string): 
   return `untitled.${ext}`;
 }
 
+/** Derive a page filename from an HTML page's <title> (e.g. "Menu | Bella" -> menu.html). */
+function slugFromTitle(code: string, index: number): string {
+  const title = code.match(/<title>([^<]+)<\/title>/i)?.[1] || "";
+  const slug = title
+    .split(/[|\-–—•]/)[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .join("-");
+  return slug ? `${slug}.html` : `page-${index}.html`;
+}
+
+/** Pull the DataModel JSON block out of an assistant reply (real tables to create). */
+function extractDataModel(markdown: string): DataModelTable[] {
+  const blocks = markdown.match(/```json\s*([\s\S]*?)```/g) || [];
+  for (const block of blocks) {
+    const raw = block.replace(/```json\s*/, "").replace(/```$/, "");
+    try {
+      const parsed = JSON.parse(raw) as { dataModel?: unknown };
+      const model = Array.isArray(parsed?.dataModel) ? parsed.dataModel : null;
+      if (!model) continue;
+      return model
+        .filter((t): t is DataModelTable => Boolean(t) && typeof (t as DataModelTable).table === "string")
+        .map((t) => ({
+          table: t.table,
+          columns: Array.isArray(t.columns)
+            ? t.columns.filter((c) => c && typeof c.name === "string").slice(0, 60)
+            : [],
+        }));
+    } catch {
+      /* not the DataModel block */
+    }
+  }
+  return [];
+}
+
 function extractCodeBlocks(markdown: string, userPrompt?: string): { code: string; language: string; filename?: string }[] {
   // Match code blocks, and look for filename hints in the line before the code block
-  const regex = /(?:(?:[\*`]*(\w+\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
+  const regex = /(?:(?:[\*`]*([\w./-]*\w\.\w+)[\*`]*\s*:?\s*\n))?```(\w*)\n([\s\S]*?)```/g;
   const blocks: { code: string; language: string; filename?: string }[] = [];
   let match;
   while ((match = regex.exec(markdown)) !== null) {
@@ -247,31 +424,106 @@ function extractCodeBlocks(markdown: string, userPrompt?: string): { code: strin
   }
   // If no filenames found via regex, try to detect from common patterns like "<!-- filename: xxx -->" or "// filename: xxx"
   if (blocks.length > 0 && !blocks.some(b => b.filename)) {
-    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?(\w[\w\-]*\.\w+)[`"']?/gi;
+    const filenameRegex = /(?:file(?:name)?|save\s+(?:as|to)|create)\s*:?\s*[`"']?([\w./-]*\w\.\w+)[`"']?/gi;
     let fnMatch;
     while ((fnMatch = filenameRegex.exec(markdown)) !== null) {
       const unassigned = blocks.find(b => !b.filename);
       if (unassigned) unassigned.filename = fnMatch[1];
     }
   }
-  // Generate proper filenames for blocks that still don't have one
+  // Generate proper filenames for blocks that still don't have one.
+  // Web files follow convention (first HTML is ALWAYS the homepage).
+  let htmlSeen = 0;
   blocks.forEach((block) => {
-    if (!block.filename) {
+    if (block.filename) {
+      if (/\.html$/i.test(block.filename)) htmlSeen++;
+      return;
+    }
+    const lang = LANG_MAP[block.language] || block.language;
+    if (lang === "html" || /<!DOCTYPE html|<html/i.test(block.code)) {
+      block.filename = htmlSeen++ === 0 ? "index.html" : slugFromTitle(block.code, htmlSeen);
+    } else if (lang === "css") {
+      block.filename = "styles.css";
+    } else if (lang === "javascript" && blocks.some((b) => /<!DOCTYPE html|<html/i.test(b.code))) {
+      block.filename = "script.js";
+    } else {
       block.filename = generateFileName(block.language, block.code, userPrompt);
     }
   });
   return blocks;
 }
 
+// Flatten a file tree into a list of real files (path + content)
+function flattenFiles(nodes: FileNode[]): { path: string; name: string; content: string; language?: string }[] {
+  const out: { path: string; name: string; content: string; language?: string }[] = [];
+  const walk = (ns: FileNode[]) => {
+    for (const n of ns) {
+      if (n.type === "file") out.push({ path: n.id, name: n.name, content: n.content ?? "", language: n.language });
+      if (n.children) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
+// Map a filename returned by the AI onto an EXISTING project file when possible,
+// so follow-up prompts edit the current build instead of creating duplicates.
+function resolveTargetPath(
+  filename: string,
+  language: string,
+  existing: { path: string; name: string; language?: string }[],
+  rootWebFiles = false
+): string {
+  const clean = filename.replace(/^\.?\//, "");
+  const base = clean.split("/").pop() || clean;
+
+  // 0. Static-site build: every page and asset lives at the project root, with its
+  //    exact name, so relative <link>/<script>/<a> hrefs resolve in the preview.
+  if (rootWebFiles && (/\.(html|css)$/i.test(base) || /^(script|app|main|api)\.js$/i.test(base))) {
+    return base;
+  }
+
+  // 1. Exact path match
+  const byPath = existing.find((f) => f.path === clean || f.path === `src/${clean}`);
+  if (byPath) return byPath.path;
+
+  // 2. Same basename anywhere in the tree (prefer src/)
+  const byName = existing
+    .filter((f) => f.name.toLowerCase() === base.toLowerCase())
+    .sort((a, b) => (a.path.startsWith("src/") ? -1 : 1) - (b.path.startsWith("src/") ? -1 : 1));
+  if (byName[0]) return byName[0].path;
+
+  // 3. Web pages/assets keep their exact name at the project root so the
+  //    relative <link>/<script> hrefs in the generated pages resolve.
+  if (/\.(html|css)$/i.test(base) || base === "script.js") return base;
+
+  // 4. Untitled/generic name but a single existing file of the same extension → edit that file
+  const ext = base.split(".").pop()?.toLowerCase() || "";
+  const isGeneric = /^(untitled|index|main|app|script|style|styles)\./i.test(base);
+  if (ext) {
+    const sameExt = existing.filter((f) => f.name.toLowerCase().endsWith(`.${ext}`));
+    if (isGeneric && sameExt.length === 1) {
+      return sameExt[0].path;
+    }
+  }
+
+  // 5. New file → place under src/
+  return clean.startsWith("src/") ? clean : `src/${base}`;
+
+}
+
+
 // -- File Explorer Item --
-const FileItem = ({
-  node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
-}: {
+interface FileItemProps {
   node: FileNode; depth: number; activeFileId: string | null;
   onSelect: (node: FileNode) => void; onToggle: (id: string) => void;
   onDelete: (id: string) => void; onRename: (id: string, name: string) => void;
   themeColors: EditorTheme["uiColors"];
-}) => {
+}
+
+const FileItem = ({
+  node, depth, activeFileId, onSelect, onToggle, onDelete, onRename, themeColors,
+}: FileItemProps) => {
   const isActive = node.id === activeFileId;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(node.name);
@@ -396,15 +648,47 @@ const LAYOUT_SUGGESTIONS = [
 ];
 
 const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName, onExit }, ref) => {
+  const { credits, refetch: refetchCredits } = useCredits();
+
+  // Shared icon-button surfaces for a clean, consistent toolbar
+  const iconBtn = "inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors";
+  const iconBtnSm = "inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors";
+  const initialWorkspace = useMemo(() => {
+    const saved = getSavedProjects()
+      .filter((project) => project.domain === domainName && project.fileTree.length > 0)
+      .sort((a, b) => b.lastOpened - a.lastOpened)[0];
+    const tree = saved?.fileTree || createDefaultProject(domainName);
+    const findFirstHtml = (nodes: FileNode[]): FileNode | null => {
+      for (const node of nodes) {
+        if (node.type === "file" && (node.language === "html" || node.name.endsWith(".html"))) return node;
+        if (node.children) {
+          const match = findFirstHtml(node.children);
+          if (match) return match;
+        }
+      }
+      return null;
+    };
+    const firstHtml = findFirstHtml(tree);
+    return { saved, tree, firstHtml };
+  }, [domainName]);
   // File tree state
-  const [fileTree, setFileTree] = useState<FileNode[]>([]);
-  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [fileTree, setFileTree] = useState<FileNode[]>(initialWorkspace.tree);
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>(() => initialWorkspace.firstHtml ? [{
+    id: initialWorkspace.firstHtml.id,
+    name: initialWorkspace.firstHtml.name,
+    language: initialWorkspace.firstHtml.language || getLang(initialWorkspace.firstHtml.name),
+    content: initialWorkspace.firstHtml.content || "",
+    isModified: false,
+  }] : []);
+  const [activeTabId, setActiveTabId] = useState<string | null>(initialWorkspace.firstHtml?.id || null);
 
   // Panels
   const [showSidebar, setShowSidebar] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons">("files");
+  const [sidebarTab, setSidebarTab] = useState<"files" | "search" | "snippets" | "lessons" | "history">("files");
+  const [genHistory, setGenHistory] = useState<GenerationEntry[]>(() => getHistory());
   const [showAIPanel, setShowAIPanel] = useState(true);
+  const [showGitHub, setShowGitHub] = useState(false);
+  const { status: githubStatus, push: githubPush } = useGitHub();
   const [online, setOnline] = useState(isOnline());
 
   // Sync offline cache on mount
@@ -415,6 +699,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     return () => { window.removeEventListener("online", handleOnline); window.removeEventListener("offline", handleOffline); };
+  }, []);
+
+  // Pull account-wide workspace history (previous works) once signed in
+  useEffect(() => {
+    let cancelled = false;
+    syncHistory().then((entries) => { if (!cancelled) setGenHistory(entries); }).catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   const domainId = useMemo(() => domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""), [domainName]);
@@ -442,11 +733,175 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [debugOverlay, setDebugOverlay] = useState(false);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+  type VisualSnapshot = { fileId: string; fileName: string; before: string; after: string; kind: string };
+  const [visualEditMode, setVisualEditMode] = useState(false);
+  const [visualUndo, setVisualUndo] = useState<VisualSnapshot[]>([]);
+  const [visualRedo, setVisualRedo] = useState<VisualSnapshot[]>([]);
+  const [previewZoom, setPreviewZoom] = useState(100);
   const [showChecklist, setShowChecklist] = useState(false);
   const [checklistItems, setChecklistItems] = useState<Record<string, boolean>>({});
   const currentDevice = DEVICE_PRESETS[previewDevice];
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipPreviewRebuildRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Live backend (hosted runtime) — provisioned per user + domain when the
+  // project contains server code or /api calls. Paid plans only.
+  const projectNeedsBackend = useMemo(() => {
+    const flat: { path: string; content: string }[] = [];
+    const walk = (nodes: FileNode[], prefix = "") => {
+      for (const n of nodes) {
+        const p = prefix ? `${prefix}/${n.name}` : n.name;
+        if (n.type === "file") flat.push({ path: p, content: n.content || "" });
+        if (n.children) walk(n.children, p);
+      }
+    };
+    walk(fileTree);
+    return filesNeedBackend(flat);
+  }, [fileTree]);
+  // Set when the preview reports an /api call with no backend attached.
+  const [backendNeeded, setBackendNeeded] = useState(false);
+  // Which live backend this workspace talks to. Pre-built demo sites each get their
+  // own backend (own users/admin/tables) instead of sharing the domain-wide one.
+  const runtimeScopeStorageKey = `lunor-runtime-scope:${domainId}`;
+  const [runtimeScope, setRuntimeScopeState] = useState<{ key: string; name: string } | null>(() => {
+    try {
+      const raw = localStorage.getItem(runtimeScopeStorageKey);
+      return raw ? (JSON.parse(raw) as { key: string; name: string }) : null;
+    } catch {
+      return null;
+    }
+  });
+  const setRuntimeScope = useCallback(
+    (next: { key: string; name: string } | null) => {
+      setRuntimeScopeState(next);
+      try {
+        if (next) localStorage.setItem(runtimeScopeStorageKey, JSON.stringify(next));
+        else localStorage.removeItem(runtimeScopeStorageKey);
+      } catch {
+        /* storage unavailable */
+      }
+    },
+    [runtimeScopeStorageKey],
+  );
+  const liveRuntime = useLiveRuntime({
+    scope: "domain",
+    scopeKey: runtimeScope?.key ?? domainId,
+    name: runtimeScope?.name ?? domainName,
+    // Every generated site gets a live backend on open.
+    enabled: true,
+  });
+  const liveApiUrlRef = useRef<string | null>(null);
+  liveApiUrlRef.current = liveRuntime.apiUrl;
+  const liveRuntimeRef = useRef(liveRuntime);
+  liveRuntimeRef.current = liveRuntime;
+
+  // Preview runtime errors reported by the sandboxed iframe
+  const [previewErrors, setPreviewErrors] = useState<{ message: string; stack?: string }[]>([]);
+  const [resolvingError, setResolvingError] = useState(false);
+  const previewErrorLogRef = useRef<string[]>([]);
+  const verifyPendingRef = useRef(false);
+  const repairAttemptRef = useRef(0);
+  const appliedBatchRef = useRef(0);
+  const previewEntryRef = useRef<string | null>(null);
+  const setPreview = useCallback((html: string) => {
+    setPreviewErrors([]);
+    previewErrorLogRef.current = [];
+    setPreviewContent(injectApiShim(injectRuntimeGuard(html), liveApiUrlRef.current));
+  }, []);
+
+  // Re-inject the shim into the current preview once the backend comes online
+  // (or switches to a different site's backend).
+  useEffect(() => {
+    if (!liveRuntime.apiUrl) return;
+    setPreviewContent((html) => (html ? injectApiShim(html, liveRuntime.apiUrl) : html));
+  }, [liveRuntime.apiUrl]);
+
+  // Clear the "start backend" nudge once the backend is live.
+  useEffect(() => {
+    if (liveRuntime.status === "live") setBackendNeeded(false);
+  }, [liveRuntime.status]);
+
+  // Automated verification: does the app actually load and does login work?
+  const [verify, setVerify] = useState<{ running: boolean; results: SelfTestResult[] } | null>(null);
+  const selfTestResolveRef = useRef<((r: SelfTestResult[]) => void) | null>(null);
+  const verificationMessageRef = useRef(false);
+  const autoRepairRoundsRef = useRef(0);
+
+
+
+
+  const runSelfTest = useCallback((): Promise<SelfTestResult[]> => {
+    verificationMessageRef.current = false;
+    setVerify({ running: true, results: [] });
+    return new Promise<SelfTestResult[]>((resolve) => {
+      let settled = false;
+      const finish = (results: SelfTestResult[]) => {
+        if (settled) return;
+        settled = true;
+        selfTestResolveRef.current = null;
+        setVerify({ running: false, results });
+        resolve(results);
+      };
+      selfTestResolveRef.current = finish;
+      const frame = iframeRef.current;
+      if (!frame?.contentWindow) {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "Preview frame is not available" }]);
+        return;
+      }
+      try {
+        frame.contentWindow.postMessage({ __lunorSelfTest: "run" }, "*");
+      } catch {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "Could not reach the preview frame" }]);
+        return;
+      }
+      setTimeout(() => {
+        finish([{ id: "load", label: "App loads and renders", passed: false, detail: "The app did not respond within the check window (likely a blank screen or a crash during startup)" }]);
+      }, SELF_TEST_TIMEOUT_MS);
+    });
+  }, []);
+
+  // Start verification after the newly generated iframe has mounted.
+  useEffect(() => {
+    if (!verifyPendingRef.current || !showPreview || !previewContent) return;
+    verifyPendingRef.current = false;
+    const timer = setTimeout(() => { void runSelfTest(); }, 700);
+    return () => clearTimeout(timer);
+  }, [previewContent, showPreview, runSelfTest]);
+
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as {
+        __lunorPreview?: boolean; type?: string; message?: string; stack?: string;
+        __lunorSelfTest?: boolean | string; results?: SelfTestResult[];
+      } | null;
+      if (d && d.__lunorSelfTest === true && Array.isArray(d.results)) {
+        selfTestResolveRef.current?.(d.results);
+        return;
+      }
+      if (d && d.__lunorPreview && d.type === "backend_needed") {
+        setBackendNeeded(true);
+        const rt = liveRuntimeRef.current;
+        if (rt && (rt.status === "off" || rt.status === "error") && rt.allowed) void rt.provision();
+        return;
+      }
+      if (d && d.__lunorPreview && d.type === "error" && d.message) {
+        const msg = d.message;
+        setPreviewErrors((prev) =>
+          prev.some((p) => p.message === msg) ? prev : [...prev, { message: msg, stack: d.stack }].slice(0, 6));
+        const entry = d.message + (d.stack ? ` | ${d.stack.slice(0, 400)}` : "");
+        const log = previewErrorLogRef.current;
+        if (!log.includes(entry)) {
+          log.push(entry);
+          if (log.length > 8) log.shift();
+        }
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
 
   // Theme state
   const [currentThemeId, setCurrentThemeId] = useState<string>(() => localStorage.getItem("lunor-editor-theme") || "vs-dark");
@@ -474,8 +929,8 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   }, []);
 
   // Project management
-  const [currentProjectId, setCurrentProjectId] = useState<string>(() => `proj-${Date.now()}`);
-  const [currentProjectName, setCurrentProjectName] = useState<string>(`${domainName} Workspace`);
+  const [currentProjectId, setCurrentProjectId] = useState<string>(() => initialWorkspace.saved?.id || `proj-${Date.now()}`);
+  const [currentProjectName, setCurrentProjectName] = useState<string>(() => initialWorkspace.saved?.name || `${domainName} Workspace`);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -484,7 +939,7 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [recentProjects, setRecentProjects] = useState<SavedProject[]>(() => getSavedProjects());
 
   // AI Chat
-  const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem("lunor-ai-model") || "google/gemini-3-flash-preview");
+  const [selectedModel, setSelectedModel] = useState<string>(() => resolveModelId(localStorage.getItem("lunor-ai-model")));
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: `👋 I'm your **${domainName}** AI assistant — like Lovable! Ask me to:\n\n- **Generate code** — it auto-updates in the editor\n- **Debug** — paste code and I'll fix it\n- **Explain concepts** — with examples\n- **Install packages** — I'll show you how\n\nCode I generate is **automatically applied** to your files. 🚀` },
   ]);
@@ -504,6 +959,13 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
   const [newItemName, setNewItemName] = useState("");
 
   const activeTab = openTabs.find((t) => t.id === activeTabId);
+  const activeTabRef = useRef(activeTab);
+  const activeTabIdRef = useRef(activeTabId);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    activeTabIdRef.current = activeTabId;
+  }, [activeTab, activeTabId]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -651,14 +1113,14 @@ const CodeEditorComponent = forwardRef<CodeEditorHandle, IDEProps>(({ domainName
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; }
 .app { padding: 16px; }
-button { padding: 8px 16px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
+button { padding: 8px 16px; border-radius: 8px; border: none; background: #ef4444; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
 button:active { opacity: 0.8; }
 input, textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; width: 100%; margin: 4px 0; }
 select { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; }
 h1 { font-size: 24px; margin-bottom: 12px; } h2 { font-size: 20px; margin-bottom: 8px; } h3 { font-size: 16px; margin-bottom: 6px; }
 p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
 img { max-width: 100%; border-radius: 8px; }
-a { color: #818cf8; text-decoration: none; }
+a { color: #f87171; text-decoration: none; }
 .error-boundary { padding: 16px; background: #1a0000; border: 1px solid #ff4444; border-radius: 8px; margin: 16px; }
 .error-boundary h3 { color: #ff6b6b; margin-bottom: 8px; }
 .error-boundary pre { font-size: 11px; color: #ff9999; white-space: pre-wrap; word-break: break-all; }
@@ -682,12 +1144,12 @@ window.StyleSheet = { create: (s) => s, flatten: (s) => Object.assign({}, ...(Ar
 window.Alert = { alert: (title, msg) => window.alert(title + (msg ? '\\n' + msg : '')) };
 window.Dimensions = { get: () => ({width: window.innerWidth, height: window.innerHeight}) };
 window.Platform = { OS: 'web', select: (o) => o.web || o.default || o.ios };
-window.ActivityIndicator = (props) => React.createElement('div', {style:{textAlign:'center', padding:'20px', color: props?.color || '#6366f1'}}, '⏳ Loading...');
+window.ActivityIndicator = (props) => React.createElement('div', {style:{textAlign:'center', padding:'20px', color: props?.color || '#ef4444'}}, '⏳ Loading...');
 window.Switch = (props) => React.createElement('input', {type:'checkbox', checked: props?.value, onChange: (e) => props?.onValueChange?.(e.target.checked), style:{width:'40px', height:'20px', cursor:'pointer'}});
 window.Modal = (props) => props?.visible ? React.createElement('div', {style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}, React.createElement('div', {style:{background:'#1e1e2e',borderRadius:'12px',padding:'20px',maxWidth:'90%',maxHeight:'90%',overflow:'auto'}}, props?.children)) : null;
 window.KeyboardAvoidingView = (props) => React.createElement('div', props, props?.children);
 // React Native Button shim
-window.Button = (props) => React.createElement('button', {onClick: props?.onPress, disabled: props?.disabled, style: {padding:'10px 20px', borderRadius:'8px', border:'none', background: props?.color || '#6366f1', color:'white', fontSize:'14px', cursor:'pointer', opacity: props?.disabled ? 0.5 : 1, margin:'4px'}}, props?.title || 'Button');
+window.Button = (props) => React.createElement('button', {onClick: props?.onPress, disabled: props?.disabled, style: {padding:'10px 20px', borderRadius:'8px', border:'none', background: props?.color || '#ef4444', color:'white', fontSize:'14px', cursor:'pointer', opacity: props?.disabled ? 0.5 : 1, margin:'4px'}}, props?.title || 'Button');
 window.TouchableHighlight = (props) => React.createElement('button', {...props, onClick: props?.onPress, style: {background:'transparent', border:'none', color:'inherit', padding:0, cursor:'pointer', ...props?.style}}, props?.children);
 window.TouchableWithoutFeedback = (props) => React.createElement('div', {...props, onClick: props?.onPress, style: {cursor:'pointer', ...props?.style}}, props?.children);
 window.SectionList = (props) => React.createElement('div', {style: props?.style}, props?.sections?.map?.((section, si) => React.createElement('div', {key:si}, props?.renderSectionHeader?.({section}), section.data?.map?.((item, index) => props?.renderItem?.({item, index, section})))));
@@ -797,7 +1259,7 @@ try {
 body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0f0f23; color: #e0e0e0; padding: 16px; font-size: 13px; }
 .log-line { padding: 2px 0; white-space: pre-wrap; word-break: break-all; border-bottom: 1px solid #1a1a2e; }
 .error { color: #ff6b6b; } .warn { color: #fbbf24; }
-h3 { color: #6366f1; margin-bottom: 8px; font-size: 14px; }
+h3 { color: #ef4444; margin-bottom: 8px; font-size: 14px; }
 ${allCss}
 </style>
 </head><body>
@@ -818,10 +1280,12 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 </body></html>`;
   }, []);
 
-  // Build a full HTML document for preview by injecting sibling CSS/JS
-  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>) => {
-    let html = htmlContent;
-    
+  // Assemble one HTML page with sibling CSS/JS injected inline (no nav shim)
+  const assemblePage = useCallback((htmlContent: string, allFiles: Record<string, string>, pageName = "index.html") => {
+    // Scaffold shared assets + site nav BEFORE inlining, so injected tags get inlined too
+    let html = scaffoldPage(pageName, htmlContent, allFiles);
+
+
     // Inject a base visible style so content is never invisible against iframe bg
     const baseStyle = `<style id="__preview-base">body:not([data-themed]) { background: #ffffff; color: #1a1a1a; }</style>`;
     if (html.includes("</head>")) {
@@ -831,31 +1295,40 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
     } else {
       html = baseStyle + html;
     }
-    
+
     // Track which CSS/JS files were already referenced and injected
     const injectedFiles = new Set<string>();
+    const scaffolded = html;
+    const lookup = (fileName: string): string | undefined => {
+      if (allFiles[fileName] != null) return allFiles[fileName];
+      const key = Object.keys(allFiles).find((k) => (k.split("/").pop() || k) === fileName);
+      return key ? allFiles[key] : undefined;
+    };
 
     // Find referenced CSS files and inject inline if they exist in the project
     const cssLinkRegex = /<link[^>]+href=["']([^"']+\.css)["'][^>]*>/gi;
     let cssMatch;
-    while ((cssMatch = cssLinkRegex.exec(htmlContent)) !== null) {
+    while ((cssMatch = cssLinkRegex.exec(scaffolded)) !== null) {
       const cssFileName = cssMatch[1].split("/").pop() || "";
-      if (allFiles[cssFileName]) {
-        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${allFiles[cssFileName]}</style>`);
+      const cssContent = lookup(cssFileName);
+      if (cssContent != null) {
+        html = html.replace(cssMatch[0], `<style>/* ${cssFileName} */\n${cssContent}</style>`);
         injectedFiles.add(cssFileName);
       }
     }
-    
+
     // Find referenced JS files and inject inline if they exist in the project
     const jsScriptRegex = /<script[^>]+src=["']([^"']+\.js)["'][^>]*><\/script>/gi;
     let jsMatch;
-    while ((jsMatch = jsScriptRegex.exec(htmlContent)) !== null) {
+    while ((jsMatch = jsScriptRegex.exec(scaffolded)) !== null) {
       const jsFileName = jsMatch[1].split("/").pop() || "";
-      if (allFiles[jsFileName]) {
-        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${allFiles[jsFileName]}<\/script>`);
+      const jsContent = lookup(jsFileName);
+      if (jsContent != null) {
+        html = html.replace(jsMatch[0], `<script>/* ${jsFileName} */\n${jsContent}<\/script>`);
         injectedFiles.add(jsFileName);
       }
     }
+
 
     // Also inject any remaining CSS/JS files that weren't explicitly referenced
     const remainingCss = Object.entries(allFiles)
@@ -883,9 +1356,93 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
         html += remainingJs;
       }
     }
-    
-    return html;
+
+    return injectRuntimeGuard(html);
   }, []);
+
+  // Build a full HTML document for preview, with multi-page in-iframe navigation
+  const buildPreviewHtml = useCallback((htmlContent: string, allFiles: Record<string, string>, currentPage?: string) => {
+    // Identify which project page this content belongs to (so nav marks it active)
+    const activeName =
+      (currentPage && (currentPage.split("/").pop() || currentPage)) ||
+      Object.keys(allFiles).find((n) => n.endsWith(".html") && allFiles[n] === htmlContent)?.split("/").pop() ||
+      "index.html";
+    let html = rewriteLocationForPreview(assemblePage(htmlContent, allFiles, activeName));
+
+    // Multi-page navigation: pre-assemble every sibling .html page and swap in-iframe.
+    // Generated scripts that write `location.href = "page.html?x=1"` (or read location.search)
+    // are routed through window.__lunorLoc, because a sandboxed srcdoc frame cannot navigate by URL.
+    const pageNames = Object.keys(allFiles).filter((n) => n.endsWith(".html"));
+    const pages: Record<string, string> = {};
+    for (const name of pageNames) {
+      const short = name.split("/").pop() || name;
+      const pageHtml = rewriteLocationForPreview(assemblePage(allFiles[name], allFiles, short));
+      pages[short] = btoa(unescape(encodeURIComponent(pageHtml)));
+    }
+
+    const shim = `<script>(function(){
+  var PAGES = ${JSON.stringify(pages)};
+  var CUR = { name: ${JSON.stringify(activeName)}, search: '' };
+  function nav(name, search){
+    var encoded = PAGES[name];
+    if(!encoded) return;
+    CUR.name = name; CUR.search = search || '';
+    var doc = decodeURIComponent(escape(atob(encoded)));
+    document.open(); document.write(doc); document.close();
+    if (window.__attachPreviewNav) window.__attachPreviewNav();
+  }
+  function goTo(v){
+    v = String(v == null ? '' : v);
+    if (!v || v.charAt(0) === '#') return;
+    if (/^(https?:)?\\/\\//i.test(v) || /^(mailto|tel):/i.test(v)) { try { window.open(v, '_blank'); } catch (_) {} return; }
+    var noHash = v.split('#')[0];
+    var qi = noHash.indexOf('?');
+    var search = qi >= 0 ? noHash.slice(qi) : '';
+    var path = qi >= 0 ? noHash.slice(0, qi) : noHash;
+    var name = path.split('/').pop();
+    if (!name || name === '.' || name === '/') name = 'index.html';
+    if (!/\\.html?$/i.test(name)) name = name + '.html';
+    if (!PAGES[name]) { if (!path) { nav(CUR.name, search); } return; }
+    nav(name, search);
+  }
+  window.__lunorLoc = {
+    get href(){ return 'https://preview.lunor.local/' + CUR.name + CUR.search; },
+    set href(v){ goTo(v); },
+    get search(){ return CUR.search; },
+    get pathname(){ return '/' + CUR.name; },
+    assign: goTo,
+    replace: goTo,
+    reload: function(){ nav(CUR.name, CUR.search); }
+  };
+  window.__attachPreviewNav = function(){
+    document.addEventListener('click', function(e){
+      var a = e.target && e.target.closest && e.target.closest('a[href]');
+      if(!a) return;
+      var full = a.getAttribute('href') || '';
+      var href = full.split('#')[0];
+      if(!href) return;
+      var qi = href.indexOf('?');
+      var name = (qi >= 0 ? href.slice(0, qi) : href).split('/').pop();
+      if(!name || !PAGES[name]) return;
+      e.preventDefault();
+      nav(name, qi >= 0 ? href.slice(qi) : '');
+    }, true);
+  };
+  window.__previewNavigate = nav;
+  window.__attachPreviewNav();
+})();<\/script>`;
+    // Inject at the top of <head> so __lunorLoc exists before any page script runs.
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head[^>]*>/i, (m) => m + shim);
+    } else if (/<body[^>]*>/i.test(html)) {
+      html = html.replace(/<body[^>]*>/i, (m) => m + shim);
+    } else {
+      html = shim + html;
+    }
+
+    return html;
+  }, [assemblePage]);
+
 
   const isAppDomain = domainId === "app-development";
 
@@ -961,10 +1518,10 @@ if(!output.children.length) addLine('Code executed successfully (no output)');
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; padding: 16px; }
-button { padding: 8px 16px; border-radius: 8px; border: none; background: #6366f1; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
+button { padding: 8px 16px; border-radius: 8px; border: none; background: #ef4444; color: white; font-size: 14px; cursor: pointer; margin: 4px; }
 button:active { opacity: 0.8; }
 input, textarea { padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #1a1a2e; color: #e0e0e0; font-size: 14px; width: 100%; margin: 4px 0; }
-h1 { font-size: 24px; margin-bottom: 12px; color: #6366f1; }
+h1 { font-size: 24px; margin-bottom: 12px; color: #ef4444; }
 h2 { font-size: 20px; margin-bottom: 8px; }
 p { font-size: 14px; line-height: 1.5; margin-bottom: 8px; }
 ${allCss}
@@ -986,6 +1543,7 @@ ${jsCode}
 
   const updatePreview = useCallback(() => {
     if (!activeTab || !showPreview) return;
+    previewEntryRef.current = activeTab.id;
     const allFiles = collectFiles(fileTree);
     const isHtml = activeTab.language === "html" || activeTab.name.endsWith(".html");
     const isJsLike = ["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name);
@@ -995,23 +1553,100 @@ ${jsCode}
     const isReactProject = hasJSX(filesList);
 
     if (isHtml) {
-      setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+      const src = visualEditMode ? annotateHtml(activeTab.content) : activeTab.content;
+      let html = buildPreviewHtml(src, allFiles, activeTab.name);
+      if (visualEditMode) {
+        html = /<\/body>/i.test(html)
+          ? html.replace(/<\/body>/i, `${VISUAL_EDIT_AGENT}</body>`)
+          : html + VISUAL_EDIT_AGENT;
+      }
+      setPreview(html);
     } else if (isJsLike && hasJSXContent) {
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isAppDomain && isJsLike) {
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     } else if (isJsLike && usesDOM) {
       // Vanilla JS with DOM usage — render in an HTML shell with DOM available
-      setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+      setPreview(buildVanillaJsPreview(activeTab.content, allFiles));
     } else if (isJsLike) {
       // Pure JS without DOM — run and capture console output
-      setPreviewContent(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
+      setPreview(buildAppPreviewHtml(activeTab.content, activeTab.language, allFiles));
     }
-  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain]);
+  }, [activeTab, showPreview, fileTree, collectFiles, buildPreviewHtml, buildAppPreviewHtml, buildVanillaJsPreview, isAppDomain, visualEditMode]);
+
+  // Hard refresh: rebuild the document AND remount the iframe (works even when nothing changed)
+  const hardRefreshPreview = useCallback(() => {
+    setPreviewErrors([]);
+    setPreviewKey((k) => k + 1);
+    updatePreview();
+  }, [updatePreview]);
+
+  // Live-apply admin edits: when this user's saved pages change in the backend,
+  // reload the snapshot into the open workspace and refresh the preview instantly.
+  useEffect(() => {
+    const channel = supabase.channel("workspace-history-live");
+    let active = true;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const userId = data.user?.id;
+      if (!userId || !active) return;
+      channel
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "workspace_history", filter: `user_id=eq.${userId}` },
+          (payload) => {
+            const row = payload.new as {
+              files?: { path: string; language?: string; content: string }[];
+              domain?: string;
+              client_id?: string;
+            };
+            // Only react to the site this workspace actually has open, otherwise an
+            // edit to another site would replace these files and drop unsaved work.
+            if (row?.domain && row.domain !== domainId) return;
+            const files = Array.isArray(row?.files) ? row.files : [];
+            if (!files.length) return;
+            setFileTree(buildTreeFromSnapshot(files));
+            setOpenTabs((tabs) =>
+              tabs.map((t) => {
+                const f = files.find((x) => x.path === t.id || x.path.endsWith(`/${t.id}`));
+                return f ? { ...t, content: f.content, isModified: false } : t;
+              })
+            );
+            setShowPreview(true);
+            hardRefreshPreview();
+            toast.success("Site updated — preview refreshed");
+            syncHistory().then(setGenHistory).catch(() => {});
+          }
+        )
+        .subscribe();
+    })();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [hardRefreshPreview, domainId]);
+
+  const copyPreviewHtml = useCallback(() => {
+    if (!previewContent) return;
+    navigator.clipboard.writeText(previewContent).then(() => toast.success("Preview HTML copied"));
+  }, [previewContent]);
+
+  const downloadPreviewHtml = useCallback(() => {
+    if (!previewContent) return;
+    const blob = new Blob([previewContent], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (activeTab?.name || "preview").replace(/\.[^.]+$/, "") + ".html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast.success("Page downloaded");
+  }, [previewContent, activeTab?.name]);
+
 
   // Debounced preview update when content or active tab changes
   useEffect(() => {
     if (!showPreview || !activeTab) return;
+    if (skipPreviewRebuildRef.current) { skipPreviewRebuildRef.current = false; return; }
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     previewTimerRef.current = setTimeout(updatePreview, 300);
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current); };
@@ -1032,6 +1667,108 @@ ${jsCode}
     setOpenTabs((prev) => prev.map((t) => t.id === activeTabId ? { ...t, content: val || "", isModified: true } : t));
     setFileTree((prev) => updateNode(prev, activeTabId, (n) => ({ ...n, content: val || "" })));
   };
+
+  // Write a specific content string into a file + its open tab
+  const writeFileContent = useCallback((fileId: string, name: string, content: string) => {
+    setFileTree((prev) => updateNode(prev, fileId, (n) => ({ ...n, content })));
+    setOpenTabs((prev) => prev.some((t) => t.id === fileId)
+      ? prev.map((t) => t.id === fileId ? { ...t, content, isModified: true } : t)
+      : [...prev, { id: fileId, name, language: getLang(name), content, isModified: true }]);
+    if (activeTabIdRef.current === fileId && activeTabRef.current) {
+      activeTabRef.current = { ...activeTabRef.current, content, isModified: true };
+    }
+  }, [updateNode]);
+
+  const pushVisualSnapshot = useCallback((snap: VisualSnapshot) => {
+    setVisualUndo((s) => [...s.slice(-49), snap]);
+    setVisualRedo([]);
+  }, []);
+
+  const undoVisualEdit = useCallback(() => {
+    setVisualUndo((stack) => {
+      const snap = stack[stack.length - 1];
+      if (!snap) { toast.info("Nothing to undo"); return stack; }
+      writeFileContent(snap.fileId, snap.fileName, snap.before);
+      setVisualRedo((r) => [...r, snap]);
+      toast.success(`Undid ${snap.kind} in ${snap.fileName}`);
+      return stack.slice(0, -1);
+    });
+  }, [writeFileContent]);
+
+  const redoVisualEdit = useCallback(() => {
+    setVisualRedo((stack) => {
+      const snap = stack[stack.length - 1];
+      if (!snap) { toast.info("Nothing to redo"); return stack; }
+      writeFileContent(snap.fileId, snap.fileName, snap.after);
+      setVisualUndo((u) => [...u, snap]);
+      toast.success(`Redid ${snap.kind} in ${snap.fileName}`);
+      return stack.slice(0, -1);
+    });
+  }, [writeFileContent]);
+
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z while Visual Edit is active
+  useEffect(() => {
+    if (!visualEditMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) redoVisualEdit(); else undoVisualEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [visualEditMode, undoVisualEdit, redoVisualEdit]);
+
+  // Cursor / drag-and-drop edits made inside the preview -> patch the real source file
+  useEffect(() => {
+    const onEdit = (e: MessageEvent) => {
+      const d = e.data as { __lunorVisualEdit?: boolean; op?: VisualEditOp } | null;
+      const currentTab = activeTabRef.current;
+      const currentId = activeTabIdRef.current;
+      if (!d || !d.__lunorVisualEdit || !d.op || !currentId || !currentTab) return;
+      if (iframeRef.current?.contentWindow && e.source !== iframeRef.current.contentWindow) return;
+      const next = applyVisualEdit(currentTab.content, d.op);
+      if (next && next !== currentTab.content) {
+        if (d.op.kind !== "move" && d.op.kind !== "delete") skipPreviewRebuildRef.current = true;
+        const updatedTab = { ...currentTab, content: next, isModified: true };
+        pushVisualSnapshot({ fileId: currentId, fileName: currentTab.name, before: currentTab.content, after: next, kind: d.op.kind });
+        activeTabRef.current = updatedTab;
+        setOpenTabs((prev) => prev.map((t) => t.id === currentId ? updatedTab : t));
+        setFileTree((prev) => updateNode(prev, currentId, (n) => ({ ...n, content: next })));
+        toast.success(`${currentTab.name} updated (${d.op.kind})`);
+      } else if (d.op.kind === "text" && d.op.previous && d.op.previous !== d.op.value) {
+        const previousText = d.op.previous;
+        const nextText = d.op.value;
+        const candidates: FileNode[] = [];
+        const visit = (nodes: FileNode[]) => {
+          nodes.forEach((node) => {
+            if (node.type === "folder") visit(node.children || []);
+            else if (/\.(html?|jsx?|tsx?)$/i.test(node.name) && (node.content?.split(previousText).length || 0) === 2) candidates.push(node);
+          });
+        };
+        visit(fileTree);
+        if (candidates.length === 1) {
+          const owner = candidates[0];
+          const ownerContent = owner.content || "";
+          const updatedContent = ownerContent.replace(previousText, nextText);
+          pushVisualSnapshot({ fileId: owner.id, fileName: owner.name, before: ownerContent, after: updatedContent, kind: "dynamic text" });
+          setFileTree((prev) => updateNode(prev, owner.id, (node) => ({ ...node, content: updatedContent })));
+          setOpenTabs((prev) => prev.some((tab) => tab.id === owner.id)
+            ? prev.map((tab) => tab.id === owner.id ? { ...tab, content: updatedContent, isModified: true } : tab)
+            : [...prev, { id: owner.id, name: owner.name, language: owner.language || getLang(owner.name), content: updatedContent, isModified: true }]);
+          activeTabRef.current = { id: owner.id, name: owner.name, language: owner.language || getLang(owner.name), content: updatedContent, isModified: true };
+          activeTabIdRef.current = owner.id;
+          setActiveTabId(owner.id);
+          skipPreviewRebuildRef.current = true;
+          toast.success(`${owner.name} updated (dynamic text)`);
+        } else {
+          toast.error(candidates.length > 1 ? "That text appears in multiple files; edit it in code." : "Could not locate this dynamic text in project source.");
+        }
+      }
+    };
+    window.addEventListener("message", onEdit);
+    return () => window.removeEventListener("message", onEdit);
+  }, [fileTree, updateNode, pushVisualSnapshot]);
+
 
   // Auto-apply code to editor — Lovable style: direct apply, no diff review
   const applyCodeToEditor = useCallback((code: string, language: string, filename?: string) => {
@@ -1059,6 +1796,64 @@ ${jsCode}
       setActiveTabId(newId);
     }
   }, [activeTabId, activeTab, updateNode, addChild]);
+
+  // Live auto-apply: write streamed code blocks into their files as soon as each
+  // block finishes, so nothing needs an "Apply" click.
+  const liveAppliedRef = useRef<Map<string, number>>(new Map());
+  const lastLiveApplyRef = useRef(0);
+
+  const liveApplyBlocks = useCallback((markdown: string, userPrompt?: string) => {
+    const fences = (markdown.match(/```/g) || []).length;
+    if (fences < 2) return;
+    const complete = fences % 2 === 0 ? markdown : markdown.slice(0, markdown.lastIndexOf("```"));
+    const blocks = extractCodeBlocks(complete, userPrompt);
+    if (!blocks.length) return;
+    const isSiteBuild = !isAppDomain && blocks.some(
+      (b) => /<!DOCTYPE html|<html/i.test(b.code) || /\.html$/i.test(b.filename || ""));
+
+    const written: { id: string; name: string; lang: string; code: string }[] = [];
+    setFileTree((prev) => {
+      let tree = [...prev];
+      const existing = flattenFiles(tree);
+      blocks.forEach((block) => {
+        const lang = LANG_MAP[block.language] || block.language;
+        const ext = LANG_EXT_MAP[lang] || LANG_EXT_MAP[block.language] || block.language || "js";
+        const fname = block.filename || `untitled.${ext}`;
+        const id = resolveTargetPath(fname, lang, existing, isSiteBuild);
+        if (liveAppliedRef.current.get(id) === block.code.length) return;
+        liveAppliedRef.current.set(id, block.code.length);
+        const name = id.split("/").pop() || fname;
+        written.push({ id, name, lang: lang || getLang(name), code: block.code });
+        if (findFile(tree, id)) {
+          tree = updateNode(tree, id, (n) => ({ ...n, content: block.code }));
+          return;
+        }
+        const node: FileNode = { id, name, type: "file", language: lang || getLang(name), content: block.code };
+        if (id.includes("/")) {
+          if (!tree.find((n) => n.id === "src" && n.type === "folder"))
+            tree = [{ id: "src", name: "src", type: "folder", isOpen: true, children: [] }, ...tree];
+          tree = addChild(tree, "src", node);
+        } else {
+          tree = [...tree, node];
+        }
+      });
+      return tree;
+    });
+    if (!written.length) return;
+    setOpenTabs((prev) => {
+      let tabs = [...prev];
+      written.forEach(({ id, name, lang, code }) => {
+        tabs = tabs.some((t) => t.id === id)
+          ? tabs.map((t) => (t.id === id ? { ...t, content: code, isModified: true } : t))
+          : [...tabs, { id, name, language: lang, content: code, isModified: true }];
+      });
+      return tabs;
+    });
+    const entry = written.find((f) => f.name === "index.html")
+      || written.find((f) => f.name.endsWith(".html")) || written[0];
+    if (entry) { previewEntryRef.current = entry.id; setActiveTabId(entry.id); }
+    setShowPreview(true);
+  }, [isAppDomain, updateNode, addChild]);
 
   // -- Ghost text inline completions --
   const fetchGhostSuggestion = useCallback(async (code: string, language: string, line: number, column: number) => {
@@ -1254,13 +2049,13 @@ ${jsCode}
       const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(activeTab.content);
 
       if (isHtml) {
-        setPreviewContent(buildPreviewHtml(activeTab.content, allFiles));
+        setPreview(buildPreviewHtml(activeTab.content, allFiles, activeTab.name));
       } else if (isJsLike && hasJSXInFile) {
-        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+        setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       } else if (isJsLike && usesDOM) {
-        setPreviewContent(buildVanillaJsPreview(activeTab.content, allFiles));
+        setPreview(buildVanillaJsPreview(activeTab.content, allFiles));
       } else {
-        setPreviewContent(buildAppPreviewHtml(activeTab.content, lang, allFiles));
+        setPreview(buildAppPreviewHtml(activeTab.content, lang, allFiles));
       }
       setOutput((p) => [...p, "✅ Preview rendered successfully"]);
       setIsRunning(false);
@@ -1307,15 +2102,87 @@ ${jsCode}
   };
 
   // -- AI Chat with auto-apply --
-  const handleChatSend = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return;
-    // Add file context to the user message
-    const fileContext = activeTab ? `\n\n[Current file: ${activeTab.name} (${activeTab.language})]\n\`\`\`${activeTab.language}\n${activeTab.content.slice(0, 2000)}\n\`\`\`` : "";
-    const userMsg: Message = { role: "user", content: chatInput };
+  const handleChatSend = useCallback(async (overrideInput?: string) => {
+    const input = (overrideInput ?? chatInput).trim();
+    if (!input || chatLoading) return;
+
+    // --- Automation: "push / upload this to my github" ---
+    if (/\b(push|upload|export|publish|commit|save|send|deploy)\b[^.!?]{0,60}\bgit\s?hub\b/i.test(input)
+      || /\bgit\s?hub\b[^.!?]{0,40}\b(push|upload|export|repo|repository)\b/i.test(input)) {
+      const filesToPush = flattenFiles(fileTree).map((f) => ({ path: f.path, content: f.content || "" }));
+      setChatInput("");
+      setMessages((prev) => [...prev, { role: "user", content: input }]);
+      if (!filesToPush.length) {
+        setMessages((prev) => [...prev, { role: "assistant", content: "There are no files in this project yet — generate something first, then I'll push it to GitHub." }]);
+        return;
+      }
+      setMessages((prev) => [...prev, { role: "assistant", content: "Pushing your project to GitHub…" }]);
+      try {
+        const nameMatch = input.match(/(?:repo|repository|named|called)\s+["'`]?([A-Za-z0-9._-]{2,60})["'`]?/i);
+        const result = await githubPush(filesToPush, {
+          repo: nameMatch?.[1],
+          private: !/\bpublic\b/i.test(input),
+          commitMessage: "Update from Lunor.AI",
+        });
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: `${result.created ? "Created" : "Updated"} **${result.repo}** with ${result.fileCount} file(s) on \`${result.branch}\`.\n\n[Open repository](${result.repoUrl}) · [View commit](${result.commitUrl})`,
+        }]);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Push failed";
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          content: /connect your github/i.test(msg)
+            ? "I need access to your GitHub account first — I've opened the connect panel for you."
+            : `GitHub push failed: ${msg}`,
+        }]);
+        setShowGitHub(true);
+      }
+      return;
+    }
+
+    // Build FULL project context so follow-up prompts modify the existing build
+    const projectFiles = flattenFiles(fileTree);
+    const CHAR_BUDGET = 120000;
+    const PER_FILE = 9000;
+    let used = 0;
+    const fileBlocks: string[] = [];
+    // Active file first so the AI focuses on what the user is looking at
+    const ordered = [...projectFiles].sort((a, b) => {
+      if (activeTab && a.path === activeTab.id) return -1;
+      if (activeTab && b.path === activeTab.id) return 1;
+      return 0;
+    });
+    for (const f of ordered) {
+      if (used >= CHAR_BUDGET) break;
+      const body = (f.content || "").slice(0, PER_FILE);
+      used += body.length;
+      fileBlocks.push(`${f.path}\n\`\`\`${f.language || getLang(f.name)}\n${body}\n\`\`\``);
+    }
+    const fileContext = projectFiles.length
+      ? `\n\n---\n[CURRENT PROJECT STATE — ${projectFiles.length} file(s). This is the website/app already built. Treat my request above as an EDIT to these files.]\n` +
+        `Files: ${projectFiles.map((f) => f.path).join(", ")}\n` +
+        (activeTab ? `Currently open file: ${activeTab.id}\n` : "") +
+        `\n${fileBlocks.join("\n\n")}\n\n` +
+        `[EDIT RULES: This is a TARGETED EDIT to the live project above. Change ONLY the exact part the user asked about; keep all other layout, structure, markup, ids, classes, styling, spacing, colors, fonts, animations, content and behavior byte-identical. Do NOT redesign, refactor, reorder or regenerate untouched sections, and do NOT add unrequested sections or files. Reuse the EXACT file paths above. Return the COMPLETE updated content of only the files that actually change (never diffs, never "// rest unchanged"). Do NOT rename or duplicate existing files. Do NOT restart the project from scratch.]\n---`
+      : "";
+
+    // Attach captured preview runtime errors when the user is asking for a fix
+    const fixIntent = /\b(error|errors|not working|doesn'?t work|isn'?t working|broken|fix|debug|solve|issue|fails?|failing|crash|blank|white screen|can'?t (log|sign) ?in|login)\b/i.test(input);
+    const capturedErrors = previewErrorLogRef.current;
+    const errorContext = fixIntent && capturedErrors.length
+      ? `\n\n---\n[CAPTURED RUNTIME ERRORS FROM THE LIVE PREVIEW — these are real, authoritative errors thrown by the code above. Fix their ROOT CAUSE, not the symptom.]\n` +
+        capturedErrors.map((e, i) => `${i + 1}. ${e}`).join("\n") +
+        `\n\n[FIX REQUIREMENTS: Trace each error to the exact file and line in the project above and fix it properly. Return the COMPLETE updated content of every file you change, using the EXACT existing file paths (format: path/to/file.ext followed by a fenced code block). Do not answer with prose only, explanations only, TODOs or placeholders. After fixing, confirm in one short line that each listed error can no longer occur.]\n---`
+      : "";
+
+    const userMsg: Message = { role: "user", content: input };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setChatInput("");
     setChatLoading(true);
+    liveAppliedRef.current.clear();
+    lastLiveApplyRef.current = 0;
     let assistantSoFar = "";
 
     const upsert = (chunk: string) => {
@@ -1326,22 +2193,45 @@ ${jsCode}
           return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
         return [...prev, { role: "assistant", content: assistantSoFar }];
       });
+      if (Date.now() - lastLiveApplyRef.current > 900) {
+        lastLiveApplyRef.current = Date.now();
+        liveApplyBlocks(assistantSoFar, input);
+      }
     };
 
-    // Check for cached response when offline
-    if (!online) {
-      const cached = findCachedAIResponse(chatInput, domainId);
+    // Pre-built demo site saved for this exact prompt: replay it through the normal
+    // streaming path so files, tables and the preview appear live (no AI credits used).
+    const demo = online ? await findDemoBuild(input, domainId) : null;
+    if (demo) {
+      // Each demo site runs on its own live backend so users, admins and data never mix.
+      const demoScopeKey = `${domainId}::demo:${demo.slug}`;
+      setRuntimeScope({ key: demoScopeKey, name: demo.title });
+      // Load the site's sample content while the files stream in, so the very first
+      // page already lists rooms / products / dishes instead of an empty state.
+      // The scope key is passed explicitly — the hook's ref still holds the old scope.
+      const demoSeed = demo.seedData ?? seedForDemo(demo.slug);
+      if (demoSeed) void liveRuntime.seed(demoSeed, extractDataModel(demo.response), demoScopeKey);
+      const CHUNK = 600;
+      for (let i = 0; i < demo.response.length; i += CHUNK) {
+        upsert(demo.response.slice(i, i + CHUNK));
+        await new Promise((r) => setTimeout(r, 30));
+      }
+    } else if (!online) {
+      // Check for cached response when offline
+      const cached = findCachedAIResponse(input, domainId);
       if (cached) {
         upsert(cached.response);
       } else {
         upsert("📴 **Offline mode** — no cached response found for this query.\n\nTry browsing the **Snippets** tab in the sidebar for pre-loaded code examples.");
       }
     } else {
+      // A brand-new (non-demo) build goes back to the workspace's own backend.
+      if (runtimeScope && updated.length <= 1) setRuntimeScope(null);
       try {
         // Append file context to the last user message for AI awareness
         const messagesWithContext = updated.map((m, i) => {
           if (i === updated.length - 1 && m.role === "user") {
-            return { role: m.role, content: m.content + fileContext };
+            return { role: m.role, content: m.content + fileContext + errorContext };
           }
           return { role: m.role, content: m.content };
         });
@@ -1352,15 +2242,20 @@ ${jsCode}
           if (resp.status === 404) msg = `AI service not deployed. Run: supabase functions deploy code-engine --project-ref ${import.meta.env.VITE_SUPABASE_PROJECT_ID || "YOUR_PROJECT_REF"}`;
           if (resp.status === 401) msg = "Please log in to use the AI assistant.";
           if (resp.status === 402) {
-            let diagnostic = "";
-            try {
-              const pingResp = await fetchCodeEngine({ action: "ping" });
-              if (pingResp.ok) {
-                const ping = await pingResp.json();
-                diagnostic = `\n\n**Diagnostic:** Provider=${ping.provider}, Project=${ping.projectRef}. ${ping.hint || ""}`;
-              }
-            } catch {}
-            msg = `AI credits exhausted.${diagnostic}\n\n**Fix:** Get a free key from [Google AI Studio](https://aistudio.google.com/apikey), then run: \`supabase secrets set GEMINI_API_KEY=your_key --project-ref byveaoqwuwyhaykgjufj\`. If on Lovable preview, set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Lovable env to point to byveaoqwuwyhaykgjufj.`;
+            if (err?.code === "credits_exhausted") {
+              msg = `**You're out of AI credits.** Balance: ${err?.balance ?? 0}.\n\nTop up **20 credits for ₹50** or upgrade your plan on the [Pricing page](/pricing).`;
+              refetchCredits();
+            } else {
+              let diagnostic = "";
+              try {
+                const pingResp = await fetchCodeEngine({ action: "ping" });
+                if (pingResp.ok) {
+                  const ping = await pingResp.json();
+                  diagnostic = `\n\n**Diagnostic:** Provider=${ping.provider}, Project=${ping.projectRef}. ${ping.hint || ""}`;
+                }
+              } catch {}
+              msg = `AI service credits exhausted on the provider side.${diagnostic}`;
+            }
           }
           if (resp.status === 503 && err?.hint) msg = `${err.error} ${err.hint}`;
           upsert(`❌ ${msg}`);
@@ -1386,8 +2281,48 @@ ${jsCode}
             catch { buf = line + "\n" + buf; break; }
           }
         }
+        // A cut-off answer leaves an unclosed code fence (or an unfinished HTML file).
+        // Ask the model to continue, up to twice, so long builds finish instead of landing broken.
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const unclosed = (assistantSoFar.match(/```/g) || []).length % 2 === 1;
+          if (!unclosed) break;
+          const contResp = await fetchCodeEngine({
+            action: "generate",
+            domain: domainName,
+            model: selectedModel,
+            messages: [
+              ...messagesWithContext,
+              { role: "assistant", content: assistantSoFar },
+              {
+                role: "user",
+                content:
+                  "Your answer was cut off mid-file. Continue from the EXACT character where you stopped — do not repeat anything you already wrote, do not restart the file, do not add explanations. Close the current code block correctly, then continue with the remaining files in the same path + fenced-code-block format.",
+              },
+            ],
+          });
+          if (!contResp.ok || !contResp.body) break;
+          const cr = contResp.body.getReader();
+          const cd = new TextDecoder();
+          let cbuf = "";
+          while (true) {
+            const { done, value } = await cr.read();
+            if (done) break;
+            cbuf += cd.decode(value, { stream: true });
+            let ci: number;
+            while ((ci = cbuf.indexOf("\n")) !== -1) {
+              let line = cbuf.slice(0, ci); cbuf = cbuf.slice(ci + 1);
+              if (line.endsWith("\r")) line = line.slice(0, -1);
+              if (!line.startsWith("data: ") || line.trim() === "" || line.startsWith(":")) continue;
+              const json = line.slice(6).trim();
+              if (json === "[DONE]") break;
+              try { const p = JSON.parse(json); const c = p.choices?.[0]?.delta?.content; if (c) upsert(c); }
+              catch { cbuf = line + "\n" + cbuf; break; }
+            }
+          }
+        }
+
         // Cache the response for offline use
-        if (assistantSoFar) cacheAIResponse(chatInput, domainId, assistantSoFar);
+        if (assistantSoFar) cacheAIResponse(input, domainId, assistantSoFar);
       } catch (e) {
         upsert(
           isAuthRequiredError(e)
@@ -1397,19 +2332,54 @@ ${jsCode}
       }
     }
 
+    // Declared data model -> real database tables in the live backend.
+    const declaredModel = extractDataModel(assistantSoFar);
+    if (declaredModel.length > 0) void liveRuntime.applySchema(declaredModel);
+
     // Auto-apply: extract code blocks, batch all file operations, then trigger preview
     const userPrompt = updated.filter(m => m.role === "user").pop()?.content;
     const codeBlocks = extractCodeBlocks(assistantSoFar, userPrompt);
     if (codeBlocks.length > 0) {
-      // Prepare all new files/updates in one pass
+      // Prepare all new files/updates in one pass — resolve onto existing paths first
+      const existingForResolve = flattenFiles(fileTree);
+      // Static-site build (plain HTML pages, not the React app domain):
+      // keep pages and assets at the root so relative links resolve.
+      const isSiteBuild =
+        !isAppDomain &&
+        codeBlocks.some((b) => /<!DOCTYPE html|<html/i.test(b.code) || /\.html$/i.test(b.filename || ""));
       const newFiles: { id: string; name: string; lang: string; code: string }[] = [];
       codeBlocks.forEach((block) => {
         const normalizedLang = LANG_MAP[block.language] || block.language;
         const ext = LANG_EXT_MAP[normalizedLang] || LANG_EXT_MAP[block.language] || block.language || "js";
         const fname = block.filename || `untitled.${ext}`;
-        const newId = `src/${fname}`;
-        newFiles.push({ id: newId, name: fname, lang: normalizedLang || getLang(fname), code: block.code });
+        const newId = resolveTargetPath(fname, normalizedLang, existingForResolve, isSiteBuild);
+        const displayName = newId.split("/").pop() || fname;
+        if (newFiles.some((f) => f.id === newId)) {
+          // Same file returned twice in one response — keep the latest version
+          const idx = newFiles.findIndex((f) => f.id === newId);
+          newFiles[idx] = { id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code };
+          return;
+        }
+        newFiles.push({ id: newId, name: displayName, lang: normalizedLang || getLang(displayName), code: block.code });
       });
+
+      // Fresh site build: drop untouched starter-template files so they can't
+      // pollute the generated preview (e.g. the "Hello World!" app.js).
+      let staleTemplatePaths: string[] = [];
+      if (isSiteBuild) {
+        const templates = new Set(
+          (domainEnvironments[domainId]?.templateFiles ?? []).map((t) => (t.content || "").trim()),
+        );
+        const starterNames = /^(index\.html|app\.js|main\.js|script\.js|style\.css|styles\.css)$/i;
+        staleTemplatePaths = existingForResolve
+          .filter(
+            (f) =>
+              !newFiles.some((n) => n.id === f.path) &&
+              (templates.has((f.content || "").trim()) ||
+                (f.path.startsWith("src/") && starterNames.test(f.name))),
+          )
+          .map((f) => f.path);
+      }
 
       // Batch update file tree in a single setState
       setFileTree(prev => {
@@ -1421,13 +2391,19 @@ ${jsCode}
           tree = [srcFolder, ...tree];
         }
 
+        staleTemplatePaths.forEach((p) => { tree = removeNode(tree, p); });
+
         newFiles.forEach(({ id, name, lang, code }) => {
           const existingInTree = findFile(tree, id);
           if (existingInTree) {
             tree = updateNode(tree, id, n => ({ ...n, content: code }));
           } else {
             const newNode: FileNode = { id, name, type: "file", language: lang, content: code };
-            tree = addChild(tree, "src", newNode);
+            if (id.includes("/")) {
+              tree = addChild(tree, "src", newNode);
+            } else {
+              tree = [...tree, newNode];
+            }
           }
         });
         return tree;
@@ -1435,7 +2411,7 @@ ${jsCode}
 
       // Batch update tabs in a single setState
       setOpenTabs(prev => {
-        let tabs = [...prev];
+        let tabs = [...prev].filter(t => !staleTemplatePaths.includes(t.id));
         newFiles.forEach(({ id, name, lang, code }) => {
           const existingTab = tabs.find(t => t.id === id);
           if (existingTab) {
@@ -1446,6 +2422,7 @@ ${jsCode}
         });
         return tabs;
       });
+      appliedBatchRef.current += 1;
 
       // Auto-select the best file for preview (prefer HTML, then first JS)
       const htmlFile = newFiles.find(f => f.lang === "html" || f.name.endsWith(".html"));
@@ -1453,10 +2430,31 @@ ${jsCode}
       const bestFile = htmlFile || jsFile || newFiles[0];
       if (bestFile) setActiveTabId(bestFile.id);
 
+      // Record this generation in the history feed (snapshot = existing files + new files)
+      try {
+        const snapshotMap = new Map<string, { path: string; language?: string; content: string }>();
+        existingForResolve.forEach((f) => snapshotMap.set(f.path, { path: f.path, language: f.language, content: f.content || "" }));
+        newFiles.forEach((f) => snapshotMap.set(f.id, { path: f.id, language: f.lang, content: f.code }));
+        const snapshot = Array.from(snapshotMap.values());
+        addHistoryEntry({
+          domain: domainName,
+          projectId: currentProjectId,
+          projectName: currentProjectName,
+          prompt: (userPrompt || "(no prompt)").slice(0, 2000),
+          isFullStack: isFullStackFiles(snapshot.map((f) => f.path)),
+          files: snapshot,
+        });
+        setGenHistory(getHistory());
+      } catch (e) {
+        console.warn("[editor] could not record generation history", e);
+      }
+
       // Auto-open preview and build it directly from the code blocks (don't rely on stale state)
       const hasWebCode = newFiles.some(f => ["html", "javascript", "typescript", "css", "jsx", "tsx"].includes(f.lang));
       if (hasWebCode) {
         setShowPreview(true);
+        verifyPendingRef.current = true;
+
 
         // Build a complete file map from existing tree + new files for immediate preview
         setTimeout(() => {
@@ -1464,22 +2462,29 @@ ${jsCode}
           setFileTree(currentTree => {
             const allFiles = collectFiles(currentTree);
 
-            // Determine which file to preview
-            const previewFile = htmlFile || jsFile || newFiles[0];
+            // Keep previewing the same entry page; only switch if it no longer exists.
+            const entry = previewEntryRef.current;
+            const entryCode = entry ? allFiles[entry] : undefined;
+            const previewFile = entry && entryCode !== undefined
+              ? { name: entry.split("/").pop() || entry, code: entryCode, lang: getLang(entry) }
+              : (htmlFile || jsFile || newFiles[0]);
             if (previewFile) {
+              previewEntryRef.current = entry && entryCode !== undefined
+                ? entry
+                : ((previewFile as { id?: string }).id ?? previewFile.name);
               const isHtml = previewFile.lang === "html" || previewFile.name.endsWith(".html");
               const isJsLike = ["javascript", "typescript"].includes(previewFile.lang) || /\.(js|jsx|ts|tsx)$/.test(previewFile.name);
               const hasJSX = /<\w+[\s/>]/.test(previewFile.code) && /\breturn\s*[\s(]/.test(previewFile.code);
               const usesDOM = /document\.|getElementById|querySelector|innerHTML|addEventListener/.test(previewFile.code);
 
               if (isHtml) {
-                setPreviewContent(buildPreviewHtml(previewFile.code, allFiles));
+                setPreview(buildPreviewHtml(previewFile.code, allFiles, previewFile.name));
               } else if (isJsLike && hasJSX) {
-                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+                setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               } else if (isJsLike && usesDOM) {
-                setPreviewContent(buildVanillaJsPreview(previewFile.code, allFiles));
+                setPreview(buildVanillaJsPreview(previewFile.code, allFiles));
               } else if (isJsLike) {
-                setPreviewContent(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
+                setPreview(buildAppPreviewHtml(previewFile.code, previewFile.lang, allFiles));
               }
             }
 
@@ -1491,7 +2496,7 @@ ${jsCode}
 
     // Live debugging hints for app-development domain
     if (isAppDomain && assistantSoFar) {
-      const lowerInput = chatInput.toLowerCase();
+      const lowerInput = input.toLowerCase();
       const lowerResponse = assistantSoFar.toLowerCase();
       const isDebugging = /debug|error|crash|issue|fix|bug|not working|broken|fail|undefined|null|typeerror|referenceerror|warning|exception/.test(lowerInput + " " + lowerResponse);
 
@@ -1528,7 +2533,68 @@ ${jsCode}
     }
 
     setChatLoading(false);
-  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine]);
+    refetchCredits();
+  }, [chatInput, chatLoading, messages, domainName, applyCodeToEditor, liveApplyBlocks, isAppDomain, activeTab, selectedModel, online, domainId, fetchCodeEngine, fileTree, collectFiles, refetchCredits]);
+
+  // -- Voice assistant: speak commands, hear friendly replies --
+  const voice = useVoiceAssistant({
+    onFinalTranscript: (text) => { void handleChatSend(text); },
+  });
+  const spokenRef = useRef<number>(-1);
+  useEffect(() => {
+    if (!voice.voiceEnabled || chatLoading) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (spokenRef.current === messages.length - 1) return;
+    spokenRef.current = messages.length - 1;
+    void voice.speak(last.content);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, chatLoading, voice.voiceEnabled]);
+
+  // One-click AI fix for every runtime error surfaced by the preview
+  const handleResolveError = useCallback(async () => {
+    if (!previewErrors.length || resolvingError) return;
+    setResolvingError(true);
+    const attempt = ++repairAttemptRef.current;
+    const before = appliedBatchRef.current;
+    const prompt =
+      `The preview is throwing ${previewErrors.length} runtime error(s). Fix the ROOT CAUSE of ALL of them.\n` +
+      previewErrors
+        .map((e, i) => `${i + 1}. ${e.message}${e.stack ? `\n   ${e.stack.slice(0, 800)}` : ""}`)
+        .join("\n") +
+      (previewEntryRef.current ? `\nEntry page being previewed: ${previewEntryRef.current}\n` : "\n") +
+      (attempt > 1 ? `Attempt ${attempt}: the previous fix did NOT work — change your approach, do not repeat it.\n` : "") +
+      `Rules: keep the existing design and features; guard every browser API a sandboxed iframe may block (storage, cookies, clipboard, notifications); never leave undefined element/DOM lookups unguarded; return COMPLETE files at their exact existing paths.`;
+    try {
+      await handleChatSend(prompt);
+      if (appliedBatchRef.current === before) {
+        toast.error("The assistant replied without code — errors kept so you can retry.");
+        return;
+      }
+      setPreviewErrors([]);
+      previewErrorLogRef.current = [];
+      setPreviewKey((k) => k + 1);
+    } finally {
+      setResolvingError(false);
+    }
+  }, [previewErrors, resolvingError, handleChatSend]);
+
+  // Verification runs silently in the background. Only genuine passes are surfaced,
+  // and a self-test timeout is never treated as an application error.
+  useEffect(() => {
+    if (!verify || verify.running || !verify.results.length || verificationMessageRef.current) return;
+    verificationMessageRef.current = true;
+    const passed = verify.results.every((result) => result.passed);
+    if (passed) {
+      setMessages((prev) => [...prev, {
+        role: "assistant",
+        content: `✅ **Verified in the live preview**\n\n${summarizeResults(verify.results)}`,
+      }]);
+    }
+    // Auto-clear the badge so no persistent warning popup remains.
+    const timer = window.setTimeout(() => setVerify(null), passed ? 4000 : 1200);
+    return () => window.clearTimeout(timer);
+  }, [verify]);
 
   const handleClearChat = () => {
     setMessages([{ role: "assistant", content: `👋 Chat cleared! I'm your **${domainName}** assistant. Ask me anything!` }]);
@@ -1585,6 +2651,49 @@ ${jsCode}
     setRecentProjects(getSavedProjects());
     setNewProjectName("");
   }, [newProjectName, newProjectTemplate, domainName, handleSaveProject]);
+
+  const handleRevisitGeneration = useCallback((entry: GenerationEntry) => {
+    const tree = buildTreeFromSnapshot(entry.files);
+    setFileTree(tree);
+    setCurrentProjectId(entry.projectId || `proj-${Date.now()}`);
+    setCurrentProjectName(entry.projectName || "Restored project");
+    setOpenTabs([]);
+    setActiveTabId(null);
+    setShowWelcome(false);
+    const first = entry.files.find((f) => f.path.endsWith(".html")) || entry.files[0];
+    if (first) {
+      setOpenTabs([{ id: first.path, name: first.path.split("/").pop() || first.path, language: first.language || getLang(first.path), content: first.content, isModified: false }]);
+      setActiveTabId(first.path);
+    }
+    setOutput((prev) => [...prev, `🕘 Restored generation from ${new Date(entry.createdAt).toLocaleString()} (${entry.files.length} files).`]);
+    setShowTerminal(true);
+  }, []);
+
+  const handleRerunGeneration = useCallback((entry: GenerationEntry) => {
+    setShowAIPanel(true);
+    handleChatSend(entry.prompt);
+  }, [handleChatSend]);
+
+  const handleOpenHistoryFile = useCallback((entry: GenerationEntry, path: string) => {
+    const file = entry.files.find((f) => f.path === path);
+    if (!file) return;
+    const name = path.split("/").pop() || path;
+    setOpenTabs((prev) => (prev.some((t) => t.id === path)
+      ? prev.map((t) => (t.id === path ? { ...t, content: file.content } : t))
+      : [...prev, { id: path, name, language: file.language || getLang(name), content: file.content, isModified: false }]));
+    setActiveTabId(path);
+    setShowWelcome(false);
+  }, []);
+
+  const handleDeleteHistoryEntry = useCallback((id: string) => {
+    deleteHistoryEntry(id);
+    setGenHistory(getHistory());
+  }, []);
+
+  const handleClearHistory = useCallback(() => {
+    clearHistory();
+    setGenHistory(getHistory());
+  }, []);
 
   const handleDeleteProject = useCallback((id: string) => {
     deleteProject(id);
@@ -1821,8 +2930,8 @@ ${jsCode}
         <div className="flex items-center gap-1">
           {/* Theme picker */}
           <div className="relative">
-            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
-              <Palette className="h-3 w-3" />
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowThemeMenu(!showThemeMenu)} title="Change Theme">
+              <Palette className="h-3.5 w-3.5" />
             </Button>
             {showThemeMenu && (
               <>
@@ -1851,22 +2960,44 @@ ${jsCode}
               </>
             )}
           </div>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={handleSaveProject} title="Save Project">
-            <Save className="h-3 w-3" />
-          </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
-            {showAIPanel ? <PanelRightClose className="h-3 w-3" /> : <PanelRightOpen className="h-3 w-3" />}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={() => setShowSidebar(!showSidebar)}>
-            <Settings className="h-3 w-3" />
-          </Button>
-          {onExit && (
-            <Button variant="ghost" size="sm" className="h-6 px-1.5 text-[10px]" onClick={onExit}>
-              <Minimize2 className="h-3 w-3" />
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleSaveProject} title="Save Project">
+              <Save className="h-3.5 w-3.5" />
             </Button>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setShowGitHub(true)}
+              title={githubStatus.connected ? `Push to GitHub (${githubStatus.login})` : "Push to GitHub"}
+            >
+              <Github className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="w-px h-4 bg-border" />
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowAIPanel(!showAIPanel)} title="Toggle AI Panel">
+            {showAIPanel ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+          </Button>
+          <div className="w-px h-4 bg-border" />
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setShowSidebar(!showSidebar)} title="Explorer">
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+            {onExit && (
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onExit} title="Exit editor">
+                <Minimize2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+
+      <GitHubPushDialog
+        open={showGitHub}
+        onOpenChange={setShowGitHub}
+        files={flattenFiles(fileTree).map((f) => ({ path: f.path, content: f.content || "" }))}
+        projectName={domainName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Activity bar */}
@@ -1879,6 +3010,9 @@ ${jsCode}
           </button>
           <button onClick={() => { setShowSidebar(true); setSidebarTab("snippets"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "snippets" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Offline Snippets">
             <FileCode2 className="h-4 w-4" />
+          </button>
+          <button onClick={() => { setShowSidebar(true); setSidebarTab("history"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "history" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Generation History">
+            <HistoryIcon className="h-4 w-4" />
           </button>
           <button onClick={() => { setShowSidebar(true); setSidebarTab("lessons"); }} className={`p-2 rounded-md transition-colors ${showSidebar && sidebarTab === "lessons" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Lesson Instructions">
             <BookOpen className="h-4 w-4" />
@@ -1905,7 +3039,7 @@ ${jsCode}
           <div className="flex flex-col w-56 border-r shrink-0 overflow-hidden" style={{ backgroundColor: currentTheme.uiColors.card, borderColor: currentTheme.uiColors.border }}>
             <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: currentTheme.uiColors.border }}>
               <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: currentTheme.uiColors.muted }}>
-                {sidebarTab === "files" ? "Explorer" : sidebarTab === "snippets" ? "Snippets" : sidebarTab === "lessons" ? "Lessons" : "Search"}
+                {sidebarTab === "files" ? "Explorer" : sidebarTab === "snippets" ? "Snippets" : sidebarTab === "lessons" ? "Lessons" : sidebarTab === "history" ? "History" : "Search"}
               </span>
               {!online && <span className="text-[8px] px-1 py-0.5 rounded" style={{ backgroundColor: currentTheme.uiColors.accent + "20", color: currentTheme.uiColors.accent }}>OFFLINE</span>}
               {sidebarTab === "files" && (
@@ -1919,7 +3053,17 @@ ${jsCode}
                 </div>
               )}
             </div>
-            {sidebarTab === "files" ? (
+            {sidebarTab === "history" ? (
+              <GenerationHistoryPanel
+                entries={genHistory}
+                colors={currentTheme.uiColors as any}
+                onRevisit={handleRevisitGeneration}
+                onRerun={handleRerunGeneration}
+                onDelete={handleDeleteHistoryEntry}
+                onClearAll={handleClearHistory}
+                onOpenFile={handleOpenHistoryFile}
+              />
+            ) : sidebarTab === "files" ? (
               <div className="flex-1 overflow-y-auto py-1 text-xs">
                 {newItemParent !== null && (
                   <div className="flex items-center gap-1 px-3 py-1">
@@ -2016,29 +3160,50 @@ ${jsCode}
               </div>
             ))}
             <div className="flex-1" />
-            <div className="flex items-center gap-1 px-2 shrink-0">
-              <button onClick={handleCopy} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Copy">
-                {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
-              <button onClick={handleReset} className="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Reset">
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Tests">
-                <TestTube2 className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className="p-1 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-30" title="Generate Docs">
-                <BookOpen className="h-3.5 w-3.5" />
-              </button>
-              <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-6 gap-1 px-2.5 text-[10px]">
-                {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            <div className="flex items-center gap-1.5 px-2 shrink-0">
+              {credits && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-secondary/40 px-2 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    color: credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444",
+                  }}
+                  title={`${credits.planCredits} plan + ${credits.topupCredits} top-up credits`}
+                >
+                  <Coins className="h-3 w-3" />
+                  {credits.balance} credits
+                  {credits.balance === 0 && <a href="/pricing" className="underline">Top up</a>}
+                </span>
+              )}
+
+              <div className="flex items-center gap-0.5">
+                <button onClick={handleCopy} className={iconBtn} title="Copy">
+                  {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                <button onClick={handleReset} className={iconBtn} title="Reset">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-0.5">
+                <button onClick={handleGenerateTests} disabled={chatLoading || !activeTab} className={`${iconBtn} disabled:opacity-30 disabled:hover:bg-transparent`} title="Generate Tests">
+                  <TestTube2 className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={handleGenerateDocs} disabled={chatLoading || !activeTab} className={`${iconBtn} disabled:opacity-30 disabled:hover:bg-transparent`} title="Generate Docs">
+                  <BookOpen className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="w-px h-4 bg-border" />
+              <Button size="sm" onClick={handleRun} disabled={isRunning || !activeTab} className="h-7 gap-1 px-3 text-[11px] font-medium shadow-sm">
+                {isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                 Run
               </Button>
               <RunLocallyDialog fileTree={fileTree} domainName={domainName} projectName={currentProjectName || "my-app"}>
-                <Button size="sm" variant="outline" className="h-6 gap-1 px-2.5 text-[10px]">
-                  <Download className="h-3 w-3" />
+                <Button size="sm" variant="outline" className="h-7 gap-1 px-3 text-[11px] font-medium">
+                  <Download className="h-3.5 w-3.5" />
                   Run Locally
                 </Button>
               </RunLocallyDialog>
+              <div className="w-px h-4 bg-border" />
               {activeTab && (
                 (activeTab.language === "html" || activeTab.name.endsWith(".html") ||
                   (isAppDomain && (["javascript", "typescript"].includes(activeTab.language) || /\.(js|jsx|ts|tsx)$/.test(activeTab.name)))
@@ -2046,7 +3211,7 @@ ${jsCode}
               ) && (
                 <button
                   onClick={() => setShowPreview(!showPreview)}
-                  className={`p-1 transition-colors ${showPreview ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  className={`${iconBtn} ${showPreview ? "text-primary bg-primary/10 hover:bg-primary/15" : ""}`}
                   title={showPreview ? "Hide Preview" : isAppDomain ? "Show App Preview" : "Show Web Preview"}
                 >
                   {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : isAppDomain ? <Smartphone className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -2108,13 +3273,18 @@ ${jsCode}
               const showSandpackPreview = isAppDomainOnly && isReactProjectPreview;
               return (
               <div className={`flex flex-col border-l border-border overflow-hidden ${previewFullscreen ? "fixed inset-0 z-50 w-full h-full border-l-0" : "w-1/2"}`}>
-                <div className="flex items-center h-7 bg-card border-b border-border px-2 shrink-0 gap-1">
-                  {isAppDomain ? <Smartphone className="h-3 w-3 text-primary" /> : <Eye className="h-3 w-3 text-primary" />}
-                  <span className="text-[10px] font-medium text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
-                  <span className="text-[9px] text-muted-foreground ml-0.5">— Live</span>
+                <div className="flex items-center h-10 bg-card border-b border-border px-2.5 shrink-0 gap-1.5">
+                  {/* Preview label + live status */}
+                  <div className="flex items-center gap-1.5">
+                    {isAppDomain ? <Smartphone className="h-3.5 w-3.5 text-primary" /> : <Eye className="h-3.5 w-3.5 text-primary" />}
+                    <span className="text-[10px] font-semibold text-foreground">{isAppDomain ? "App Preview" : "Preview"}</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-500">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live
+                    </span>
+                  </div>
                   {/* Device label & dimensions indicator */}
                   {isAppDomain && currentDevice.type !== "desktop" && (
-                    <div className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
+                    <div className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20">
                       <span className="text-[9px] font-semibold text-primary">{currentDevice.label}</span>
                       <span className="text-[8px] text-primary/70">·</span>
                       <span className="text-[8px] font-mono text-primary/70">{currentDevice.w}×{currentDevice.h}</span>
@@ -2123,7 +3293,7 @@ ${jsCode}
                     </div>
                   )}
                   {isAppDomain && currentDevice.type === "desktop" && (
-                    <div className="flex items-center gap-1 ml-1.5 px-1.5 py-0.5 rounded bg-secondary/50">
+                    <div className="flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded-md bg-secondary/50">
                       <span className="text-[9px] font-semibold text-secondary-foreground/80">Desktop</span>
                       <span className="text-[8px] text-muted-foreground">· Responsive</span>
                     </div>
@@ -2134,7 +3304,7 @@ ${jsCode}
                     <div className="relative">
                       <button
                         onClick={() => setShowDeviceMenu(!showDeviceMenu)}
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors hover:bg-secondary/50"
+                        className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[9px] font-medium transition-colors hover:bg-secondary/60"
                         style={{ color: currentTheme.uiColors.text }}
                       >
                         {currentDevice.type === "phone" ? <Smartphone className="h-3 w-3" /> : currentDevice.type === "tablet" ? <Tablet className="h-3 w-3" /> : <Monitor className="h-3 w-3" />}
@@ -2180,73 +3350,168 @@ ${jsCode}
                       )}
                     </div>
                   ) : (
-                    <>
-                      <button onClick={() => setPreviewDevice("iphone-15")} className={`p-0.5 transition-colors ${currentDevice.type === "phone" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Mobile">
-                        <Smartphone className="h-3 w-3" />
+                    <div className="flex items-center gap-0.5 rounded-lg border border-border bg-secondary/40 p-0.5">
+                      <button
+                        onClick={() => setPreviewDevice("iphone-15")}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-all hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${currentDevice.type === "phone" ? "bg-card text-primary shadow-sm" : "hover:bg-secondary/60"}`}
+                        title="Mobile"
+                      >
+                        <Smartphone className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => setPreviewDevice("ipad-mini")} className={`p-0.5 transition-colors ${currentDevice.type === "tablet" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Tablet">
-                        <Tablet className="h-3 w-3" />
+                      <button
+                        onClick={() => setPreviewDevice("ipad-mini")}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-all hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${currentDevice.type === "tablet" ? "bg-card text-primary shadow-sm" : "hover:bg-secondary/60"}`}
+                        title="Tablet"
+                      >
+                        <Tablet className="h-3.5 w-3.5" />
                       </button>
-                      <button onClick={() => setPreviewDevice("desktop")} className={`p-0.5 transition-colors ${previewDevice === "desktop" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} title="Desktop">
-                        <Monitor className="h-3 w-3" />
+                      <button
+                        onClick={() => setPreviewDevice("desktop")}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-all hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${previewDevice === "desktop" ? "bg-card text-primary shadow-sm" : "hover:bg-secondary/60"}`}
+                        title="Desktop"
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
                       </button>
-                    </>
+                    </div>
                   )}
                   {isAppDomain && currentDevice.type !== "desktop" && (
                     <>
-                      <div className="w-px h-3.5 bg-border mx-0.5" />
+                      <div className="w-px h-4 bg-border" />
                       <button
                         onClick={() => setDebugOverlay(!debugOverlay)}
-                        className={`p-0.5 transition-colors ${debugOverlay ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`${iconBtnSm} ${debugOverlay ? "text-primary bg-primary/10" : ""}`}
                         title="Layout Debug Overlay"
                       >
-                        <Grid3X3 className="h-3 w-3" />
+                        <Grid3X3 className="h-3.5 w-3.5" />
                       </button>
                     </>
                   )}
-                  <div className="w-px h-3.5 bg-border mx-0.5" />
-                  <button
-                    onClick={updatePreview}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Refresh Preview"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setPreviewFullscreen(!previewFullscreen)}
-                    className={`p-0.5 transition-colors ${previewFullscreen ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                    title={previewFullscreen ? "Exit Fullscreen" : "Fullscreen Preview"}
-                  >
-                    {previewFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const newWindow = window.open("", "_blank");
-                      if (newWindow && previewContent) {
-                        newWindow.document.open();
-                        newWindow.document.write(previewContent);
-                        newWindow.document.close();
-                      }
-                    }}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                    title="Open in New Tab"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => setShowPreview(false)}
-                    className="p-0.5 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="h-3 w-3" />
+                  {(projectNeedsBackend || liveRuntime.status === "live") && (
+                    <>
+                      <div className="w-px h-4 bg-border" />
+                      <LiveBackendPanel
+                        compact
+                        status={liveRuntime.status}
+                        info={liveRuntime.info}
+                        error={liveRuntime.error}
+                        busy={liveRuntime.busy}
+                        onStart={() => void liveRuntime.provision()}
+                        onRefresh={() => void liveRuntime.refresh()}
+                        onReset={() => void liveRuntime.reset()}
+                        onCredentials={liveRuntime.credentials}
+                      />
+                    </>
+                  )}
+                  <div className="w-px h-4 bg-border" />
+                  {/* Visual edit */}
+                  <div className="flex items-center gap-0.5">
+                    <button
+                      onClick={() => {
+                        const isHtml = !!activeTab && (activeTab.language === "html" || activeTab.name.endsWith(".html"));
+                        if (!isHtml && !visualEditMode) {
+                          toast.error("Open an .html page to use Visual Edit");
+                          return;
+                        }
+                        setVisualEditMode((v) => !v);
+                      }}
+                      className={`${iconBtnSm} ${visualEditMode ? "text-primary bg-primary/15 hover:bg-primary/20" : ""}`}
+                      title="Visual Edit — click text to edit, drag to reorder, drop images"
+                    >
+                      <MousePointerClick className="h-3.5 w-3.5" />
+                    </button>
+                    {visualEditMode && (
+                      <>
+                        <button
+                          onClick={undoVisualEdit}
+                          disabled={!visualUndo.length}
+                          className={`${iconBtnSm} disabled:opacity-30 disabled:hover:bg-transparent`}
+                          title="Undo visual edit (Ctrl+Z)"
+                        >
+                          <Undo2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={redoVisualEdit}
+                          disabled={!visualRedo.length}
+                          className={`${iconBtnSm} disabled:opacity-30 disabled:hover:bg-transparent`}
+                          title="Redo visual edit (Ctrl+Shift+Z)"
+                        >
+                          <Redo2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  {/* Zoom */}
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))} className={iconBtnSm} title="Zoom out">
+                      <ZoomOut className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => setPreviewZoom(100)} className="h-6 min-w-9 px-1 rounded-md text-[9px] font-mono text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors" title="Reset zoom">
+                      {previewZoom}%
+                    </button>
+                    <button onClick={() => setPreviewZoom((z) => Math.min(150, z + 10))} className={iconBtnSm} title="Zoom in">
+                      <ZoomIn className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  {/* Export */}
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={copyPreviewHtml} className={iconBtnSm} title="Copy preview HTML">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={downloadPreviewHtml} className={iconBtnSm} title="Download page as .html">
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  {/* View controls */}
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={hardRefreshPreview} className={`${iconBtnSm} hover:rotate-180`} title="Refresh Preview (hard reload)">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setPreviewFullscreen(!previewFullscreen)}
+                      className={`${iconBtnSm} ${previewFullscreen ? "text-primary bg-primary/10" : ""}`}
+                      title={previewFullscreen ? "Exit Fullscreen" : "Fullscreen Preview"}
+                    >
+                      {previewFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newWindow = window.open("", "_blank");
+                        if (newWindow && previewContent) {
+                          newWindow.document.open();
+                          newWindow.document.write(previewContent);
+                          newWindow.document.close();
+                        }
+                      }}
+                      className={iconBtnSm}
+                      title="Open in New Tab"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="w-px h-4 bg-border" />
+                  <button onClick={() => setShowPreview(false)} className={iconBtnSm} title="Close preview">
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                <div className={`flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
+                {visualEditMode && (
+                  <div className="flex items-center gap-2 px-2 py-1 shrink-0 border-b border-primary/30 bg-primary/10 animate-in fade-in slide-in-from-top-1">
+                    <MousePointerClick className="h-3 w-3 text-primary animate-pulse" />
+                    <span className="text-[9px] text-primary font-medium">
+                      Visual Edit ON — click text to type · drag to reorder · drop an image to swap · Del to remove · Ctrl+Z undo / Ctrl+Shift+Z redo. Code updates live.
+                    </span>
+                  </div>
+                )}
+                <div className={`relative flex-1 flex items-center justify-center overflow-auto min-h-0 ${showSandpackPreview ? "bg-[#1a1a2e] p-0" : isAppDomain && currentDevice.type !== "desktop" ? "bg-[#1a1a2e] p-4" : "bg-[#1a1a2e] p-0"}`}>
                   {showSandpackPreview ? (
                     <SandpackPreviewPanel
                       fileTree={fileTree}
                       projectName={currentProjectName || "app"}
                       showEditor={false}
                       className="w-full h-full"
+                      apiUrl={liveRuntime.apiUrl}
                     />
                   ) : isAppDomain && currentDevice.type === "phone" ? (
                     /* Phone frame */
@@ -2274,10 +3539,11 @@ ${jsCode}
                           </div>
                         </div>
                         <iframe
+                          key={previewKey}
                           ref={iframeRef}
                           srcDoc={previewContent}
                           className="border-0 w-full"
-                          style={{ height: "calc(100% - 48px)" }}
+                          style={{ height: "calc(100% - 48px)", zoom: previewZoom / 100 }}
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
@@ -2285,12 +3551,12 @@ ${jsCode}
                         {debugOverlay && (
                           <div className="absolute inset-0 z-20 pointer-events-none" style={{ top: "48px" }}>
                             {/* Safe area top */}
-                            <div className="absolute top-0 left-0 right-0 h-11 border-b border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-top</span>
+                            <div className="absolute top-0 left-0 right-0 h-11 border-b border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-primary/70">safe-area-top</span>
                             </div>
                             {/* Safe area bottom */}
-                            <div className="absolute bottom-0 left-0 right-0 h-8 border-t border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-bottom</span>
+                            <div className="absolute bottom-0 left-0 right-0 h-8 border-t border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-primary/70">safe-area-bottom</span>
                             </div>
                             {/* Center crosshair */}
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6">
@@ -2300,15 +3566,15 @@ ${jsCode}
                             {/* Grid columns */}
                             <div className="absolute inset-0 flex">
                               {[...Array(4)].map((_, i) => (
-                                <div key={i} className="flex-1 border-r border-dashed border-purple-400/20" />
+                                <div key={i} className="flex-1 border-r border-dashed border-primary/20" />
                               ))}
                             </div>
                             {/* Horizontal thirds */}
                             <div className="absolute left-0 right-0" style={{ top: "33%" }}>
-                              <div className="h-px bg-purple-400/15" />
+                              <div className="h-px bg-primary/15" />
                             </div>
                             <div className="absolute left-0 right-0" style={{ top: "66%" }}>
-                              <div className="h-px bg-purple-400/15" />
+                              <div className="h-px bg-primary/15" />
                             </div>
                             {/* Padding guides */}
                             <div className="absolute top-0 bottom-0 left-4 w-px border-l border-dotted border-yellow-400/30" />
@@ -2333,21 +3599,22 @@ ${jsCode}
                           <div className="flex items-center gap-1"><span>📶</span><span>🔋</span></div>
                         </div>
                         <iframe
+                          key={previewKey}
                           ref={iframeRef}
                           srcDoc={previewContent}
                           className="border-0 w-full"
-                          style={{ height: "calc(100% - 32px)" }}
+                          style={{ height: "calc(100% - 32px)", zoom: previewZoom / 100 }}
                           sandbox="allow-scripts allow-modals allow-forms allow-popups"
                           title="App Preview"
                         />
                         {/* Debug overlay - tablet */}
                         {debugOverlay && (
                           <div className="absolute inset-0 z-20 pointer-events-none" style={{ top: "32px" }}>
-                            <div className="absolute top-0 left-0 right-0 h-6 border-b border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-top</span>
+                            <div className="absolute top-0 left-0 right-0 h-6 border-b border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 top-0.5 text-[7px] font-mono text-primary/70">safe-area-top</span>
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 h-5 border-t border-dashed border-cyan-400/50 bg-cyan-400/5">
-                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-cyan-400/70">safe-area-bottom</span>
+                            <div className="absolute bottom-0 left-0 right-0 h-5 border-t border-dashed border-primary/50 bg-primary/5">
+                              <span className="absolute right-1 bottom-0.5 text-[7px] font-mono text-primary/70">safe-area-bottom</span>
                             </div>
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8">
                               <div className="absolute top-1/2 left-0 right-0 h-px bg-red-400/40" />
@@ -2355,7 +3622,7 @@ ${jsCode}
                             </div>
                             <div className="absolute inset-0 flex">
                               {[...Array(6)].map((_, i) => (
-                                <div key={i} className="flex-1 border-r border-dashed border-purple-400/15" />
+                                <div key={i} className="flex-1 border-r border-dashed border-primary/15" />
                               ))}
                             </div>
                             <div className="absolute top-0 bottom-0 left-5 w-px border-l border-dotted border-yellow-400/25" />
@@ -2371,6 +3638,7 @@ ${jsCode}
                     </div>
                   ) : (
                     <iframe
+                      key={previewKey}
                       ref={iframeRef}
                       srcDoc={previewContent}
                       className="border-0 bg-white transition-all duration-200"
@@ -2378,10 +3646,28 @@ ${jsCode}
                         width: currentDevice.type === "phone" ? `${currentDevice.w}px` : currentDevice.type === "tablet" ? `${currentDevice.w}px` : "100%",
                         height: "100%",
                         maxWidth: "100%",
+                        zoom: previewZoom / 100,
                       }}
                       sandbox="allow-scripts allow-modals allow-forms allow-popups"
                       title="Web Preview"
                     />
+                  )}
+                  {backendNeeded && liveRuntime.status !== "live" && (
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-lg border border-red-500/40 bg-[#1a0d0d]/95 px-3 py-2 shadow-lg backdrop-blur" style={{ maxWidth: "90%" }}>
+                      <span className="text-[11px] text-red-200">
+                        {liveRuntime.status === "locked"
+                          ? "Live backend needs a paid plan."
+                          : liveRuntime.status === "error"
+                          ? liveRuntime.error || "Backend failed to start."
+                          : "Live backend isn't running yet."}
+                      </span>
+                      {liveRuntime.status !== "locked" && (
+                        <button onClick={() => void liveRuntime.provision()} className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-red-500 transition-colors">
+                          {liveRuntime.status === "starting" ? "Starting…" : "Start backend"}
+                        </button>
+                      )}
+                      <button onClick={() => setBackendNeeded(false)} className="text-[10px] text-red-300/70 hover:text-red-200">Dismiss</button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -2576,7 +3862,36 @@ ${jsCode}
                   </button>
                 )}
               </div>
-              <div className="flex gap-1.5">
+              {credits && (
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
+                  style={{
+                    color: credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444",
+                    backgroundColor: (credits.balance > 0 ? currentTheme.uiColors.accent : "#ef4444") + "15",
+                  }}
+                  title={`${credits.planCredits} plan credits + ${credits.topupCredits} top-up credits`}
+                >
+                  {credits.balance} credits
+                  {credits.balance === 0 && (
+                    <a href="/pricing" className="underline ml-1">Top up</a>
+                  )}
+                </div>
+              )}
+              <VoiceAssistant
+                supported={voice.supported}
+                listening={voice.listening}
+                speaking={voice.speaking}
+                transcript={voice.transcript}
+                error={voice.error}
+                voiceEnabled={voice.voiceEnabled}
+                disabled={chatLoading}
+                accent={currentTheme.uiColors.accent}
+                muted={currentTheme.uiColors.muted}
+                onToggleListening={voice.toggleListening}
+                onToggleVoice={() => voice.setVoiceEnabled(!voice.voiceEnabled)}
+                onStopSpeaking={voice.stopSpeaking}
+              />
+              <div className="mt-1 flex gap-1.5">
                 <input
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
@@ -2593,7 +3908,7 @@ ${jsCode}
                 <button
                   className="h-7 px-2 rounded-md text-xs font-medium transition-colors disabled:opacity-50"
                   style={{ backgroundColor: currentTheme.uiColors.accent, color: "#ffffff" }}
-                  onClick={handleChatSend}
+                  onClick={() => handleChatSend()}
                   disabled={chatLoading || !chatInput.trim()}
                 >
                   <Send className="h-3.5 w-3.5" />
@@ -2606,6 +3921,54 @@ ${jsCode}
           </div>
         )}
       </div>
+
+      {/* Automated preview verification — quiet success badge only */}
+      {verify && !verify.running && verify.results.length > 0 && verify.results.every((r) => r.passed) && (
+        <div className="fixed bottom-10 left-4 z-[9997] rounded-lg border border-primary/40 bg-card/95 px-3 py-2 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+          <p className="text-[11px] font-semibold text-primary">✓ Preview verified</p>
+        </div>
+      )}
+
+      {/* Preview runtime error — one-click AI fix */}
+      {previewErrors.length > 0 && (
+        <div className="fixed bottom-10 right-4 z-[9998] w-80 rounded-lg border border-destructive/40 bg-card/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 text-destructive text-sm">⚠</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold text-foreground">
+                {previewErrors.length} error{previewErrors.length > 1 ? "s" : ""} in preview
+                {repairAttemptRef.current > 0 && ` · fix attempt ${repairAttemptRef.current}`}
+              </p>
+              <ul className="mt-1 max-h-24 space-y-1 overflow-y-auto">
+                {previewErrors.map((e, i) => (
+                  <li key={i} className="text-[10px] leading-relaxed text-muted-foreground break-words">• {e.message}</li>
+                ))}
+              </ul>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={handleResolveError}
+                  disabled={resolvingError}
+                  className="h-6 rounded-md bg-primary px-2 text-[10px] font-medium text-primary-foreground transition-transform hover:scale-[1.03] disabled:opacity-60"
+                >
+                  {resolvingError ? "Resolving…" : previewErrors.length > 1 ? "Resolve all errors" : "Resolve error"}
+                </button>
+                <button
+                  onClick={hardRefreshPreview}
+                  className="h-6 rounded-md border border-border px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Retry preview
+                </button>
+                <button
+                  onClick={() => setPreviewErrors([])}
+                  className="h-6 rounded-md px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status bar */}
       <div className="flex items-center justify-between h-6 border-t px-3 shrink-0 select-none" style={{ backgroundColor: currentTheme.uiColors.accent + "18", borderColor: currentTheme.uiColors.border }}>

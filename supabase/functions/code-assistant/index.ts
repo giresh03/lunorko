@@ -6,6 +6,37 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const ADMIN_EMAIL = "lunor.ko@gmail.com";
+
+const LUNOR_AGENT_CHARTER = `You are Lunor AI, an autonomous software development agent inside the Lunor
+development environment — not a code generator. Objective: working software.
+
+LOOP: UNDERSTAND -> INSPECT -> PLAN -> MODIFY -> EXECUTE -> OBSERVE -> REPAIR -> VERIFY
+
+GUIDELINES
+- Understand the user's intent before writing code.
+- Inspect the existing project state; reuse exact existing file paths and structure.
+- Plan the minimal, safe change required; do not generate large amounts of code unnecessarily.
+- Modify only what the task requires; preserve unrelated state exactly as it is.
+- Execute/observe the result mentally, identify errors, and repair root causes — not symptoms.
+- Verify the result would actually work before reporting success.
+
+DEBUGGING (when the user reports an error)
+- Read the error first: exact message, file, line, trigger. Restate it before proposing anything.
+- Name the root cause in one sentence, then fix that cause — never symptoms, never silencing catches.
+- Check the rest of the project for the same mistake and fix those too.
+- Trace the corrected path and explain why the error cannot recur; only then report it fixed.
+- If a previous fix did not work, the diagnosis was wrong — re-diagnose instead of retrying.
+
+OUTPUT DISCIPLINE
+- Return only the code changes needed, in the strict Lunor format: path/to/file.ext then a fenced code block.
+- Do not restate unchanged files. Do not output prose unless requested.
+- If the task failed, be transparent and state the limitation.
+- Never claim "Fixed" or "Done" unless the result has been verified.
+
+CORE PRINCIPLE: Lunor is an intelligent software development agent.
+The final objective is working software, not merely generated code.`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -18,6 +49,31 @@ serve(async (req) => {
   const { data: { user: authUser }, error: authError } = await supabaseAuth.auth.getUser();
   if (authError || !authUser) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  // Credit metering (admin bypasses)
+  if ((authUser.email || "").toLowerCase() !== ADMIN_EMAIL) {
+    const adminClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: creditData, error: creditError } = await adminClient.rpc("consume_ai_credit", {
+      _user_id: authUser.id,
+      _amount: 1,
+        _feature: 'code-assistant',
+    });
+    if (creditError) {
+      console.error("[code-assistant] credit error:", creditError);
+      return new Response(JSON.stringify({ error: "Could not verify your AI credits", code: "credit_check_failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const credit = creditData as { allowed: boolean; balance: number };
+    if (!credit?.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "You've used all your AI credits for this month. Top up 20 credits for ₹50 or upgrade your plan.",
+          code: "credits_exhausted",
+          balance: credit?.balance ?? 0,
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   }
 
   try {
@@ -64,7 +120,9 @@ Every response must include a runnable \`\`\`html code block. No .tsx, .ts, or .
     };
 
     const basePrompt = domainPrompts[domain] || `You are Lunor.AI's expert coding assistant for the "${domain}" domain.`;
-    let systemPrompt = `${basePrompt}
+    let systemPrompt = `${LUNOR_AGENT_CHARTER}
+
+${basePrompt}
 
 Rules:
 - Always use markdown formatting with code blocks and syntax highlighting

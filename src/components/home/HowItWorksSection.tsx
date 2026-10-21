@@ -5,7 +5,7 @@ const steps = [
   {
     icon: Search,
     title: "Choose Your Domain",
-    desc: "Pick from 12+ engineering domains — Web Dev, AI/ML, Cybersecurity, Cloud, and more.",
+    desc: "Pick from 4 domains — Web Development, App Development, DSA & Competitive Programming, and UI/UX Design.",
   },
   {
     icon: Route,

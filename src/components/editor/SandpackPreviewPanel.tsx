@@ -73,6 +73,8 @@ interface SandpackPreviewPanelProps {
    * `sandpack` = remote bundler (can TIME_OUT if codesandbox.io is blocked).
    */
   previewEngine?: "local" | "sandpack";
+  /** Hosted Lunor runtime API URL — when set, /api calls are routed there live. */
+  apiUrl?: string | null;
 }
 
 export default function SandpackPreviewPanel({
@@ -81,10 +83,11 @@ export default function SandpackPreviewPanel({
   showEditor = false,
   className = "",
   previewEngine = "local",
+  apiUrl = null,
 }: SandpackPreviewPanelProps) {
   const files = useMemo(
-    () => buildSandpackFiles(fileTree, projectName),
-    [fileTree, projectName]
+    () => buildSandpackFiles(fileTree, projectName, apiUrl),
+    [fileTree, projectName, apiUrl]
   );
 
   const srcDoc = useMemo(() => buildWebDevLivePreviewHtml(files), [files]);

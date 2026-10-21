@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { getPurchasePrice, matchesCapturedPayment } from "../_shared/subscriptionPricing.ts";
 
 async function verifySignature(orderId: string, paymentId: string, signature: string, secret: string): Promise<boolean> {
   const message = `${orderId}|${paymentId}`;
@@ -43,9 +40,15 @@ serve(async (req) => {
     }
     const userId = authUser.id;
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: "Invalid request body" }), { status: 400, headers: corsHeaders });
+    }
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    if (typeof razorpay_order_id !== "string" || !/^order_[A-Za-z0-9]{1,64}$/.test(razorpay_order_id) ||
+        typeof razorpay_payment_id !== "string" || !/^pay_[A-Za-z0-9]{1,64}$/.test(razorpay_payment_id) ||
+        typeof razorpay_signature !== "string" || !/^[a-f0-9]{64}$/.test(razorpay_signature)) {
       return new Response(JSON.stringify({ error: "Missing razorpay_order_id, razorpay_payment_id, or razorpay_signature" }), { status: 400, headers: corsHeaders });
     }
 
@@ -78,6 +81,23 @@ serve(async (req) => {
     const domain_id = notes.domain_id;
     const project_id = notes.project_id;
     const amount = order.amount; // in paise, from Razorpay
+    let pricing: { amount: number; couponCode: string } | undefined;
+    if (purchaseType !== "hackathon_project") {
+      try { pricing = getPurchasePrice(plan_id, notes.coupon_code); } catch {
+        return new Response(JSON.stringify({ error: "Invalid order pricing" }), { status: 400, headers: corsHeaders });
+      }
+      if (amount !== pricing.amount || order.currency !== "INR") {
+        return new Response(JSON.stringify({ error: "Order amount does not match plan price" }), { status: 400, headers: corsHeaders });
+      }
+    } else if (order.currency !== "INR") {
+      return new Response(JSON.stringify({ error: "Invalid order currency" }), { status: 400, headers: corsHeaders });
+    }
+    const paymentRes = await fetch(`https://api.razorpay.com/v1/payments/${razorpay_payment_id}`, {
+      headers: { Authorization: "Basic " + btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`) },
+    });
+    if (!paymentRes.ok || !matchesCapturedPayment(order, await paymentRes.json())) {
+      return new Response(JSON.stringify({ error: "Payment is not captured or does not match the order" }), { status: 400, headers: corsHeaders });
+    }
 
     if (notes.user_id !== userId) {
       return new Response(JSON.stringify({ error: "Order does not belong to this user" }), { status: 403, headers: corsHeaders });
@@ -89,9 +109,33 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const { data: recordedOrder, error: recordedError } = await adminClient.from("payment_orders")
+      .select("user_id, plan_id, amount_cents, currency, coupon_code, status")
+      .eq("razorpay_order_id", razorpay_order_id).maybeSingle();
+    if (recordedError || !recordedOrder || recordedOrder.user_id !== userId || recordedOrder.plan_id !== (purchaseType === "hackathon_project" ? "hackathon_project" : plan_id) ||
+        recordedOrder.amount_cents !== amount || recordedOrder.currency !== "INR" ||
+        (recordedOrder.coupon_code || "") !== (pricing?.couponCode ?? "")) {
+      return new Response(JSON.stringify({ error: "Payment order record does not match" }), { status: 400, headers: corsHeaders });
+    }
+    if (recordedOrder.status === "paid") {
+      return new Response(
+        JSON.stringify(purchaseType === "hackathon_project" ? { success: true, purchase_type: "hackathon_project", project_id } : { success: true, plan_id, domain_id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (purchaseType === "hackathon_project") {
       if (!project_id) {
         return new Response(JSON.stringify({ error: "Order missing project_id" }), { status: 400, headers: corsHeaders });
+      }
+
+      const { data: projectRow, error: projectErr } = await adminClient
+        .from("hackathon_projects")
+        .select("price")
+        .eq("id", project_id)
+        .maybeSingle();
+      if (projectErr || !projectRow || projectRow.price !== amount) {
+        return new Response(JSON.stringify({ error: "Order amount does not match project price" }), { status: 400, headers: corsHeaders });
       }
 
       const { data: existing } = await adminClient
@@ -119,36 +163,65 @@ serve(async (req) => {
         }
       }
 
+      await adminClient
+        .from("payment_orders")
+        .update({ status: "paid", paid_at: new Date().toISOString(), razorpay_payment_id })
+        .eq("razorpay_order_id", razorpay_order_id);
+
       return new Response(JSON.stringify({ success: true, purchase_type: "hackathon_project", project_id }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (!plan_id || !domain_id) {
-      return new Response(JSON.stringify({ error: "Order missing plan or domain" }), { status: 400, headers: corsHeaders });
+    // Credit top-up purchase: add credits, no subscription row
+    if (plan_id === "topup") {
+      const TOPUP_CREDITS = 200;
+      if (amount !== 5000) {
+        return new Response(JSON.stringify({ error: "Invalid top-up amount" }), { status: 400, headers: corsHeaders });
+      }
+      const { error: topupError } = await adminClient.rpc("add_topup_credits", {
+        _user_id: userId,
+        _credits: TOPUP_CREDITS,
+      });
+      if (topupError) {
+        console.error("Top-up error:", topupError);
+        return new Response(JSON.stringify({ error: "Failed to add credits" }), { status: 500, headers: corsHeaders });
+      }
+      await adminClient
+        .from("payment_orders")
+        .update({ status: "paid", paid_at: new Date().toISOString(), razorpay_payment_id })
+        .eq("razorpay_order_id", razorpay_order_id);
+      await adminClient.from("analytics_events").insert({
+        user_id: userId,
+        event: "payment_paid",
+        properties: { plan_id, amount, kind: "topup" },
+      });
+      return new Response(JSON.stringify({ success: true, plan_id, credits_added: TOPUP_CREDITS }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + 1);
-
-    const { error: insertError } = await adminClient.from("subscriptions").insert({
-      user_id: userId,
-      plan_id,
-      status: "active",
-      razorpay_payment_id,
-      razorpay_order_id,
-      razorpay_signature,
-      amount,
-      domain_id,
-      expires_at: expiresAt.toISOString(),
+    // Activate the plan atomically: mark order paid, create/extend subscription, grant credits
+    const { data: activation, error: activateError } = await adminClient.rpc("activate_subscription", {
+      _user_id: userId,
+      _plan_id: plan_id,
+      _order_id: razorpay_order_id,
+      _payment_id: razorpay_payment_id,
+      _domain_id: domain_id,
     });
 
-    if (insertError) {
-      console.error("Subscription insert error:", insertError);
-      return new Response(JSON.stringify({ error: "Failed to save subscription" }), { status: 500, headers: corsHeaders });
+    if (activateError) {
+      console.error("Activation error:", activateError);
+      return new Response(JSON.stringify({ error: "Failed to activate subscription" }), { status: 500, headers: corsHeaders });
     }
 
-    return new Response(JSON.stringify({ success: true, purchase_type: "subscription", plan_id, domain_id }), {
+    await adminClient.from("analytics_events").insert({
+      user_id: userId,
+      event: "payment_paid",
+      properties: { plan_id, domain_id, amount, kind: "subscription" },
+    });
+
+    return new Response(JSON.stringify({ success: true, plan_id, domain_id, activation }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

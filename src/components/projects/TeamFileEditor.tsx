@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FilePlus, FileCode, Save, Trash2, Loader2 } from "lucide-react";
+import { FilePlus, FileCode, Save, Trash2, Loader2, History, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,14 @@ interface TeamFile {
   updated_at: string;
 }
 
+interface FileVersion {
+  id: string;
+  file_id: string;
+  content: string;
+  saved_by: string;
+  created_at: string;
+}
+
 interface TeamFileEditorProps {
   projectId: string;
   profiles: Record<string, string>;
@@ -36,8 +44,35 @@ const TeamFileEditor = ({ projectId, profiles }: TeamFileEditorProps) => {
   const [showNewFile, setShowNewFile] = useState(false);
   const [newFileName, setNewFileName] = useState("");
   const [newFileLang, setNewFileLang] = useState("javascript");
+  const [showHistory, setShowHistory] = useState(false);
+  const [versions, setVersions] = useState<FileVersion[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState<FileVersion | null>(null);
 
   const activeFile = files.find((f) => f.id === activeFileId);
+
+  const fetchVersions = async (fileId: string) => {
+    setLoadingVersions(true);
+    const { data } = await supabase
+      .from("team_file_versions")
+      .select("id, file_id, content, saved_by, created_at")
+      .eq("file_id", fileId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setVersions((data as FileVersion[]) || []);
+    setLoadingVersions(false);
+  };
+
+  useEffect(() => {
+    setPreviewVersion(null);
+    if (showHistory && activeFileId) fetchVersions(activeFileId);
+  }, [showHistory, activeFileId]);
+
+  const restoreVersion = (v: FileVersion) => {
+    setContent(v.content);
+    setPreviewVersion(null);
+    toast.info("Version loaded into editor — click Save to keep it");
+  };
 
   const fetchFiles = async () => {
     const { data } = await supabase
@@ -102,8 +137,20 @@ const TeamFileEditor = ({ projectId, profiles }: TeamFileEditorProps) => {
       .from("team_files")
       .update({ content, last_edited_by: user.id })
       .eq("id", activeFileId);
-    if (error) toast.error("Failed to save");
-    else toast.success("Saved!");
+    if (error) {
+      toast.error("Failed to save");
+    } else {
+      toast.success("Saved!");
+      // Keep a version of every save so the team can look back and restore.
+      const { error: vErr } = await supabase.from("team_file_versions").insert({
+        file_id: activeFileId,
+        project_id: projectId,
+        content,
+        saved_by: user.id,
+      });
+      if (vErr) console.warn("[team-files] version not recorded", vErr.message);
+      else if (showHistory) fetchVersions(activeFileId);
+    }
     setSaving(false);
   };
 
@@ -190,20 +237,92 @@ const TeamFileEditor = ({ projectId, profiles }: TeamFileEditorProps) => {
                   </span>
                 )}
               </div>
-              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={saveFile} disabled={saving}>
-                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                Save
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant={showHistory ? "secondary" : "ghost"}
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => setShowHistory((s) => !s)}
+                  title="Show earlier saved versions of this file"
+                >
+                  <History className="h-3 w-3" />
+                  History
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={saveFile} disabled={saving}>
+                  {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                  Save
+                </Button>
+              </div>
             </div>
-            <div className="flex-1">
-              <Editor
-                height="100%"
-                language={activeFile.language}
-                value={content}
-                onChange={(v) => setContent(v || "")}
-                theme="vs-dark"
-                options={{ fontSize: 13, minimap: { enabled: false }, wordWrap: "on", padding: { top: 8 } }}
-              />
+            <div className="flex-1 flex min-h-0">
+              <div className="flex-1 min-w-0">
+                <Editor
+                  height="100%"
+                  language={activeFile.language}
+                  value={previewVersion ? previewVersion.content : content}
+                  onChange={(v) => { if (!previewVersion) setContent(v || ""); }}
+                  theme="vs-dark"
+                  options={{
+                    fontSize: 13, minimap: { enabled: false }, wordWrap: "on", padding: { top: 8 },
+                    readOnly: !!previewVersion,
+                  }}
+                />
+              </div>
+
+              {showHistory && (
+                <div className="w-56 border-l border-border bg-muted/30 flex flex-col">
+                  <div className="flex items-center justify-between px-2 py-1.5 border-b border-border">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {versions.length} version{versions.length === 1 ? "" : "s"}
+                    </span>
+                    <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => setShowHistory(false)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  {previewVersion && (
+                    <div className="px-2 py-1.5 border-b border-border bg-primary/10 space-y-1">
+                      <p className="text-[10px] text-foreground">Previewing version from {new Date(previewVersion.created_at).toLocaleString()}</p>
+                      <div className="flex gap-1">
+                        <Button size="sm" className="h-6 flex-1 gap-1 text-[10px]" onClick={() => restoreVersion(previewVersion)}>
+                          <RotateCcw className="h-3 w-3" /> Restore
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setPreviewVersion(null)}>
+                          Back
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex-1 overflow-y-auto">
+                    {loadingVersions ? (
+                      <div className="p-3 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                    ) : versions.length === 0 ? (
+                      <p className="p-3 text-[10px] text-muted-foreground text-center">
+                        No saved versions yet. Every Save adds one here.
+                      </p>
+                    ) : (
+                      versions.map((v, i) => (
+                        <button
+                          key={v.id}
+                          onClick={() => setPreviewVersion(previewVersion?.id === v.id ? null : v)}
+                          className={`w-full text-left px-2 py-1.5 border-b border-border/50 hover:bg-muted/60 ${previewVersion?.id === v.id ? "bg-primary/10" : ""}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-medium text-foreground">
+                              {i === 0 ? "Latest" : `v${versions.length - i}`}
+                            </span>
+                            <span className="text-[9px] text-muted-foreground">
+                              {new Date(v.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          <p className="text-[9px] text-muted-foreground truncate">
+                            by {profiles[v.saved_by] || "Unknown"} · {Math.max(1, Math.round(v.content.length / 1024))}kb
+                          </p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (

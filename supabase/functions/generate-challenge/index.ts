@@ -40,10 +40,12 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existing) {
-      return new Response(JSON.stringify(existing), {
+      const { solution_code: _s, ...safeExisting } = existing as Record<string, unknown>;
+      return new Response(JSON.stringify(safeExisting), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const domainNames: Record<string, string> = {
       "web-development": "Web Development (HTML, CSS, JS, React, Node.js)",
@@ -144,9 +146,11 @@ Do NOT wrap in markdown code blocks. Return raw JSON only.`,
 
     if (error) throw error;
 
-    return new Response(JSON.stringify(inserted), {
+    const { solution_code: _sc, ...safeInserted } = (inserted || {}) as Record<string, unknown>;
+    return new Response(JSON.stringify(safeInserted), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (e) {
     console.error("generate-challenge error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
