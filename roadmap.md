@@ -5,6 +5,6 @@
 - [x] Run 16 pricing/payment tests and verify coupon apply/remove plus real authenticated ₹59 order creation. No payment charged; completed payment activation not exercised.
 
 # Germany program
-- [ ] Add Lunorsoft × Parul University Germany program at ₹3,35,000.
-- [ ] Add verified Razorpay orders and private purchase records without changing subscriptions.
-- [ ] Deploy payment functions, run price tests, and check signed-in checkout without a charge.
+- [x] Add Lunorsoft × Parul University Germany program at ₹3,35,000.
+- [x] Add verified Razorpay orders and private purchase records without changing subscriptions.
+- [x] Deploy payment functions, pass 20 pricing/payment tests, and verify desktop/mobile plus real signed-in ₹3,35,000 Razorpay checkout. No charge submitted; completed live payment not exercised.
