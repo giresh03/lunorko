@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { GERMANY_PROGRAM_AMOUNT, GERMANY_PROGRAM_ID } from "../../supabase/functions/_shared/subscriptionPricing";
+import { germanyProgram } from "@/content/germanyProgram";
 
 type PaymentResponse = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string };
 type Checkout = { open: () => void; on: (event: string, handler: () => void) => void };
@@ -28,7 +29,7 @@ async function loadCheckout(): Promise<RazorpayConstructor> {
   return checkout;
 }
 
-export default function GermanyProgram() {
+export default function GermanyProgram({ checkoutSection = false }: { checkoutSection?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -99,11 +100,11 @@ export default function GermanyProgram() {
   };
 
   return (
-    <section id="germany-program" className="border-y border-border bg-secondary/20">
+    <section id={checkoutSection ? "program-purchase" : "germany-program"} className="scroll-mt-24 border-y border-border bg-secondary/20">
       <div className="container mx-auto grid gap-8 px-4 py-12 lg:grid-cols-[1fr_auto] lg:items-center lg:px-6">
         <div className="max-w-2xl">
           <span className="flex items-center gap-2 text-xs font-semibold uppercase text-primary"><Globe2 className="h-4 w-4" /> International program · Germany</span>
-          <h2 className="mt-4 font-serif text-3xl text-foreground sm:text-4xl">Germany Program</h2>
+          <h2 className="mt-4 font-serif text-3xl text-foreground sm:text-4xl">{checkoutSection ? "Ready to purchase?" : "Germany Program"}</h2>
           <p className="mt-3 text-lg font-medium text-foreground">Lunorsoft × Parul University</p>
           <p className="mt-3 text-muted-foreground">Explore the Germany program offered by Lunorsoft in collaboration with Parul University.</p>
           <p className="mt-4 text-sm text-muted-foreground">Confirm dates, eligibility, fee inclusions and refund terms with the Lunorsoft team before purchasing. Payment alone does not guarantee a visa or admission.</p>
@@ -111,9 +112,14 @@ export default function GermanyProgram() {
         <div className="min-w-0 lg:w-80 lg:border-l lg:border-border lg:pl-8">
           <p className="text-sm text-muted-foreground">Program fee · One-time payment</p>
           <p className="mt-2 text-4xl font-semibold text-foreground">₹3,35,000</p>
-          <Button className="mt-5 w-full gap-2" size="lg" onClick={() => setOpen(true)}>
-            {purchased ? "View purchase" : "Buy program"}<ArrowUpRight className="h-4 w-4" />
-          </Button>
+          <p className="mt-3 text-sm font-medium text-foreground">Last payment date: <time dateTime={germanyProgram.paymentDeadline}>{germanyProgram.paymentDeadlineLabel}</time></p>
+          {checkoutSection ? (
+            <Button className="mt-5 w-full gap-2" size="lg" onClick={() => setOpen(true)}>
+              {purchased ? "View purchase" : "Buy program"}<ArrowUpRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button asChild className="mt-5 w-full gap-2" size="lg"><Link to={germanyProgram.basePath}>Explore program<ArrowUpRight className="h-4 w-4" /></Link></Button>
+          )}
           <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4" /> Secure payment through Razorpay</p>
         </div>
       </div>
@@ -124,6 +130,7 @@ export default function GermanyProgram() {
             <DialogDescription>Lunorsoft in collaboration with Parul University</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-between border-y border-border py-5"><span className="text-muted-foreground">One-time program fee</span><strong className="text-2xl text-foreground">₹3,35,000</strong></div>
+          <p className="text-sm text-muted-foreground">Last payment date: <time dateTime={germanyProgram.paymentDeadline}>{germanyProgram.paymentDeadlineLabel}</time></p>
           {purchased ? (
             <div className="space-y-4">
               <p className="flex items-center gap-2 font-medium text-primary"><CheckCircle2 className="h-5 w-5" /> Payment confirmed</p>

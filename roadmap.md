@@ -8,3 +8,7 @@
 - [x] Add Lunorsoft × Parul University Germany program at ₹3,35,000.
 - [x] Add verified Razorpay orders and private purchase records without changing subscriptions.
 - [x] Deploy payment functions, pass 20 pricing/payment tests, and verify desktop/mobile plus real signed-in ₹3,35,000 Razorpay checkout. No charge submitted; completed live payment not exercised.
+- [x] Add public overview, syllabus, curriculum, schedule and testimonials pages with purchase after details.
+- [x] Show the supplied 20 November 2026 payment deadline; deadline and 20 existing pricing/payment tests pass.
+- [x] Verify all page navigation, mobile layout, signed-out purchase entry and signed-in live Razorpay checkout opening; no payment submitted.
+- [ ] Publish official syllabus, curriculum, teaching dates, fee inclusions, refund terms and verified testimonials — awaiting documents from the program team.

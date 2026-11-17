@@ -33,6 +33,7 @@ import GitHubCallback from "./pages/GitHubCallback";
 import Assistant from "./pages/Assistant";
 import Studio from "./pages/Studio";
 import Internships from "./pages/Internships";
+import GermanyProgramDetails from "./pages/GermanyProgramDetails";
 import DownloadPage from "./pages/Download";
 import NotFound from "./pages/NotFound";
 import PopAd from "./components/PopAd";
@@ -104,6 +105,7 @@ const AppContent = () => {
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/assistant/:threadId" element={<Assistant />} />
         <Route path="/studio" element={<Studio />} />
+        <Route path="/internships/germany/:section?" element={<GermanyProgramDetails />} />
         <Route
           path="/internships"
           element={
