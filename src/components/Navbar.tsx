@@ -46,7 +46,7 @@ const menuGroups: MenuGroup[] = [
       { to: "/ai-interview", label: "AI Interview", desc: "Mock technical interviews", icon: Video },
       { to: "/skill-radar", label: "Skill Radar", desc: "0–100 skill scoring", icon: Radar },
       { to: "/resume-builder", label: "Resume Builder", desc: "ATS-optimized resumes", icon: FileText },
-      { to: "/internships", label: "Internships", desc: "Apply & earn certificates", icon: Briefcase },
+      { to: "/internships", label: "Programs", desc: "Apply & earn certificates", icon: Briefcase },
     ],
   },
 ];
