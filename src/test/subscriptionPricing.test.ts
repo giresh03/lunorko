@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { getPurchasePrice, matchesCapturedPayment } from "../../supabase/functions/_shared/subscriptionPricing";
+import { getPurchasePrice, getProgramPrice, matchesCapturedPayment } from "../../supabase/functions/_shared/subscriptionPricing";
+
+describe("Germany program pricing", () => {
+  it("charges exactly ₹3,35,000 in paise", () => expect(getProgramPrice("germany-parul").amount).toBe(33500000));
+  it("does not apply subscription coupons", () => expect(() => getProgramPrice("germany-parul", "DUSHERA2026")).toThrow("subscriptions only"));
+  it("rejects unknown programs", () => expect(() => getProgramPrice("unknown")).toThrow("Invalid program_id"));
+  it("rejects a captured underpayment for the program", () => expect(matchesCapturedPayment(
+    { id: "order_program", amount: 33500000, currency: "INR" },
+    { order_id: "order_program", amount: 3350000, currency: "INR", status: "captured", captured: true },
+  )).toBe(false));
+});
 
 describe("subscription prices in paise", () => {
   it("keeps Pro at ₹150 without a coupon", () => expect(getPurchasePrice("pro").amount).toBe(15000));

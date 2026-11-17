@@ -1254,6 +1254,42 @@ export type Database = {
         }
         Relationships: []
       }
+      internship_program_purchases: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          program_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          program_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          program_id?: string
+          razorpay_order_id?: string
+          razorpay_payment_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       internship_submissions: {
         Row: {
           admin_notes: string | null
@@ -1482,6 +1518,7 @@ export type Database = {
           kind: string
           paid_at: string | null
           plan_id: string
+          program_id: string | null
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
           status: string
@@ -1496,6 +1533,7 @@ export type Database = {
           kind?: string
           paid_at?: string | null
           plan_id: string
+          program_id?: string | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           status?: string
@@ -1510,6 +1548,7 @@ export type Database = {
           kind?: string
           paid_at?: string | null
           plan_id?: string
+          program_id?: string | null
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
           status?: string

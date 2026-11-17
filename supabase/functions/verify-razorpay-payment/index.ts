@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { getPurchasePrice, matchesCapturedPayment } from "../_shared/subscriptionPricing.ts";
+import { getPurchasePrice, getProgramPrice, matchesCapturedPayment } from "../_shared/subscriptionPricing.ts";
 
 async function verifySignature(orderId: string, paymentId: string, signature: string, secret: string): Promise<boolean> {
   const message = `${orderId}|${paymentId}`;
@@ -77,13 +77,17 @@ serve(async (req) => {
     const order = await orderRes.json();
     const notes = order.notes || {};
     const purchaseType = notes.purchase_type || "subscription";
+    if (!["subscription", "hackathon_project", "internship_program"].includes(purchaseType)) {
+      return new Response(JSON.stringify({ error: "Invalid purchase type" }), { status: 400, headers: corsHeaders });
+    }
+    const program_id = notes.program_id;
     const plan_id = notes.plan_id;
     const domain_id = notes.domain_id;
     const project_id = notes.project_id;
     const amount = order.amount; // in paise, from Razorpay
     let pricing: { amount: number; couponCode: string } | undefined;
     if (purchaseType !== "hackathon_project") {
-      try { pricing = getPurchasePrice(plan_id, notes.coupon_code); } catch {
+      try { pricing = purchaseType === "internship_program" ? getProgramPrice(program_id, notes.coupon_code) : getPurchasePrice(plan_id, notes.coupon_code); } catch {
         return new Response(JSON.stringify({ error: "Invalid order pricing" }), { status: 400, headers: corsHeaders });
       }
       if (amount !== pricing.amount || order.currency !== "INR") {
@@ -110,12 +114,35 @@ serve(async (req) => {
     );
 
     const { data: recordedOrder, error: recordedError } = await adminClient.from("payment_orders")
-      .select("user_id, plan_id, amount_cents, currency, coupon_code, status")
+      .select("user_id, plan_id, amount_cents, currency, coupon_code, status, program_id, kind")
       .eq("razorpay_order_id", razorpay_order_id).maybeSingle();
-    if (recordedError || !recordedOrder || recordedOrder.user_id !== userId || recordedOrder.plan_id !== (purchaseType === "hackathon_project" ? "hackathon_project" : plan_id) ||
+    if (recordedError || !recordedOrder || recordedOrder.user_id !== userId || recordedOrder.plan_id !== (purchaseType === "subscription" ? plan_id : purchaseType) ||
         recordedOrder.amount_cents !== amount || recordedOrder.currency !== "INR" ||
         (recordedOrder.coupon_code || "") !== (pricing?.couponCode ?? "")) {
       return new Response(JSON.stringify({ error: "Payment order record does not match" }), { status: 400, headers: corsHeaders });
+    }
+    if (purchaseType === "internship_program") {
+      if (recordedOrder.program_id !== program_id || recordedOrder.kind !== "internship_program") {
+        return new Response(JSON.stringify({ error: "Program order record does not match" }), { status: 400, headers: corsHeaders });
+      }
+      const { error: purchaseError } = await adminClient.from("internship_program_purchases").upsert({
+        user_id: userId, program_id, amount, currency: "INR", status: "paid",
+        razorpay_order_id, razorpay_payment_id,
+      }, { onConflict: "razorpay_order_id", ignoreDuplicates: true });
+      if (purchaseError) {
+        return new Response(JSON.stringify({ error: "Unable to save program purchase; retry verification with the same payment" }), { status: 500, headers: corsHeaders });
+      }
+      const { data: purchase, error: readError } = await adminClient.from("internship_program_purchases")
+        .select("id, user_id, program_id, amount, razorpay_payment_id").eq("razorpay_order_id", razorpay_order_id).single();
+      if (readError || !purchase || purchase.user_id !== userId || purchase.program_id !== program_id || purchase.amount !== amount || purchase.razorpay_payment_id !== razorpay_payment_id) {
+        return new Response(JSON.stringify({ error: "Program purchase record does not match" }), { status: 400, headers: corsHeaders });
+      }
+      const { error: updateError } = await adminClient.from("payment_orders")
+        .update({ status: "paid", paid_at: new Date().toISOString(), razorpay_payment_id }).eq("razorpay_order_id", razorpay_order_id);
+      if (updateError) return new Response(JSON.stringify({ error: "Unable to finalize program payment; retry verification" }), { status: 500, headers: corsHeaders });
+      return new Response(JSON.stringify({ success: true, purchase_type: purchaseType, program_id, purchase_id: purchase.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
     if (recordedOrder.status === "paid") {
       return new Response(

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import GermanyProgram from "@/components/GermanyProgram";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -246,6 +247,8 @@ const Internships = () => {
             </div>
           </div>
         </section>
+
+        <GermanyProgram />
 
         {/* Benefits */}
         <section className="container mx-auto px-4 lg:px-6 pb-6">

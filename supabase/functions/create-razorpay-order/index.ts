@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
-import { getPurchasePrice } from "../_shared/subscriptionPricing.ts";
+import { getPurchasePrice, getProgramPrice } from "../_shared/subscriptionPricing.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -30,13 +30,23 @@ serve(async (req) => {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), { status: 400, headers: corsHeaders });
     }
-    const { plan_id, domain_id, coupon_code, project_id } = body;
-    const purchase_type: "subscription" | "hackathon_project" =
-      body.purchase_type === "hackathon_project" ? "hackathon_project" : "subscription";
+    const { plan_id, domain_id, coupon_code, project_id, program_id } = body;
+    const purchase_type = body.purchase_type ?? "subscription";
+    if (!["subscription", "hackathon_project", "internship_program"].includes(purchase_type)) {
+      return new Response(JSON.stringify({ error: "Invalid purchase_type" }), { status: 400, headers: corsHeaders });
+    }
 
     // Subscription prices are computed server-side; the client-sent amount is never trusted.
     let pricing: { amount: number; couponCode: string } = { amount: 0, couponCode: "" };
-    if (purchase_type === "subscription") {
+    if (purchase_type === "internship_program") {
+      try { pricing = getProgramPrice(program_id, coupon_code); } catch (error) {
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid program" }), { status: 400, headers: corsHeaders });
+      }
+      const { data: purchases, error: purchaseError } = await supabase.from("internship_program_purchases")
+        .select("id").eq("user_id", userId).eq("program_id", program_id).limit(1);
+      if (purchaseError) return new Response(JSON.stringify({ error: "Unable to check program purchase" }), { status: 500, headers: corsHeaders });
+      if (purchases?.length) return new Response(JSON.stringify({ error: "You have already purchased this program" }), { status: 409, headers: corsHeaders });
+    } else if (purchase_type === "subscription") {
       try { pricing = getPurchasePrice(plan_id, coupon_code); } catch (error) {
         return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Invalid purchase" }), { status: 400, headers: corsHeaders });
       }
@@ -88,6 +98,8 @@ serve(async (req) => {
         project_title: project.title || "Hackathon Project",
         user_id: userId,
       };
+    } else if (purchase_type === "internship_program") {
+      notes = { purchase_type, program_id, user_id: userId };
     } else {
       notes = {
         purchase_type: "subscription",
@@ -128,13 +140,14 @@ serve(async (req) => {
       );
       const { error: recordError } = await adminClient.from("payment_orders").insert({
         user_id: userId,
-        plan_id: purchase_type === "hackathon_project" ? "hackathon_project" : plan_id,
+        plan_id: purchase_type === "subscription" ? plan_id : purchase_type,
         amount_cents: order.amount,
         currency: order.currency ?? "INR",
         razorpay_order_id: order.id,
         status: "created",
-        kind: purchase_type === "hackathon_project" ? "hackathon_project" : plan_id === "topup" ? "topup" : "subscription",
+        kind: purchase_type === "subscription" ? (plan_id === "topup" ? "topup" : "subscription") : purchase_type,
         coupon_code: couponCode || null,
+        program_id: purchase_type === "internship_program" ? program_id : null,
       });
       if (recordError) throw recordError;
     } catch (recordErr) {

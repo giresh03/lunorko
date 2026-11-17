@@ -2,6 +2,14 @@ export const FESTIVAL_COUPON = "DUSHERA2026";
 export const REGULAR_PRICES = { pro: 15000, premium: 25000, professional: 50000, topup: 5000 } as const;
 export const FESTIVAL_PRICES = { pro: 5900, premium: 9900, professional: 16900 } as const;
 export type PurchasePlan = keyof typeof REGULAR_PRICES;
+export const GERMANY_PROGRAM_ID = "germany-parul";
+export const GERMANY_PROGRAM_AMOUNT = 33500000;
+
+export function getProgramPrice(program: unknown, coupon?: unknown): { amount: number; couponCode: string } {
+  if (program !== GERMANY_PROGRAM_ID) throw new Error("Invalid program_id");
+  if (normalizeCoupon(coupon)) throw new Error("Coupon applies to subscriptions only");
+  return { amount: GERMANY_PROGRAM_AMOUNT, couponCode: "" };
+}
 
 export function normalizeCoupon(value: unknown): string {
   if (value === undefined || value === null) return "";
