@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, CheckCircle2, CreditCard, Globe2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { GERMANY_PROGRAM_AMOUNT, GERMANY_PROGRAM_ID } from "../../supabase/funct
 import { germanyProgram } from "@/content/germanyProgram";
 
 type PaymentResponse = { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string };
-type Checkout = { open: () => void; on: (event: string, handler: () => void) => void };
+type Checkout = { open: () => void; close: () => void; on: (event: string, handler: () => void) => void };
 type RazorpayConstructor = new (options: Record<string, unknown>) => Checkout;
 
 async function loadCheckout(): Promise<RazorpayConstructor> {
@@ -66,7 +67,7 @@ export default function GermanyProgram({ checkoutSection = false }: { checkoutSe
       toast({ title: "Program payment confirmed", description: "Your Germany program purchase has been saved." });
     } catch (error) {
       toast({ title: "Payment verification pending", description: error instanceof Error ? error.message : "Retry verification; do not pay again.", variant: "destructive" });
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setOpen(true); }
   };
 
   const buy = async () => {
@@ -86,15 +87,20 @@ export default function GermanyProgram({ checkoutSection = false }: { checkoutSe
         name: "Lunorsoft", description: "Germany Program · Parul University collaboration",
         prefill: { email: user.email ?? "" },
         handler: (response: PaymentResponse) => { void verifyPayment(response); },
-        modal: { ondismiss: () => setBusy(false) },
+        modal: { ondismiss: () => { setBusy(false); setOpen(true); } },
       });
       checkout.on("payment.failed", () => {
+        checkout.close();
         setBusy(false);
+        setOpen(true);
         toast({ title: "Payment unsuccessful", description: "Your purchase has not been confirmed.", variant: "destructive" });
       });
+      // Release the dialog's pointer/focus lock before Razorpay mounts its iframe.
+      flushSync(() => setOpen(false));
       checkout.open();
     } catch (error) {
       setBusy(false);
+      setOpen(true);
       toast({ title: "Could not open checkout", description: error instanceof Error ? error.message : "Please try again.", variant: "destructive" });
     }
   };
@@ -114,7 +120,7 @@ export default function GermanyProgram({ checkoutSection = false }: { checkoutSe
           <p className="mt-2 text-4xl font-semibold text-foreground">₹3,35,000</p>
           <p className="mt-3 text-sm font-medium text-foreground">Last payment date: <time dateTime={germanyProgram.paymentDeadline}>{germanyProgram.paymentDeadlineLabel}</time></p>
           {checkoutSection ? (
-            <Button className="mt-5 w-full gap-2" size="lg" onClick={() => setOpen(true)}>
+            <Button className="mt-5 w-full gap-2" size="lg" disabled={busy} onClick={() => setOpen(true)}>
               {purchased ? "View purchase" : "Buy program"}<ArrowUpRight className="h-4 w-4" />
             </Button>
           ) : (
@@ -124,7 +130,7 @@ export default function GermanyProgram({ checkoutSection = false }: { checkoutSe
         </div>
       </div>
       <Dialog open={open} onOpenChange={(value) => { if (!busy) setOpen(value); }}>
-        <DialogContent className="sm:max-w-md">
+        {open && <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{purchased ? "Germany program purchase" : "Germany Program"}</DialogTitle>
             <DialogDescription>Lunorsoft in collaboration with Parul University</DialogDescription>
@@ -153,7 +159,7 @@ export default function GermanyProgram({ checkoutSection = false }: { checkoutSe
               <Button className="w-full gap-2" disabled={busy || checking} onClick={() => void buy()}>{busy || checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />} {busy ? "Processing…" : "Pay ₹3,35,000 with Razorpay"}</Button>
             </div>
           )}
-        </DialogContent>
+        </DialogContent>}
       </Dialog>
     </section>
   );
